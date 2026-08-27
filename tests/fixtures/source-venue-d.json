@@ -1,0 +1,442 @@
+{
+ "works_count": 4045,
+ "summary_stats": {
+  "2yr_mean_citedness": 1.4435483870967742,
+  "h_index": 93,
+  "i10_index": 1202
+ },
+ "is_oa": false,
+ "is_in_doaj": false,
+ "is_core": true,
+ "apc_usd": 4550,
+ "topics": [
+  {
+   "id": "https://openalex.org/T11537",
+   "display_name": "Ethics in medical practice",
+   "count": 1422,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T14437",
+   "display_name": "Ethics and Legal Issues in Pediatric Healthcare",
+   "count": 574,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2735",
+    "display_name": "Pediatrics, Perinatology and Child Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11953",
+   "display_name": "Neuroethics, Human Enhancement, Biomedical Innovations",
+   "count": 421,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2805",
+    "display_name": "Cognitive Neuroscience"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/28",
+    "display_name": "Neuroscience"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11156",
+   "display_name": "Reproductive Health and Technologies",
+   "count": 389,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2743",
+    "display_name": "Reproductive Medicine"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10582",
+   "display_name": "Ethics in Clinical Research",
+   "count": 376,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13048",
+   "display_name": "Patient Dignity and Privacy",
+   "count": 369,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13417",
+   "display_name": "Biomedical Ethics and Regulation",
+   "count": 361,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2737",
+    "display_name": "Physiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10177",
+   "display_name": "Palliative Care and End-of-Life Issues",
+   "count": 260,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11163",
+   "display_name": "Organ Donation and Transplantation",
+   "count": 188,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13638",
+   "display_name": "Human auditory perception and evaluation",
+   "count": 135,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2202",
+    "display_name": "Aerospace Engineering"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/22",
+    "display_name": "Engineering"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/3",
+    "display_name": "Physical Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12520",
+   "display_name": "Psychology of Moral and Emotional Judgment",
+   "count": 133,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2805",
+    "display_name": "Cognitive Neuroscience"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/28",
+    "display_name": "Neuroscience"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10804",
+   "display_name": "Health Systems, Economic Evaluations, Quality of Life",
+   "count": 113,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2002",
+    "display_name": "Economics and Econometrics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/20",
+    "display_name": "Economics, Econometrics and Finance"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13370",
+   "display_name": "Diverse Scientific and Economic Studies",
+   "count": 98,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2002",
+    "display_name": "Economics and Econometrics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/20",
+    "display_name": "Economics, Econometrics and Finance"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11388",
+   "display_name": "Grief, Bereavement, and Mental Health",
+   "count": 97,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3203",
+    "display_name": "Clinical Psychology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/32",
+    "display_name": "Psychology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12339",
+   "display_name": "Medical Malpractice and Liability Issues",
+   "count": 90,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3611",
+    "display_name": "Pharmacy"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10297",
+   "display_name": "Philosophical Ethics and Theory",
+   "count": 86,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1211",
+    "display_name": "Philosophy"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/12",
+    "display_name": "Arts and Humanities"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10718",
+   "display_name": "Political Philosophy and Ethics",
+   "count": 82,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3320",
+    "display_name": "Political Science and International Relations"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/33",
+    "display_name": "Social Sciences"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11678",
+   "display_name": "Healthcare Decision-Making and Restraints",
+   "count": 82,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3203",
+    "display_name": "Clinical Psychology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/32",
+    "display_name": "Psychology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12308",
+   "display_name": "Mental Health and Psychiatry",
+   "count": 78,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1211",
+    "display_name": "Philosophy"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/12",
+    "display_name": "Arts and Humanities"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13555",
+   "display_name": "Healthcare cost, quality, practices",
+   "count": 74,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13076",
+   "display_name": "Torture, Ethics, and Law",
+   "count": 71,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3312",
+    "display_name": "Sociology and Political Science"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/33",
+    "display_name": "Social Sciences"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T14090",
+   "display_name": "Health and Conflict Studies",
+   "count": 69,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12788",
+   "display_name": "Space Science and Extraterrestrial Life",
+   "count": 61,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3103",
+    "display_name": "Astronomy and Astrophysics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/31",
+    "display_name": "Physics and Astronomy"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/3",
+    "display_name": "Physical Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11997",
+   "display_name": "Free Will and Agency",
+   "count": 55,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2805",
+    "display_name": "Cognitive Neuroscience"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/28",
+    "display_name": "Neuroscience"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T14335",
+   "display_name": "Educational Robotics and Engineering",
+   "count": 54,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1702",
+    "display_name": "Artificial Intelligence"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/17",
+    "display_name": "Computer Science"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/3",
+    "display_name": "Physical Sciences"
+   }
+  }
+ ],
+ "display_name": "Venue D",
+ "id": "https://openalex.org/S000004",
+ "_note": "Real OpenAlex topic distribution and counts, with the journal's identity removed. See SPEC.md 0b."
+}

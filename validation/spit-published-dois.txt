@@ -1,0 +1,10 @@
+# Published papers with a known venue, from PaperTrail (read 27 Aug 2026).
+# Used by `dovetail validate-ranking` to answer the half of the question the
+# Phase 0 validation could not: do high scores track venues that said yes?
+10.3389/ijph.2025.1608617
+10.1007/s40889-025-00227-2
+10.1080/09515089.2025.2532761
+10.1007/s12152-025-09601-9
+10.2196/79290
+10.2196/33735
+10.1016/j.ssaho.2026.102865

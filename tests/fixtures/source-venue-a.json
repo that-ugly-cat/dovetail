@@ -1,0 +1,442 @@
+{
+ "works_count": 356,
+ "summary_stats": {
+  "2yr_mean_citedness": 2.25,
+  "h_index": 32,
+  "i10_index": 155
+ },
+ "is_oa": false,
+ "is_in_doaj": false,
+ "is_core": true,
+ "apc_usd": null,
+ "topics": [
+  {
+   "id": "https://openalex.org/T10582",
+   "display_name": "Ethics in Clinical Research",
+   "count": 139,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11537",
+   "display_name": "Ethics in medical practice",
+   "count": 94,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T14437",
+   "display_name": "Ethics and Legal Issues in Pediatric Healthcare",
+   "count": 50,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2735",
+    "display_name": "Pediatrics, Perinatology and Child Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10177",
+   "display_name": "Palliative Care and End-of-Life Issues",
+   "count": 42,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10827",
+   "display_name": "Patient-Provider Communication in Healthcare",
+   "count": 35,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10769",
+   "display_name": "BRCA gene mutations in cancer",
+   "count": 31,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1311",
+    "display_name": "Genetics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/13",
+    "display_name": "Biochemistry, Genetics and Molecular Biology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13417",
+   "display_name": "Biomedical Ethics and Regulation",
+   "count": 26,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2737",
+    "display_name": "Physiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11639",
+   "display_name": "Mental Health and Patient Involvement",
+   "count": 23,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10978",
+   "display_name": "Prenatal Screening and Diagnostics",
+   "count": 22,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2735",
+    "display_name": "Pediatrics, Perinatology and Child Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T13048",
+   "display_name": "Patient Dignity and Privacy",
+   "count": 22,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11642",
+   "display_name": "Genomics and Rare Diseases",
+   "count": 20,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1311",
+    "display_name": "Genetics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/13",
+    "display_name": "Biochemistry, Genetics and Molecular Biology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11678",
+   "display_name": "Healthcare Decision-Making and Restraints",
+   "count": 17,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3203",
+    "display_name": "Clinical Psychology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/32",
+    "display_name": "Psychology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12749",
+   "display_name": "Race, Genetics, and Society",
+   "count": 17,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1311",
+    "display_name": "Genetics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/13",
+    "display_name": "Biochemistry, Genetics and Molecular Biology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10804",
+   "display_name": "Health Systems, Economic Evaluations, Quality of Life",
+   "count": 15,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2002",
+    "display_name": "Economics and Econometrics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/20",
+    "display_name": "Economics, Econometrics and Finance"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10629",
+   "display_name": "Health Policy Implementation Science",
+   "count": 13,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11649",
+   "display_name": "Pharmaceutical industry and healthcare",
+   "count": 13,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3004",
+    "display_name": "Pharmacology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/30",
+    "display_name": "Pharmacology, Toxicology and Pharmaceutics"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11953",
+   "display_name": "Neuroethics, Human Enhancement, Biomedical Innovations",
+   "count": 13,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2805",
+    "display_name": "Cognitive Neuroscience"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/28",
+    "display_name": "Neuroscience"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/1",
+    "display_name": "Life Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11163",
+   "display_name": "Organ Donation and Transplantation",
+   "count": 12,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12339",
+   "display_name": "Medical Malpractice and Liability Issues",
+   "count": 12,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3611",
+    "display_name": "Pharmacy"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10254",
+   "display_name": "Innovations in Medical Education",
+   "count": 10,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11156",
+   "display_name": "Reproductive Health and Technologies",
+   "count": 10,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2743",
+    "display_name": "Reproductive Medicine"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11430",
+   "display_name": "Disaster Response and Management",
+   "count": 10,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3604",
+    "display_name": "Emergency Medical Services"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11058",
+   "display_name": "Ethics in Business and Education",
+   "count": 9,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1802",
+    "display_name": "Information Systems and Management"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/18",
+    "display_name": "Decision Sciences"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11141",
+   "display_name": "Childhood Cancer Survivors' Quality of Life",
+   "count": 9,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2735",
+    "display_name": "Pediatrics, Perinatology and Child Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11999",
+   "display_name": "Empathy and Medical Education",
+   "count": 9,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2738",
+    "display_name": "Psychiatry and Mental health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  }
+ ],
+ "display_name": "Venue A",
+ "id": "https://openalex.org/S000001",
+ "_note": "Real OpenAlex topic distribution and counts, with the journal's identity removed. See SPEC.md 0b."
+}

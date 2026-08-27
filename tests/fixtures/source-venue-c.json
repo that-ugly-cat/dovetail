@@ -1,0 +1,442 @@
+{
+ "works_count": 35216,
+ "summary_stats": {
+  "2yr_mean_citedness": 4.548086956521739,
+  "h_index": 291,
+  "i10_index": 20950
+ },
+ "is_oa": true,
+ "is_in_doaj": true,
+ "is_core": true,
+ "apc_usd": 3290,
+ "topics": [
+  {
+   "id": "https://openalex.org/T10010",
+   "display_name": "Obesity, Physical Activity, Diet",
+   "count": 3359,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10235",
+   "display_name": "Health disparities and outcomes",
+   "count": 2128,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3306",
+    "display_name": "Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/33",
+    "display_name": "Social Sciences"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10352",
+   "display_name": "Physical Activity and Health",
+   "count": 2127,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2737",
+    "display_name": "Physiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10082",
+   "display_name": "HIV/AIDS Research and Interventions",
+   "count": 2094,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2725",
+    "display_name": "Infectious Diseases"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10209",
+   "display_name": "Global Maternal and Child Health",
+   "count": 2014,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2735",
+    "display_name": "Pediatrics, Perinatology and Child Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10327",
+   "display_name": "Adolescent Sexual and Reproductive Health",
+   "count": 1681,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10596",
+   "display_name": "Child Nutrition and Water Access",
+   "count": 1671,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2916",
+    "display_name": "Nutrition and Dietetics"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/29",
+    "display_name": "Nursing"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10060",
+   "display_name": "Smoking Behavior and Cessation",
+   "count": 1526,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2737",
+    "display_name": "Physiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10168",
+   "display_name": "COVID-19 and Mental Health",
+   "count": 1419,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3203",
+    "display_name": "Clinical Psychology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/32",
+    "display_name": "Psychology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10833",
+   "display_name": "Vaccine Coverage and Hesitancy",
+   "count": 1354,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3306",
+    "display_name": "Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/33",
+    "display_name": "Social Sciences"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10027",
+   "display_name": "Diabetes, Cardiovascular Risks, and Lipoproteins",
+   "count": 1344,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2712",
+    "display_name": "Endocrinology, Diabetes and Metabolism"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11084",
+   "display_name": "Workplace Health and Well-being",
+   "count": 1280,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10043",
+   "display_name": "Substance Abuse Treatment and Outcomes",
+   "count": 1134,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2713",
+    "display_name": "Epidemiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10410",
+   "display_name": "COVID-19 epidemiological studies",
+   "count": 862,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2611",
+    "display_name": "Modeling and Simulation"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/26",
+    "display_name": "Mathematics"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/3",
+    "display_name": "Physical Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10866",
+   "display_name": "Nutritional Studies and Diet",
+   "count": 860,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2739",
+    "display_name": "Public Health, Environmental and Occupational Health"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10793",
+   "display_name": "Diabetes Management and Education",
+   "count": 838,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2712",
+    "display_name": "Endocrinology, Diabetes and Metabolism"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10762",
+   "display_name": "Migration, Health and Trauma",
+   "count": 788,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3203",
+    "display_name": "Clinical Psychology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/32",
+    "display_name": "Psychology"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11446",
+   "display_name": "Mobile Health and mHealth Applications",
+   "count": 778,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T12816",
+   "display_name": "Global Public Health Policies and Epidemiology",
+   "count": 775,
+   "subfield": {
+    "id": "https://openalex.org/subfields/1407",
+    "display_name": "Organizational Behavior and Human Resource Management"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/14",
+    "display_name": "Business, Management and Accounting"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11860",
+   "display_name": "HIV, Drug Use, Sexual Risk",
+   "count": 768,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2713",
+    "display_name": "Epidemiology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11531",
+   "display_name": "Healthcare Systems and Reforms",
+   "count": 763,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2003",
+    "display_name": "Finance"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/20",
+    "display_name": "Economics, Econometrics and Finance"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/2",
+    "display_name": "Social Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10629",
+   "display_name": "Health Policy Implementation Science",
+   "count": 743,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10556",
+   "display_name": "Global Cancer Incidence and Screening",
+   "count": 736,
+   "subfield": {
+    "id": "https://openalex.org/subfields/2730",
+    "display_name": "Oncology"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/27",
+    "display_name": "Medicine"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T11610",
+   "display_name": "Food Security and Health in Diverse Populations",
+   "count": 729,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  },
+  {
+   "id": "https://openalex.org/T10737",
+   "display_name": "Health Literacy and Information Accessibility",
+   "count": 721,
+   "subfield": {
+    "id": "https://openalex.org/subfields/3600",
+    "display_name": "General Health Professions"
+   },
+   "field": {
+    "id": "https://openalex.org/fields/36",
+    "display_name": "Health Professions"
+   },
+   "domain": {
+    "id": "https://openalex.org/domains/4",
+    "display_name": "Health Sciences"
+   }
+  }
+ ],
+ "display_name": "Venue C",
+ "id": "https://openalex.org/S000003",
+ "_note": "Real OpenAlex topic distribution and counts, with the journal's identity removed. See SPEC.md 0b."
+}

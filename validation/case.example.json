@@ -1,0 +1,23 @@
+{
+  "_note": "Public example so the script runs for anyone. Replace with your own case, or copy to case.local.json and edit; case.local.json is gitignored and wins when present.",
+  "title": "Artificial intelligence and the future of scholarly publishing",
+  "abstract": "Large language models are being adopted across the scholarly publishing workflow, from manuscript screening to peer review support and copy editing. This paper reviews the current uses, the evidence on their reliability, and the governance questions they raise for editors and publishers. We argue that the main risks are not technical but institutional: the erosion of accountability when a judgement is produced by a system nobody can interrogate, and the quiet transfer of editorial discretion to vendors.",
+  "panel": [
+    {
+      "issn": "0269-9702",
+      "outcome": "untried"
+    },
+    {
+      "issn": "1472-6939",
+      "outcome": "untried"
+    },
+    {
+      "issn": "1471-2458",
+      "outcome": "untried"
+    },
+    {
+      "issn": "0306-6800",
+      "outcome": "untried"
+    }
+  ]
+}
