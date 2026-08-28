@@ -168,10 +168,13 @@ def _maybe_user(request: Request, s: Session) -> User | None:
 
 @app.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, s: Session = Depends(get_db)):
-    if auth.gateway_mode():
-        # Behind the gate there is nothing to type: either the proxy vouched for
-        # the caller or it did not.
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+    # In gateway mode this page must **render**, not redirect to "/".
+    #
+    # "/" is among Caddy's public paths, so the gate never fires there: the app
+    # sees no identity, sends the visitor to /login, and /login used to send them
+    # back to "/". That is an infinite loop, and it is what anyone opening the
+    # bare domain got. So here the page draws a way *into* the gate instead —
+    # a link to a path that is not public, which is what makes forward_auth run.
     return page(request, "login.html", None, error=None)
 
 

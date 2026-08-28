@@ -195,3 +195,17 @@ def test_there_is_no_default_secret(monkeypatch):
     monkeypatch.delenv("JWT_SECRET", raising=False)
     with pytest.raises(RuntimeError, match="JWT_SECRET"):
         auth.secret_key()
+
+
+def test_the_root_does_not_loop_in_gateway_mode(client, monkeypatch):
+    """`/` is public in Caddy, so the gate never fires there. The app sees no
+    identity, sends the visitor to /login — and /login used to send them back to
+    `/`. Anyone opening the bare domain got an infinite redirect, and it only
+    appeared once the deploy switched to gateway mode.
+    """
+    monkeypatch.setenv("AUTH_MODE", "gateway")
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert "Continue with Borant ID" in r.text
+    # And no password form to fill in, since there is nothing to type.
+    assert 'type="password"' not in r.text

@@ -2,6 +2,15 @@
 {% block body %}
 <h1>Dovetail</h1>
 <p class="sub">Where to send a paper.</p>
+{% if gateway %}
+<div class="card" style="max-width:26rem">
+  <p>This instance is behind Borant ID. There is nothing to type: the gateway
+  vouches for you, or it does not.</p>
+  <p><a class="btn" href="/venues">Continue with Borant ID</a></p>
+  <p class="dim">That link goes to a page the gateway protects, which is what
+  makes it ask who you are.</p>
+</div>
+{% else %}
 <div class="card" style="max-width:26rem">
   <form method="post" action="/login">
     <p><label>Email<br><input name="email" type="email" required autofocus style="width:100%"></label></p>
@@ -10,6 +19,5 @@
     <button type="submit">Sign in</button>
   </form>
 </div>
-<p class="note">Running standalone. Behind Borant ID there is nothing to type here:
-the gateway vouches for you, or it does not.</p>
+{% endif %}
 {% endblock %}
