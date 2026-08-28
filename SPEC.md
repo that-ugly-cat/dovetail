@@ -361,6 +361,19 @@ assente o scaduto**; la venue resta, marcata `da verificare`, e sale in cima all
 soglia minima di scope. Se meno di tre passano i vincoli, Dovetail restituisce anche le escluse
 dicendo quale vincolo le ha tolte: una lista vuota non è una risposta.
 
+**E il taglio produce tre cestini, non uno.** `shortlist`, `excluded` (mostrate perché meno di tre
+sono passate), `unclassifiable` (nessun profilo, quindi nessun punteggio applicabile). La CLI li ha
+sempre stampati sotto tre intestazioni; la **persistenza li concatenava** con un unico contatore
+progressivo, buttando via il cestino un passo dopo che `cut` l'aveva calcolato.
+
+Il difetto si è visto il 28 ago 2026, alla prima corsa dopo il form che dichiara una rivista a mano:
+*Future of Science and Ethics*, senza profilo e con punteggio 0.0000, è uscita alla **posizione 13 di
+una shortlist tagliata a dodici**. Il suo zero significa «non lo so»; letto come ultima riga di una
+lista ordinata dice «la peggiore fra quelle trovate». Ora `match_result` porta il cestino, le
+posizioni numerano **dentro** il cestino, e nessuna superficie li mette in fila insieme —
+`explain_match` compreso, perché un modello che legge `position: 13` ha lo stesso problema di una
+persona e meno modi di accorgersene.
+
 **Stadio 5 — Lettura delle finaliste.** Nuovo in v0.3, e gira **solo** sulle venue sopravvissute al
 taglio. Due chiamate di natura diversa:
 
@@ -514,7 +527,7 @@ test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *
 ## 12. UI
 
 Sette schermate dietro il gate — la panoramica, l'elenco delle riviste, la scheda di una rivista con
-**una data per campo**, le consultazioni, una consultazione, la coda, gli utenti — più due form di
+**una data per campo**, le consultazioni, una consultazione, la coda, gli utenti — più tre form di
 scrittura e, davanti a tutto, una vetrina pubblica.
 
 ### La vetrina, e la regola che la tiene
@@ -585,6 +598,26 @@ chiamata: 100 per la classificazione, 25 per lo sweep, 10 per il raggruppamento 
 recupero dei record che quel raggruppamento nomina. Tetto 137. E un test legge il sorgente di
 `generate_candidates` e fallisce se chiama qualcosa che la stima non prezza — che è esattamente la
 deriva avvenuta, quindi è la cosa da intercettare invece di un commento che chiede di ricordarsene.
+
+### Il profilo di una rivista si costruisce dalla UI, e la coda non c'entra
+
+Fino al 28 ago `profile-venue` era solo CLI, quindi il form che dichiara una rivista era un **vicolo
+cieco**: si poteva creare una rivista dal web e non renderla mai punteggiabile, cioè produrre una
+riga che poteva soltanto uscire fra le non classificabili. Ora la scheda offre di costruire il
+profilo dagli articoli incollati — titolo sulla prima riga di un blocco, blocchi separati da `---`,
+perché chi compila sta copiando dal sito di una rivista e chiedergli di sfuggire le virgolette di un
+JSON sarebbe chiedergli di fare il lavoro della macchina.
+
+Sincrono, a differenza di una consultazione, ed è una differenza di scala e non di principio: cinque
+o dieci chiamate contro un centinaio. I controlli gratuiti stanno prima — lo stesso guard-rail dello
+stadio 1, perché un articolo troppo corto per essere classificato spenderebbe 100 crediti per
+aggiungere rumore, e il budget rifiutato col numero.
+
+Le due avvertenze che rendono leggibile un profilo costruito a mano restano dichiarate in pagina: il
+campione **è** tutto ciò che si sa, quindi `topics_coverage` resta vuota invece di far sembrare
+misurata una cosa non misurata; e poche decine di articoli danno un vettore piatto, che il coseno
+penalizza contro un manoscritto appuntito — di nuovo la proprietà di §16c, vista dal lato di chi il
+profilo lo costruisce.
 
 ### Dichiarare una rivista scrive dritto, e non passa dalla coda
 
