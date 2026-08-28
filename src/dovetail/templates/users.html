@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Users — Dovetail{% endblock %}
+{% block body %}
+<h1>Users</h1>
+<p class="sub">A reader looks. An admin spends the OpenAlex budget and turns proposals into facts.</p>
+<div class="card wrap"><table>
+  <tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th><th>Active</th></tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.email }}</td>
+    <td class="dim">{{ u.name or '—' }}</td>
+    <td class="dim">{{ 'Borant ID' if u.borant_sub else 'local' }}</td>
+    <td>
+      <form class="inline" method="post" action="/admin/users/{{ u.id }}/role">
+        <select name="role" onchange="this.form.submit()" {% if u.id == user.id %}disabled{% endif %}>
+          <option value="reader" {% if u.role.value == 'reader' %}selected{% endif %}>reader</option>
+          <option value="admin" {% if u.role.value == 'admin' %}selected{% endif %}>admin</option>
+        </select>
+      </form>
+      {% if u.id == user.id %}<span class="dim">you</span>{% endif %}
+    </td>
+    <td class="dim">{{ 'yes' if u.is_active else 'no' }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+<p class="note">You cannot remove your own admin role here. Locking yourself out is not a permission
+question, it is a mistake the app declines to make on your behalf.</p>
+{% endblock %}

@@ -360,3 +360,51 @@ def validate_against_published(
                 typer.echo(f"                {r.note}")
 
     typer.echo("\n" + json.dumps(summarise(results, top_n), indent=2, ensure_ascii=False))
+
+
+@app.command("create-user")
+def create_user(
+    email: str = typer.Option(..., help="Sign-in address."),
+    password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
+    role: str = typer.Option("reader", help="reader or admin."),
+    name: str = typer.Option(None),
+):
+    """Create a local user. Needed at least once: the web UI has no sign-up.
+
+    Behind Borant ID people arrive through the gate and this is only the way back
+    in when the gate is off — which is exactly why gateway-created users still
+    get a local password.
+    """
+    from .auth import hash_password
+    from .models import Role, User
+
+    db.init_engine()
+    with db.session_scope() as s:
+        if s.scalar(select(User).where(User.email == email.strip().lower())):
+            typer.secho(f"{email} already exists", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        u = User(
+            email=email.strip().lower(),
+            name=name or email,
+            hashed_password=hash_password(password),
+            role=Role(role),
+        )
+        s.add(u)
+        s.flush()
+        typer.echo(f"user #{u.id}: {u.email} · {u.role.value}")
+
+
+@app.command("serve")
+def serve(host: str = typer.Option("127.0.0.1"), port: int = typer.Option(8015)):
+    """Run the web UI.
+
+    Refuses to start without JWT_SECRET: a default secret is the same as no
+    secret, because everyone has it.
+    """
+    import uvicorn
+
+    from .auth import auth_mode, secret_key
+
+    secret_key()
+    typer.echo(f"auth mode: {auth_mode()}")
+    uvicorn.run("dovetail.web:app", host=host, port=port)

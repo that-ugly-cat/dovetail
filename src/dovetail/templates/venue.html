@@ -1,0 +1,66 @@
+{% extends "base.html" %}{% block title %}{{ venue.display_name }} — Dovetail{% endblock %}
+{% block body %}
+<h1>{{ venue.display_name }}</h1>
+<p class="sub">{{ venue.host_organization_name or 'Publisher not declared' }}
+  {% if venue.issn_l %}· <span class="mono">{{ venue.issn_l }}</span>{% endif %}
+  {% if venue.homepage_url %}· <a href="{{ venue.homepage_url }}">site</a>{% endif %}</p>
+
+<div class="grid">
+  <div class="card"><div class="dim">Open access</div>
+    <strong>{{ (venue.oa_model.value if venue.oa_model else 'unknown').replace('_',' ') }}</strong></div>
+  <div class="card"><div class="dim">APC</div>
+    <strong>{% if venue.apc_usd %}{{ venue.apc_usd }} USD{% else %}unknown{% endif %}</strong></div>
+  <div class="card"><div class="dim">Works / h-index</div>
+    <strong>{{ venue.works_count or '—' }} / {{ venue.h_index if venue.h_index is not none else '—' }}</strong></div>
+  <div class="card"><div class="dim">Time to publication</div>
+    <strong>{% if venue.publication_time_weeks %}{{ venue.publication_time_weeks }} weeks{% else %}—{% endif %}</strong>
+    <div class="dim" style="font-size:.8rem">self-declared, to publication — not the decision latency</div></div>
+</div>
+
+{% if venue.predatory_risk and venue.predatory_risk.get('flags') %}
+<div class="card"><strong class="{{ 'red' if venue.predatory_risk.level == 'high' else 'warn' }}">
+  Risk flags ({{ venue.predatory_risk.level }})</strong>
+  <ul class="dim">{% for f in venue.predatory_risk.flags %}<li>{{ f }}</li>{% endfor %}</ul>
+  <div class="dim">No single one of these convicts. Together they need a person to close them.</div>
+</div>
+{% endif %}
+
+<h2>Article types</h2>
+{% if article_types %}
+<div class="card wrap"><table>
+  <tr><th>Type</th><th>Words</th><th>What the count includes</th><th>Unsolicited</th><th>Checked</th></tr>
+  {% for a in article_types %}
+  <tr><td>{{ a.name }}</td><td>{{ a.word_limit or '—' }}</td>
+      <td class="dim">{{ a.word_limit_scope or 'not recorded' }}</td>
+      <td class="dim">{{ 'yes' if a.unsolicited else ('no' if a.unsolicited is not none else '—') }}</td>
+      <td class="dim">{{ a.verified_at.strftime('%d %b %Y') if a.verified_at else '—' }}</td></tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="dim">Nobody has read this journal's author guidelines yet. That is not the same as
+«it has no limits»: no API carries this field.</p>
+{% endif %}
+
+<h2>Scope, as published</h2>
+<div class="card">
+  {% for t in (venue.topics or [])[:12] %}
+  <div><strong>{{ t.count }}</strong> <span class="dim">{{ t.display_name }} — {{ t.subfield }}</span></div>
+  {% else %}<p class="dim">No profile. This journal cannot be scored: a zero here would mean
+  «no data», not «out of scope».</p>{% endfor %}
+  {% if venue.topics %}<div class="dim" style="margin-top:.5rem">Truncated to 25 by OpenAlex; on a
+  broad journal that is a fraction of what it publishes.</div>{% endif %}
+</div>
+
+<h2>Where each field came from</h2>
+<div class="card wrap"><table>
+  <tr><th>Field</th><th>Source</th><th>Checked</th></tr>
+  {% for v in venue.verifications|sort(attribute='field_name') %}
+  <tr><td class="mono">{{ v.field_name }}</td>
+      <td class="dim">{{ v.source }}</td>
+      <td class="dim">{{ v.verified_at.strftime('%d %b %Y') }}</td></tr>
+  {% endfor %}
+</table></div>
+<p class="note">Freshness belongs to a field, not to a record: a journal can carry topics from
+yesterday and a word limit from eight months ago. Anything older than {{ stale_days }} days is
+rechecked before it is trusted to exclude.</p>
+{% endblock %}

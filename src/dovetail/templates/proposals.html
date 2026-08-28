@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block title %}Queue — Dovetail{% endblock %}
+{% block body %}
+<h1>Queue</h1>
+<p class="sub">Nothing reaches the table without passing through here. Agents and scripts propose;
+a person decides.</p>
+
+<div class="card">
+  {% for st in ['pending','approved','rejected'] %}
+  <a href="/proposals?status_filter={{ st }}" class="{{ 'on' if status_filter == st }}">{{ st }}</a>
+  {% if not loop.last %}·{% endif %}
+  {% endfor %}
+</div>
+
+{% if not user.is_admin() %}
+<p class="note">You are signed in as a reader: you can see what is waiting, and approving it needs
+an admin. That is not a hidden button — the route itself declines.</p>
+{% endif %}
+
+{% for p in proposals %}
+<div class="card">
+  <div><span class="tag">{{ p.kind }}</span> <span class="tag">confidence: {{ p.confidence }}</span>
+    {% if p.venue_id and venues.get(p.venue_id) %}
+      · <a href="/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}</div>
+  <div class="mono dim" style="margin:.4rem 0">{{ p.fields }}</div>
+  <div style="white-space:pre-wrap">{{ p.rationale }}</div>
+  {% if p.source_url %}<div class="dim"><a href="{{ p.source_url }}">{{ p.source_url }}</a></div>{% endif %}
+  {% if p.status.value == 'pending' and user.is_admin() %}
+  <div style="margin-top:.6rem">
+    <form class="inline" method="post" action="/proposals/{{ p.id }}/approve"><button>Approve</button></form>
+    <form class="inline" method="post" action="/proposals/{{ p.id }}/reject"><button class="danger">Reject</button></form>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<p class="dim">Nothing {{ status_filter }}.</p>
+{% endfor %}
+{% endblock %}

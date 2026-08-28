@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Dovetail{% endblock %}</title>
+<style>
+ :root{--ink:#1b1b1b;--dim:#6b6b6b;--line:#e0ddd6;--bg:#faf9f7;--card:#fff;
+       --red:#a4342a;--warn:#8a6a1f;--ok:#2f6b46;--accent:#3a4f7a}
+ @media (prefers-color-scheme:dark){:root{--ink:#e9e6e0;--dim:#9a958c;--line:#33312d;
+       --bg:#17171a;--card:#1f1f22;--red:#e08b80;--warn:#d7b45a;--ok:#7fc79c;--accent:#93aada}}
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+ header{border-bottom:1px solid var(--line);background:var(--card)}
+ nav{max-width:1000px;margin:0 auto;padding:.7rem 1rem;display:flex;gap:1.1rem;align-items:baseline;flex-wrap:wrap}
+ nav .brand{font-weight:650;letter-spacing:-.01em}
+ nav a{color:var(--ink);text-decoration:none;opacity:.75}
+ nav a:hover,nav a.on{opacity:1;text-decoration:underline}
+ nav .right{margin-left:auto;color:var(--dim);font-size:.86rem;display:flex;gap:.7rem;align-items:baseline}
+ main{max-width:1000px;margin:0 auto;padding:1.4rem 1rem 4rem}
+ h1{font-size:1.35rem;margin:0 0 .2rem} h2{font-size:1.05rem;margin:1.8rem 0 .6rem}
+ .sub{color:var(--dim);margin:0 0 1.4rem}
+ .card{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:1rem;margin-bottom:.8rem}
+ table{width:100%;border-collapse:collapse;font-size:.92rem}
+ th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);vertical-align:top}
+ th{color:var(--dim);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+ .wrap{overflow-x:auto}
+ .dim{color:var(--dim)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em}
+ .tag{display:inline-block;padding:.06rem .42rem;border:1px solid var(--line);border-radius:99px;font-size:.76rem;color:var(--dim)}
+ .red{color:var(--red);font-weight:600} .warn{color:var(--warn)} .ok{color:var(--ok)}
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem}
+ .num{font-size:1.6rem;font-weight:650;letter-spacing:-.02em}
+ button,.btn{font:inherit;padding:.32rem .7rem;border:1px solid var(--line);border-radius:6px;
+      background:var(--card);color:var(--ink);cursor:pointer}
+ button:hover{border-color:var(--accent)}
+ button.danger:hover{border-color:var(--red);color:var(--red)}
+ input,select{font:inherit;padding:.35rem .5rem;border:1px solid var(--line);border-radius:6px;
+      background:var(--card);color:var(--ink)}
+ form.inline{display:inline}
+ .note{border-left:3px solid var(--line);padding:.2rem 0 .2rem .8rem;color:var(--dim);margin:.6rem 0}
+</style>
+</head>
+<body>
+{% if user %}
+<header><nav>
+  <span class="brand">Dovetail</span>
+  <a href="/">Overview</a>
+  <a href="/venues">Journals</a>
+  <a href="/runs">Consultations</a>
+  <a href="/proposals">Queue</a>
+  {% if user.is_admin() %}<a href="/admin/users">Users</a>{% endif %}
+  <span class="right">
+    <span>{{ user.email }} · <span class="tag">{{ user.role.value }}</span></span>
+    {% if gateway %}<span class="tag">Borant ID</span>
+    {% else %}<form class="inline" method="post" action="/logout"><button>Sign out</button></form>{% endif %}
+  </span>
+</nav></header>
+{% endif %}
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

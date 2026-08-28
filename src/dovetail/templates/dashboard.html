@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block title %}Overview — Dovetail{% endblock %}
+{% block body %}
+<h1>Overview</h1>
+<p class="sub">A list of candidate journals for a paper, with the criteria that hold each one up.</p>
+
+<div class="grid">
+  <div class="card"><div class="num">{{ venues }}</div><div class="dim">journals known</div></div>
+  <div class="card"><div class="num">{{ runs }}</div><div class="dim">consultations</div></div>
+  <div class="card"><div class="num {% if pending %}warn{% endif %}">{{ pending }}</div>
+    <div class="dim">waiting for a person</div></div>
+  <div class="card"><div class="num">{{ budget.classifications }}</div>
+    <div class="dim">classifications left today</div></div>
+</div>
+
+<div class="card">
+  <strong>OpenAlex budget</strong>
+  <div class="dim">{{ budget.spent }} of {{ budget.total }} credits spent, {{ budget.remaining }} left.
+  Resets at midnight UTC.
+  {% if not budget.keyed %}<span class="warn">No API key set: the anonymous budget is a tenth of what
+  a free account gets.</span>{% endif %}</div>
+</div>
+
+<h2>Recent consultations</h2>
+{% if recent %}
+<div class="card wrap"><table>
+  <tr><th>#</th><th>Manuscript</th><th>Constraints</th><th>When</th></tr>
+  {% for r in recent %}
+  <tr><td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+      <td>{{ r.title[:70] }}{% if r.refused_reason %} <span class="warn">— refused</span>{% endif %}</td>
+      <td class="dim mono">{% for k,v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}{{ k }}={{ v }} {% endif %}{% endfor %}</td>
+      <td class="dim">{{ r.created_at.strftime('%d %b %H:%M') }}</td></tr>
+  {% endfor %}
+</table></div>
+{% else %}<p class="dim">Nothing yet.</p>{% endif %}
+
+<p class="note">A consultation is a list, not a ranking: the score is computed against one paper and
+the set is whatever the sweep reached that day, so a position means nothing outside its own run.</p>
+{% endblock %}

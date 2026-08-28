@@ -1,0 +1,50 @@
+{% extends "base.html" %}{% block title %}Consultation {{ run.id }} — Dovetail{% endblock %}
+{% block body %}
+<h1>Consultation {{ run.id }}</h1>
+<p class="sub">{{ run.title }}</p>
+
+{% if run.refused_reason %}
+<div class="card"><strong class="warn">Refused, and no list was produced.</strong>
+<p class="dim">{{ run.refused_reason }}</p></div>
+{% endif %}
+
+{% set sweep = (run.constraints or {}).get('_sweep') %}
+{% if sweep %}
+<div class="card"><strong>Coverage</strong>
+  <div class="dim">{{ sweep.fetched }} journals looked at, out of a pool of {{ sweep.pool }},
+  in {{ sweep.pages }} pages{% if sweep.added_by_volume %}, plus {{ sweep.added_by_volume }} reached
+  by grouping works rather than by journal profile{% endif %}.
+  {% if sweep.truncated %}<span class="warn">The sweep was cut short: the list below is not the
+  whole pool.</span>{% else %}The whole pool was swept.{% endif %}</div>
+</div>
+{% endif %}
+
+<div class="card wrap"><table>
+  <tr><th></th><th>Journal</th><th>Topic</th><th>Subfield</th><th>Merit</th><th>Logistics</th></tr>
+  {% for row in rows %}
+  <tr>
+    <td class="dim">{{ row.result.position }}</td>
+    <td><a href="/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
+      {% if row.merit|length < 2 %}<span class="red"> — thin on merit</span>{% endif %}
+      {% if not row.result.score_topic and not row.result.score_subfield %}
+        <div class="dim">no profile: this is «I don't know», not «out of scope»</div>{% endif %}
+      {% for c in row.result.excluded_by or [] %}
+        <div class="{{ 'red' if c.outcome == 'excluded' else 'warn' }}">{{ c.outcome }} · {{ c.constraint }}:
+        <span class="dim">{{ c.reason }}</span></div>
+      {% endfor %}
+      {% for f in row.result.flags or [] %}<div class="dim">! {{ f }}</div>{% endfor %}
+    </td>
+    <td class="mono">{{ '%.4f'|format(row.result.score_topic) }}</td>
+    <td class="mono dim">{{ '%.4f'|format(row.result.score_subfield) }}</td>
+    <td>{% for c in row.merit %}<div>{{ c.label }}</div>{% else %}<span class="dim">—</span>{% endfor %}</td>
+    <td class="dim">{% for c in row.logistics %}<div>{{ c.label }}</div>{% else %}—{% endfor %}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+
+<p class="note">A journal standing on fewer than two criteria of merit is marked, however well it
+does on logistics. That rule comes from a real choice that rested on three logistical reasons and
+one about merit — and it was the one about merit that failed.</p>
+<p class="note">The score measures how <em>concentrated</em> a journal is on this subject, not how
+suitable it is. Those are different things, and the score itself is not yet validated.</p>
+{% endblock %}

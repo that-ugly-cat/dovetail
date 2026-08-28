@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Journals — Dovetail{% endblock %}
+{% block body %}
+<h1>Journals</h1>
+<p class="sub">Whatever past sweeps and hand-declared venues have put in the table. Not a census.</p>
+<div class="card">
+  <form method="get" action="/venues">
+    <input name="q" value="{{ q }}" placeholder="name or ISSN" style="min-width:18rem">
+    <button type="submit">Search</button>
+    <span class="dim">Lexical: a miss means «not with these words», never «does not exist».</span>
+  </form>
+</div>
+<div class="card wrap"><table>
+  <tr><th>Journal</th><th>ISSN</th><th>Open access</th><th>APC</th><th>ANVUR</th><th>Risk</th></tr>
+  {% for v in venues %}
+  <tr>
+    <td><a href="/venues/{{ v.id }}">{{ v.display_name }}</a>
+        <div class="dim">{{ v.host_organization_name or 'publisher not declared' }}</div></td>
+    <td class="mono dim">{{ v.issn_l or '—' }}</td>
+    <td>{{ (v.oa_model.value if v.oa_model else '—').replace('_',' ') }}</td>
+    <td class="dim">{% if v.apc_usd %}{{ v.apc_usd }} USD{% else %}<span class="dim">unknown</span>{% endif %}</td>
+    <td class="dim mono">{{ v.anvur_class or '—' }}</td>
+    <td>{% set lvl = (v.predatory_risk or {}).get('level') %}
+        {% if lvl == 'high' %}<span class="red">high</span>
+        {% elif lvl == 'low' %}<span class="warn">low</span>
+        {% else %}<span class="dim">—</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+<p class="note">An unknown APC is not a free journal: the field is missing on roughly nine journals
+in ten, which is why no constraint here excludes on it.</p>
+{% endblock %}

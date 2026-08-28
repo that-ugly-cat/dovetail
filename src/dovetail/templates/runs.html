@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Consultations — Dovetail{% endblock %}
+{% block body %}
+<h1>Consultations</h1>
+<p class="sub">Each one is kept with the profile it used and a snapshot of the journals it scored,
+so an outcome can be read back against the data of the day and not of today.</p>
+<div class="card wrap"><table>
+  <tr><th>#</th><th>Manuscript</th><th>Words</th><th>Constraints</th><th>Results</th><th>When</th></tr>
+  {% for r in runs %}
+  <tr><td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+      <td>{{ r.title[:64] }}{% if r.refused_reason %}<div class="warn">refused: {{ r.refused_reason[:90] }}</div>{% endif %}</td>
+      <td class="dim">{{ r.word_count or '—' }}</td>
+      <td class="dim mono">{% for k,v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}{{ k }}={{ v }} {% endif %}{% endfor %}</td>
+      <td class="dim">{{ r.results|length }}</td>
+      <td class="dim">{{ r.created_at.strftime('%d %b %H:%M') }}</td></tr>
+  {% else %}<tr><td colspan="6" class="dim">No consultations yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

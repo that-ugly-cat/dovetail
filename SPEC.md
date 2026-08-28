@@ -504,10 +504,51 @@ test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *
 
 ## 12. UI
 
-Quattro schermate: la coda delle proposte (la sola che scrive), il registro delle consultazioni con
-i loro esiti, la scheda di una venue con le date di verifica per campo, e lo stato del budget.
+Cinque schermate: la coda, le consultazioni passate, la scheda di una rivista con **una data per
+campo**, l'elenco delle riviste, e gli utenti. Più la via d'ingresso.
 
----
+### Due livelli, e la divisione è per quanto costano
+
+**Reader** guarda: riviste, consultazioni, coda, il ragionamento dietro una lista. Niente di ciò che
+fa spende crediti OpenAlex o cambia un fatto.
+
+**Admin** esegue consultazioni (che spendono da un budget giornaliero condiviso), dichiara riviste a
+mano, e approva la coda. Approvare è quella che conta: è il punto in cui un suggerimento diventa
+qualcosa che il tool ripeterà come vero.
+
+### Standalone o dietro Borant ID
+
+`AUTH_MODE` vale `local` (predefinito) o `gateway`, ed è il pattern di casa già usato da PaperTrail e
+LSSR: JWT in cookie httpOnly, sette giorni, segreto da `JWT_SECRET` e **il processo non parte senza**,
+perché un segreto predefinito equivale a nessun segreto — ce l'hanno tutti.
+
+Il default è `local` di proposito. Un'app che crede a un header d'identità senza niente davanti fa
+entrare chiunque sappia mandare quell'header: la via gateway resta codice morto finché qualcuno non
+l'accende sapendo cosa fa, e anche allora gli header si leggono **solo** se la connessione viene da
+`BORANT_TRUSTED_PROXY`, che sotto Docker è il gateway del bridge e *non* 127.0.0.1.
+
+Quattro regole che il codice tiene e che i test proteggono:
+
+- **Lookup per `borant_sub`, mai per email.** Un refuso nel pannello di qualcun altro non deve poter
+  consegnare a una persona l'account di un'altra.
+- **Uno sconosciuto vouchato entra come reader.** È innocuo per costruzione: un reader non spende e
+  non approva, quindi il caso peggiore è una riga in più e uno schermo in sola lettura.
+- **Un hint non riconosciuto è un refuso, non un ruolo**, e non concede niente oltre a una riga di log.
+- **In gateway l'header vince sul cookie**, sempre: un cookie rimasto non deve sopravvivere a una
+  sessione che il gate ha revocato.
+
+E il caso che ha fatto emergere un difetto vero, scoperto da un test: se il gate presenta un soggetto
+la cui **email esiste già** in locale — cioè l'ordinaria accensione del gate su un'app che aveva già
+utenti — collegare i due sarebbe esattamente ciò che la regola vieta, e morire sul vincolo di unicità
+non è una risposta. Ora nasce un profilo separato sotto un indirizzo sintetico, con una riga di log
+che chiede a una persona di unirli a mano.
+
+### L'autorizzazione sta in una dependency, mai nei template
+
+`require_admin` è la porta; un template riceve `user` e decide soltanto cosa disegnare. Nascondere un
+bottone lasciando la rotta aperta non è un permesso, è una decorazione sopra un permesso — ed è il
+difetto che il fratello maggiore di questo repo ha fatto una volta e ha scritto. C'è un test che posta
+direttamente sulla rotta con un reader e pretende **403**.
 
 ## 13. Fuori dalla v1
 

@@ -66,6 +66,22 @@ class CriterionKind(str, enum.Enum):
     LOGISTICS = "logistics"
 
 
+class Role(str, enum.Enum):
+    """Two levels, and the split is by what they cost, not by seniority.
+
+    A reader looks: venues, past consultations, the queue, the reasoning behind a
+    list. Nothing a reader does spends OpenAlex credits or changes a fact.
+
+    An admin runs consultations (which spend from a shared daily budget),
+    declares venues by hand, and approves what is in the queue. Approving is the
+    one that matters: it is the point where a suggestion becomes something the
+    tool will repeat as true.
+    """
+
+    READER = "reader"
+    ADMIN = "admin"
+
+
 class Venue(Base):
     __tablename__ = "venue"
 
@@ -300,3 +316,30 @@ class BudgetLedger(Base):
     provider: Mapped[str] = mapped_column(String(32), default="openalex")
     credits_used: Mapped[int] = mapped_column(Integer, default=0)
     calls: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class User(Base):
+    """A person who can open the web UI.
+
+    `borant_sub` is the subject the gate vouches for, and it is the only key the
+    gateway path looks users up by. Never email: a typo in someone else's admin
+    panel must not be able to hand one person another person's account.
+
+    Users created through the gate still get a local password — a random one
+    nobody knows — because `AUTH_MODE=local` has to stay a working way back in,
+    and a row with no password is not a way back.
+    """
+
+    __tablename__ = "app_user"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(256))
+    hashed_password: Mapped[str] = mapped_column(String(256))
+    borant_sub: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    role: Mapped[Role] = mapped_column(Enum(Role), default=Role.READER)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    def is_admin(self) -> bool:
+        return self.role is Role.ADMIN
