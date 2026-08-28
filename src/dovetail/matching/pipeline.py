@@ -255,16 +255,25 @@ def run_match(
     discover: bool = True,
     precomputed_profile: dict | None = None,
     doaj: DoajClient | None = None,
+    run: MatchRun | None = None,
 ) -> tuple[MatchRun, list[Row], list[Row], list[Row]]:
     constraints = constraints or {}
-    run = MatchRun(
-        title=title,
-        abstract=abstract,
-        word_count=word_count,
-        constraints=constraints,
-        scoring_config_version=config.SCORING_CONFIG_VERSION,
-    )
-    session.add(run)
+    if run is None:
+        run = MatchRun(
+            title=title,
+            abstract=abstract,
+            word_count=word_count,
+            constraints=constraints,
+            scoring_config_version=config.SCORING_CONFIG_VERSION,
+        )
+        session.add(run)
+    else:
+        # A row the caller created and committed before starting, so it had an
+        # id to send the browser to while this was still running. Its constraints
+        # are overwritten rather than merged: the sweep report goes in there too,
+        # and the caller only wrote what the form asked for.
+        run.constraints = constraints
+        run.scoring_config_version = config.SCORING_CONFIG_VERSION
 
     # The profile can be reused: redoing it costs 100 credits, i.e. a hundred
     # /sources calls, and it is the spend the daily budget caps at ten.

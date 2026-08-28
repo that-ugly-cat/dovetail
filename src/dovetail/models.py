@@ -219,6 +219,22 @@ class MatchRun(Base):
     scoring_config_version: Mapped[str | None] = mapped_column(String(32))
     refused_reason: Mapped[str | None] = mapped_column(Text)
 
+    # `running` | `done` | `refused` | `failed`.
+    #
+    # A run started from the web answers before it has finished — a full sweep
+    # is a hundred-odd calls — so the row exists while there is nothing in it
+    # yet. Without this column that state is indistinguishable from a run whose
+    # process died halfway, and the two want opposite reactions: wait, or look
+    # at what went wrong. Runs from the CLI are written straight as `done`,
+    # because there the caller waited.
+    status: Mapped[str] = mapped_column(String(16), default="done", server_default="done")
+    # The failure, as a code plus whatever the library said, never as a
+    # ready-made sentence: the module producing it does not know what language
+    # it will be read in.
+    error_code: Mapped[str | None] = mapped_column(String(32))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     results: Mapped[list[MatchResult]] = relationship(

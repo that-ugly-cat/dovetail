@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Dovetail — where to send a paper{% endblock %}
+{% block body %}
+{# No `user` reaches this template, and no route hands it one. The button below
+   points at a **gated** path, which is what makes the Borant ID gate run: a page
+   that cannot recognise anyone, offering a link back to itself, is a ring nobody
+   gets into — and pointing at the gateway's own URL would wire Borant ID into an
+   app that has to keep working without it. One button covers all four cases. #}
+<div class="landing">
+  {% include "_showcase.html" %}
+  <div class="cta">
+    <a class="btn" href="/app">Open Dovetail</a>
+  </div>
+  <p class="muted small">Behind Borant ID where there is one, behind a password where there is not.
+  Either way the way in is the same link.</p>
+</div>
+{% endblock %}

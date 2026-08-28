@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Declare a journal — Dovetail{% endblock %}
+{% block body %}
+<h1>Declare a journal</h1>
+<p class="sub">For a journal that exists, publishes, and that no index covers. It goes straight into
+the table rather than through the queue — the queue is for what an agent <em>infers</em>, and here
+the person filling the form is the person who would approve it.</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<form method="post" action="/app/venues/new">
+  <div class="card">
+    <label>Name<input name="display_name" value="{{ form.display_name or '' }}" required></label>
+    <div class="row">
+      <label>ISSN-L<input name="issn_l" value="{{ form.issn_l or '' }}" placeholder="1234-5678"></label>
+      <label>Publisher<input name="host_organization_name" value="{{ form.host_organization_name or '' }}"></label>
+    </div>
+    <label>Homepage<input name="homepage_url" type="url" value="{{ form.homepage_url or '' }}"></label>
+
+    <div class="row">
+      <label>In DOAJ
+        <select name="is_in_doaj">
+          <option value="" {% if not form.is_in_doaj %}selected{% endif %}>unknown</option>
+          <option value="yes" {% if form.is_in_doaj == 'yes' %}selected{% endif %}>yes</option>
+          <option value="no" {% if form.is_in_doaj == 'no' %}selected{% endif %}>no</option>
+        </select>
+      </label>
+      <label>Open access
+        <select name="is_oa">
+          <option value="" {% if not form.is_oa %}selected{% endif %}>unknown</option>
+          <option value="yes" {% if form.is_oa == 'yes' %}selected{% endif %}>yes</option>
+          <option value="no" {% if form.is_oa == 'no' %}selected{% endif %}>no</option>
+        </select>
+      </label>
+      <label>APC in USD<input name="apc_usd" inputmode="numeric" value="{{ form.apc_usd or '' }}"></label>
+      <label>ANVUR band <span class="muted">— e.g. <code>11/C3:A</code></span>
+        <input name="anvur_class" value="{{ form.anvur_class or '' }}"></label>
+    </div>
+
+    <label>Where you checked <span class="muted">— goes onto the verification stamp</span>
+      <input name="note_url" type="url" value="{{ form.note_url or '' }}"></label>
+
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn" type="submit">Declare it</button>
+      <a class="btn btn-link" href="/app/venues">Cancel</a>
+    </div>
+  </div>
+</form>
+
+<p class="note"><strong>Unknown is a third answer, and it survives the form.</strong> Leaving
+«in DOAJ» or «open access» unknown is not the same as saying no: a constraint never excludes on a
+missing field, it marks the journal for checking. Ticking a box you have not verified would turn
+«nobody looked» into «no», which is the one substitution the whole tool is built to refuse.</p>
+<p class="note">A declared journal arrives <strong>unclassifiable</strong> and stays that way until it
+has a profile: it cannot be scored, and its zero means «I don't know». The profile is built from
+articles it actually published — <code>dovetail profile-venue</code> — which costs 100 credits per
+article, so five to ten from different years is the right size. Ten from one special issue describe
+that issue, not the journal.</p>
+{% endblock %}

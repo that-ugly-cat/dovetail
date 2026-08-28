@@ -1,32 +1,10 @@
 {% extends "base.html" %}{% block title %}Sign in — Dovetail{% endblock %}
 {% block body %}
 <div class="landing">
-  <h1 class="hero">Dovetail</h1>
-  <p class="lede">Where to send a paper. Given a title, an abstract and a word count, it produces a
-  list of candidate journals — with the criteria that hold each one up, sorted into merit and
-  logistics, and with the ones it cannot vouch for marked as such.</p>
-
-  <div class="cards">
-    <div class="card">
-      <h2>A list, not a ranking</h2>
-      <p>The score is computed against one paper, over whatever set the sweep reached that day. A
-      position means nothing outside its own run, so nothing here pretends otherwise.</p>
-    </div>
-    <div class="card">
-      <h2>Merit and logistics apart</h2>
-      <p>A journal held up only by open-access status and turnaround is marked, however well it does
-      on those. Breadth of audience is not fit of argument.</p>
-    </div>
-    <div class="card">
-      <h2>Missing is not excluded</h2>
-      <p>No constraint ever removes a journal on a field that is absent or out of date. It stays,
-      marked for checking, and goes to the front of the queue.</p>
-    </div>
-  </div>
-
+  {% include "_showcase.html" %}
   <div class="cta">
   {% if gateway %}
-    <a class="btn" href="/venues">Continue with Borant ID</a>
+    <a class="btn" href="/app">Continue with Borant ID</a>
     <p class="muted small" style="margin-top:12px">There is nothing to type: the gateway vouches for
     you, or it does not. That link goes to a page the gateway protects, which is what makes it ask.</p>
   {% else %}
@@ -38,6 +16,7 @@
         <button class="btn" type="submit" style="margin-top:8px">Sign in</button>
       </form>
     </div>
+    <p class="muted small">There is no sign-up. Accounts are created from the command line.</p>
   {% endif %}
   </div>
 </div>

@@ -79,6 +79,24 @@ it is protected by its own per-user API key and by nothing else. That middleware
 is the only thing between the open internet and a surface that spends the
 OpenAlex budget.
 
+**The block above did not change when the app moved to `/app`, and that is worth
+checking rather than trusting.** `path /` matches the bare root exactly, so
+everything under `/app` falls to the second `handle` and is gated — which is what
+the old `/venues`, `/runs` and `/proposals` did too. The public list is the list
+of paths where **no method needs to know who is asking**, and each of these still
+qualifies: `/` is a front page that never consults the user, `/login` cannot
+learn who is asking anyway, `/logout` only deletes a cookie, `/static/*` serves
+files, and `/mcp` carries its own key.
+
+Prove it from outside after deploying, because the failure is silent in the safe
+direction and invisible in the dangerous one:
+
+```bash
+curl -sI https://dovetail.borant.eu/ | head -1              # 200, no gate
+curl -sI https://dovetail.borant.eu/app | head -1           # 302 to id.borant.eu
+curl -s  https://dovetail.borant.eu/app | grep -c borant    # the gate's page, not ours
+```
+
 ## 4. First users
 
 The web UI has no sign-up. Create at least one admin, then hand out keys:
@@ -126,7 +144,28 @@ src.backup(dst); dst.close(); src.close()"
 
 The path inside the container is `/app/data/`, not `/data/`.
 
-## 7. What is not deployed
+## 7. The schema moves with the code
+
+`docker compose up -d --build` runs `alembic upgrade head` before the app starts,
+so an ordinary deploy carries its own migrations. The one added on 28 Aug 2026
+puts `status`, `error_code`, `error_detail` and `finished_at` on `match_run`, and
+stamps every existing row `done` — every run recorded before it came from the
+CLI, where the caller waited for it.
+
+It matters because a consultation started from the web answers **before** it has
+finished: the sweep is a hundred-odd calls and the better part of a minute, so
+the row is committed as `running`, the browser is sent to it, and the work
+continues off the request. Without that column a run still going and a run whose
+process died look identical, and they want opposite reactions.
+
+If the app comes up before the migration has run, the symptom is `no such column:
+match_run.status` on every page that lists runs. Check with:
+
+```bash
+docker exec dovetail python -m dovetail.cli init-db
+```
+
+## 8. What is not deployed
 
 `venue_history` is not implemented: it would read PaperTrail, which needs a key
 server-side. That is a decision about what this box may reach, not a coding task,

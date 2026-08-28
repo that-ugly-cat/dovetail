@@ -6,6 +6,12 @@
   {% if venue.country_code %}· {{ venue.country_code }}{% endif %}
   {% if venue.homepage_url %}· <a href="{{ venue.homepage_url }}" rel="noreferrer">site</a>{% endif %}</p>
 
+{% if declared %}
+<div class="flash ok"><strong>Declared.</strong> It is in the table, stamped <code>manual</code> and
+dated. It stays <strong>unclassifiable</strong> — it cannot be scored and its zero means «I don't
+know» — until it has a profile built from articles it actually published.</div>
+{% endif %}
+
 <div class="btnrow" style="margin-bottom:16px">
   {% if venue.is_core %}<span class="badge ok">core</span>
   {% else %}<span class="badge warn">not flagged core</span>{% endif %}
@@ -107,7 +113,7 @@ through the queue and never from a sweep.</p></div>
   <tbody>
   {% for res, run in appearances %}
   <tr>
-    <td><a class="name" href="/runs/{{ run.id }}">{{ run.title[:70] }}</a></td>
+    <td><a class="name" href="/app/runs/{{ run.id }}">{{ run.title[:70] }}</a></td>
     <td class="n muted">{{ res.position }}</td>
     <td class="n mono">{{ '%.4f'|format(res.score_topic) }}</td>
     <td class="n mono muted">{{ '%.4f'|format(res.score_subfield) }}</td>

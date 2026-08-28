@@ -1,0 +1,27 @@
+{# The public copy, in one place.
+   Both the front page and the sign-in page show it, and neither of them may
+   look at who is reading: on the public branch of Caddy the identity headers
+   are stripped by construction, so a `{% if user %}` in here would be always
+   false behind the gate and sometimes true standalone. #}
+<h1 class="hero">Dovetail</h1>
+<p class="lede">Where to send a paper. Given a title, an abstract and a word count, it produces a list
+of candidate journals — with the criteria that hold each one up, sorted into merit and logistics, and
+with the ones it cannot vouch for marked as such.</p>
+
+<div class="cards">
+  <div class="card">
+    <h2>A list, not a ranking</h2>
+    <p>The score is computed against one paper, over whatever set the sweep reached that day. A
+    position means nothing outside its own run, so nothing here pretends otherwise.</p>
+  </div>
+  <div class="card">
+    <h2>Merit and logistics apart</h2>
+    <p>A journal held up only by open-access status and turnaround is marked, however well it does on
+    those. Breadth of audience is not fit of argument.</p>
+  </div>
+  <div class="card">
+    <h2>Missing is not excluded</h2>
+    <p>No constraint ever removes a journal on a field that is absent or out of date. It stays,
+    marked for checking, and goes to the front of the queue.</p>
+  </div>
+</div>

@@ -6,17 +6,18 @@
 <title>{% block title %}Dovetail{% endblock %}</title>
 <link rel="stylesheet" href="/static/css/style.css?v={{ ASSETS }}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🪵</text></svg>">
+{% block head_extra %}{% endblock %}
 </head>
 <body>
 {% if user %}
 <div class="topbar">
-  <a class="brand" href="/">Dovetail</a>
+  <a class="brand" href="/app">Dovetail</a>
   <nav>
-    <a href="/" class="{{ 'on' if nav == 'overview' }}">Overview</a>
-    <a href="/venues" class="{{ 'on' if nav == 'venues' }}">Journals</a>
-    <a href="/runs" class="{{ 'on' if nav == 'runs' }}">Consultations</a>
-    <a href="/proposals" class="{{ 'on' if nav == 'proposals' }}">Queue{% if pending_count %} <span class="dot">{{ pending_count }}</span>{% endif %}</a>
-    {% if user.is_admin() %}<a href="/admin/users" class="{{ 'on' if nav == 'users' }}">Users</a>{% endif %}
+    <a href="/app" class="{{ 'on' if nav == 'overview' }}">Overview</a>
+    <a href="/app/venues" class="{{ 'on' if nav == 'venues' }}">Journals</a>
+    <a href="/app/runs" class="{{ 'on' if nav == 'runs' }}">Consultations</a>
+    <a href="/app/proposals" class="{{ 'on' if nav == 'proposals' }}">Queue{% if pending_count %} <span class="dot">{{ pending_count }}</span>{% endif %}</a>
+    {% if user.is_admin() %}<a href="/app/admin/users" class="{{ 'on' if nav == 'users' }}">Users</a>{% endif %}
     <span class="who">{{ user.email }}</span>
     <span class="badge {{ 'accent' if user.is_admin() }}">{{ user.role.value }}</span>
     {% if gateway %}<span class="badge">Borant ID</span>

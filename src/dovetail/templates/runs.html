@@ -1,31 +1,38 @@
 {% extends "base.html" %}{% block title %}Consultations — Dovetail{% endblock %}
 {% block body %}
-<h1>Consultations</h1>
+<div class="head">
+  <h1>Consultations</h1>
+  {% if user.is_admin() %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
+</div>
 <p class="sub">Each one is kept with the profile it used and a snapshot of the journals it scored, so
 an outcome can be read back against the data of the day and not of today.</p>
 
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>#</th><th>Manuscript</th><th class="n">Words</th><th>Constraints</th>
-    <th class="n">Shortlisted</th><th>When</th>
+    <th class="n">Shortlisted</th><th>Status</th><th>When</th>
   </tr></thead>
   <tbody>
   {% for r in runs %}
   <tr {% if r.refused_reason %}class="dim"{% endif %}>
-    <td class="n"><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+    <td class="n"><a href="/app/runs/{{ r.id }}">{{ r.id }}</a></td>
     <td>
-      <a class="name" href="/runs/{{ r.id }}">{{ r.title[:90] }}</a>
+      <a class="name" href="/app/runs/{{ r.id }}">{{ r.title[:90] }}</a>
       {% if r.refused_reason %}<div class="warn small">refused: {{ r.refused_reason[:120] }}</div>{% endif %}
     </td>
     <td class="n muted">{{ '{:,}'.format(r.word_count) if r.word_count else '—' }}</td>
     <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
     <td class="n muted">{{ counts.get(r.id, 0) }}</td>
+    <td>{% if r.status == 'running' %}<span class="badge warn">running</span>
+        {% elif r.status == 'failed' %}<span class="badge danger">{{ r.error_code }}</span>
+        {% elif r.status == 'refused' %}<span class="badge warn">refused</span>
+        {% else %}<span class="muted small">done</span>{% endif %}</td>
     <td class="muted small">{{ r.created_at.strftime('%d %b %Y, %H:%M') }}</td>
   </tr>
   {% else %}
-  <tr><td colspan="6" class="empty">
-    No consultation has been run yet. They start from the CLI or over MCP —
-    <code>dovetail match --title … --abstract-file …</code>
+  <tr><td colspan="7" class="empty">
+    No consultation has been run yet.
+    {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>, or run it from the CLI or over MCP.{% else %}Starting one needs an admin: it spends the shared OpenAlex budget.{% endif %}
   </td></tr>
   {% endfor %}
   </tbody>

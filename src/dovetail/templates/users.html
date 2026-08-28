@@ -13,7 +13,7 @@ The split is by what a thing <em>costs</em>, not by seniority.</p>
     <td class="muted">{{ u.name or '—' }}</td>
     <td>{% if u.borant_sub %}<span class="badge">Borant ID</span>{% else %}<span class="badge">local</span>{% endif %}</td>
     <td>
-      <form class="inline" method="post" action="/admin/users/{{ u.id }}/role">
+      <form class="inline" method="post" action="/app/admin/users/{{ u.id }}/role">
         <select name="role" onchange="this.form.submit()" {% if u.id == user.id %}disabled{% endif %} style="width:auto">
           <option value="reader" {% if u.role.value == 'reader' %}selected{% endif %}>reader</option>
           <option value="admin" {% if u.role.value == 'admin' %}selected{% endif %}>admin</option>

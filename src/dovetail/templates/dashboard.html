@@ -36,12 +36,12 @@ zeros mean opposite things. That is why they are counted apart here and marked a
   <div class="stat">
     <div class="n">{{ runs_total }}</div>
     <div class="lbl">consultations</div>
-    <div class="foot"><a href="/runs">all of them</a></div>
+    <div class="foot"><a href="/app/runs">all of them</a></div>
   </div>
   <div class="stat">
     <div class="n {% if pending %}warn{% endif %}">{{ pending }}</div>
     <div class="lbl">waiting for a person</div>
-    <div class="foot"><a href="/proposals">the queue</a></div>
+    <div class="foot"><a href="/app/proposals">the queue</a></div>
   </div>
   <div class="stat">
     <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
@@ -60,16 +60,17 @@ zeros mean opposite things. That is why they are counted apart here and marked a
 of what a free account gets. The key has to be created by hand; the tool does not register accounts.</div>
 {% endif %}
 
-<h2>Recent consultations</h2>
+<div class="head"><h2>Recent consultations</h2>
+  {% if user.is_admin() %}<a class="btn btn-small" href="/app/runs/new">New consultation</a>{% endif %}</div>
 {% if recent %}
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr><th>#</th><th>Manuscript</th><th>Constraints</th><th class="n">Shortlisted</th><th>When</th></tr></thead>
   <tbody>
   {% for r in recent %}
   <tr>
-    <td class="n"><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+    <td class="n"><a href="/app/runs/{{ r.id }}">{{ r.id }}</a></td>
     <td>
-      <a class="name" href="/runs/{{ r.id }}">{{ r.title[:80] }}</a>
+      <a class="name" href="/app/runs/{{ r.id }}">{{ r.title[:80] }}</a>
       {% if r.refused_reason %}<div class="warn small">refused — no list was produced</div>{% endif %}
     </td>
     <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
@@ -82,8 +83,9 @@ of what a free account gets. The key has to be created by hand; the tool does no
 {% else %}
 <div class="card">
   <p class="muted" style="margin-top:0">No consultation has been run on this instance yet.</p>
-  <p class="muted small" style="margin-bottom:0">They are started from the CLI or over MCP:
-  <code>dovetail match --title … --abstract-file …</code></p>
+  <p class="muted small" style="margin-bottom:0">{% if user.is_admin() %}<a href="/app/runs/new">Start one</a> —
+  it spends from the budget above, and the screen says how much before you press it.
+  {% else %}Starting one needs an admin: it spends the shared OpenAlex budget.{% endif %}</p>
 </div>
 {% endif %}
 

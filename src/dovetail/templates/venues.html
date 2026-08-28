@@ -3,11 +3,14 @@
 {% block body %}
 {% macro qs(over) %}{% set a = dict(args, **over) %}?{% for k, v in a.items() %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}{% endmacro %}
 
-<h1>Journals</h1>
+<div class="head">
+  <h1>Journals</h1>
+  {% if user.is_admin() %}<a class="btn" href="/app/venues/new">Declare a journal</a>{% endif %}
+</div>
 <p class="sub">Whatever past sweeps and hand-declared venues have put in the table. Not a census.</p>
 
 <div class="card">
-  <form class="searchbar" method="get" action="/venues">
+  <form class="searchbar" method="get" action="/app/venues">
     <input class="q" name="q" value="{{ args.q }}" placeholder="name or ISSN">
     <select name="oa">
       <option value="">any access</option>
@@ -40,7 +43,7 @@
     </select>
     <button class="btn btn-small" type="submit">Filter</button>
     {% if args.q or args.oa or args.doaj or args.profile or args.core or args.risk %}
-      <a class="btn btn-link btn-small" href="/venues">Clear</a>
+      <a class="btn btn-link btn-small" href="/app/venues">Clear</a>
     {% endif %}
   </form>
   <p class="muted small" style="margin:10px 0 0">Search is lexical: a miss means «not with these
@@ -69,7 +72,7 @@
   {% for v in venues %}
   <tr>
     <td>
-      <a class="name" href="/venues/{{ v.id }}">{{ v.display_name }}</a>
+      <a class="name" href="/app/venues/{{ v.id }}">{{ v.display_name }}</a>
       {% if not v.is_core %}<span class="badge warn" title="type:journal includes news bulletins">not core</span>{% endif %}
       <div class="muted small">{{ v.host_organization_name or 'publisher not declared' }}</div>
     </td>

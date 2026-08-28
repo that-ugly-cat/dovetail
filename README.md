@@ -11,6 +11,24 @@ with two roles. Deployed on borant at port 8021, standalone or behind Borant ID.
 The spec is in [SPEC.md](SPEC.md) — written in Italian, as the design document — and §17 records
 what changed after the adversarial review.
 
+## The web UI
+
+`/` is a public front page that **never looks at who is reading it**, with one button into the app
+at `/app`. That shape is shared with the other borant tools, and the reason is not tidiness: on the
+gateway's public branch the identity headers are stripped by construction, so a front page that
+consulted the user would be always-logged-out behind the gate and sometimes-logged-in standalone —
+one page with two behaviours, and the difference invisible to every test that runs locally.
+
+Inside, five screens and two roles. A **reader** looks; an **admin** starts consultations, declares
+journals by hand, and turns queue entries into facts. The split is by what a thing *costs*, not by
+seniority — and it is enforced in a dependency, never in a template, because hiding a button while
+leaving the route open is a decoration over a permission.
+
+Everything that spends says how much **before** the button, from the rate-limit figures OpenAlex
+publishes: a cost seen afterwards is not a decision. A consultation started here answers before it
+has finished — the sweep takes the better part of a minute — so its page says `running` and reloads
+itself until the row says otherwise.
+
 ## What it does
 
 Given a manuscript it produces a list of candidate venues, each with its article type,

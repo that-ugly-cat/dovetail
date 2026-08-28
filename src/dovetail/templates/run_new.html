@@ -1,0 +1,67 @@
+{% extends "base.html" %}{% block title %}New consultation — Dovetail{% endblock %}
+{% block body %}
+<h1>New consultation</h1>
+<p class="sub">Title, abstract and word count in; a list of candidate journals out. This is the one
+screen that spends the shared OpenAlex budget, which is why it needs an admin.</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <h2>What it will cost, before you press it</h2>
+  <div class="table-wrap"><table class="table">
+    <tbody>
+    <tr><td>Classifying the manuscript <span class="muted small">— <code>/text/topics</code>, once</span></td>
+        <td class="n">{{ estimate.classify }} credits</td></tr>
+    <tr><td>Sweeping for candidates <span class="muted small">— up to {{ estimate.sweep_pages }} pages of 200, a ceiling and not a bill</span></td>
+        <td class="n">≤ {{ estimate.sweep }} credits</td></tr>
+    <tr><td>Enriching the finalists from DOAJ</td><td class="n">free</td></tr>
+    <tr><td><strong>At most</strong></td><td class="n"><strong>{{ estimate.total }}</strong></td></tr>
+    <tr><td class="muted">Left today</td>
+        <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small" style="margin-bottom:0">Every figure comes from the rate-limit headers
+  OpenAlex returns, so this is arithmetic and not a guess. The budget resets at midnight UTC.</p>
+</div>
+
+<form method="post" action="/app/runs/new">
+  <div class="card">
+    <label>Title<input name="title" value="{{ form.title or '' }}" required></label>
+    <label>Abstract
+      <textarea name="abstract" rows="10" required
+        placeholder="At least {{ min_words }} words.">{{ form.abstract or '' }}</textarea>
+    </label>
+    <p class="muted small" style="margin:-4px 0 0">Below {{ min_words }} words the classification is
+    unstable — the same paper cut to one sentence comes back with topics <em>disjoint</em> from those
+    of the full abstract — so Dovetail refuses rather than guesses. Above 2000 characters the API
+    refuses instead, and the text is cut at a word boundary with the number of dropped characters
+    recorded on the run.</p>
+
+    <div class="row">
+      <label>Word count <span class="muted">— optional, used by the word-limit constraint</span>
+        <input name="word_count" inputmode="numeric" value="{{ form.word_count or '' }}"></label>
+      <label>Funder <span class="muted">— e.g. <code>snsf</code></span>
+        <input name="funder" value="{{ form.funder or '' }}"></label>
+      <label>Maximum APC in USD <span class="muted">— optional</span>
+        <input name="max_apc" inputmode="numeric" value="{{ form.max_apc or '' }}"></label>
+    </div>
+
+    <label class="check"><input type="checkbox" name="discover" {% if form.discover is not defined or form.discover %}checked{% endif %}>
+      Sweep OpenAlex for new candidates <span class="muted small">— unticked, it scores only the journals already in the table</span></label>
+    <label class="check"><input type="checkbox" name="doaj" {% if form.doaj is not defined or form.doaj %}checked{% endif %}>
+      Enrich the finalists from DOAJ <span class="muted small">— free, one call per shortlisted journal</span></label>
+
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn" type="submit" {% if not estimate.affordable %}disabled{% endif %}>Run it</button>
+      <a class="btn btn-link" href="/app/runs">Cancel</a>
+    </div>
+  </div>
+</form>
+
+<p class="note">A constraint never removes a journal on a field that is missing or out of date — it
+marks it. So <em>funder</em> and <em>maximum APC</em> narrow the reading of the list, they do not
+prune it behind your back: everything they touch stays visible with the reason attached.</p>
+<p class="note">The sweep is a hundred-odd calls and takes the better part of a minute, so pressing
+the button sends you to the consultation's own page while it is still filling in. Closing the tab
+does not stop it.</p>
+{% endblock %}

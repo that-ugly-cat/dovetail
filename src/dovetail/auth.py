@@ -223,6 +223,22 @@ def current_user(
 ) -> User:
     user = user_or_none(request, db, session)
     if user is None:
+        if gateway_mode():
+            # Fail closed, and say so to the operator rather than to the visitor.
+            #
+            # Under the gate this route cannot be reached without an identity: if
+            # it was, `forward_auth` did not run, which is a configuration fault
+            # and not a visitor who needs to sign in. Answering 401 — or worse,
+            # redirecting to /login — would send them round a loop the app cannot
+            # break from the inside, because /login is on the public branch where
+            # the gate never fires. This is the answer Onopedia settled on.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "AUTH_MODE=gateway, but this request carried no identity. Either "
+                "Caddy is not running forward_auth on this path, or the request "
+                "did not come from BORANT_TRUSTED_PROXY — under Docker that is "
+                "the bridge gateway, not 127.0.0.1.",
+            )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     return user
 

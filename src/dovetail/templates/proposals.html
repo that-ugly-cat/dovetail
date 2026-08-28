@@ -6,7 +6,7 @@ a person decides.</p>
 
 <div class="filters">
   {% for st in ['pending', 'approved', 'rejected'] %}
-  <a class="chip {{ 'on' if status_filter == st }}" href="/proposals?status_filter={{ st }}">
+  <a class="chip {{ 'on' if status_filter == st }}" href="/app/proposals?status_filter={{ st }}">
     {{ st }}{% if counts.get(st) %} · {{ counts[st] }}{% endif %}</a>
   {% endfor %}
 </div>
@@ -22,7 +22,7 @@ an admin. That is not a hidden button — the route itself declines.</div>
     <span class="badge accent">{{ p.kind }}</span>
     <span class="badge {{ 'ok' if p.confidence == 'high' else ('warn' if p.confidence == 'low' else '') }}">confidence: {{ p.confidence }}</span>
     {% if p.venue_id and venues.get(p.venue_id) %}
-      <a class="chip" href="/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}
+      <a class="chip" href="/app/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}
     <span class="muted small" style="margin-left:auto">{{ p.created_at.strftime('%d %b %Y, %H:%M') }}</span>
   </div>
 
@@ -42,8 +42,8 @@ an admin. That is not a hidden button — the route itself declines.</div>
 
   {% if p.status.value == 'pending' and user.is_admin() %}
   <div class="btnrow" style="margin-top:14px">
-    <form class="inline" method="post" action="/proposals/{{ p.id }}/approve"><button class="btn btn-small">Approve</button></form>
-    <form class="inline" method="post" action="/proposals/{{ p.id }}/reject"><button class="btn btn-danger btn-small">Reject</button></form>
+    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/approve"><button class="btn btn-small">Approve</button></form>
+    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/reject"><button class="btn btn-danger btn-small">Reject</button></form>
   </div>
   {% endif %}
 </div>

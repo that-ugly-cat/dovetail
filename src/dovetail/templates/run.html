@@ -1,5 +1,11 @@
 {% extends "base.html" %}{% block title %}Consultation {{ run.id }} — Dovetail{% endblock %}
 {% block main_class %}wide{% endblock %}
+{% block head_extra %}
+{# A meta refresh and no JavaScript: the page has one state to watch and it
+   changes once. Only while the run is actually going, so a finished page does
+   not sit there reloading itself forever. #}
+{% if run.status == 'running' %}<meta http-equiv="refresh" content="5">{% endif %}
+{% endblock %}
 {% block body %}
 <div class="head">
   <h1>Consultation {{ run.id }}</h1>
@@ -10,11 +16,34 @@
 <div class="btnrow" style="margin-bottom:16px">
   {% if run.word_count %}<span class="badge">{{ '{:,}'.format(run.word_count) }} words</span>{% endif %}
   {% for k, v in (run.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge accent">{{ k }}: {{ v }}</span>{% endif %}{% endfor %}
-  <span class="badge">{{ rows|length }} shortlisted</span>
+  {% if run.status == 'running' %}<span class="badge warn">running</span>
+  {% elif run.status == 'failed' %}<span class="badge danger">failed</span>
+  {% elif run.status == 'refused' %}<span class="badge warn">refused</span>
+  {% else %}<span class="badge">{{ rows|length }} shortlisted</span>{% endif %}
 </div>
 
+{% if run.status == 'running' %}
+<div class="flash"><strong>Still running.</strong> The sweep is a hundred-odd calls and takes the
+better part of a minute. This page reloads itself every five seconds; closing it does not stop the
+run.</div>
+{% endif %}
+
+{% if run.status == 'failed' %}
+<div class="flash err">
+  <strong>The run failed — <code>{{ run.error_code }}</code>.</strong>
+  {% if run.error_code == 'budget' %}The daily OpenAlex budget ran out mid-run. It resets at midnight UTC.
+  {% elif run.error_code == 'endpoint_broken' %}An OpenAlex endpoint answered with an error that is not
+  about the budget, so waiting will not help — the call itself is broken.
+  {% elif run.error_code == 'openalex' %}OpenAlex refused a call.
+  {% else %}Something unforeseen went wrong, and whatever was written before it stopped is below.{% endif %}
+  {% if run.error_detail %}<div class="mono small" style="margin-top:8px">{{ run.error_detail }}</div>{% endif %}
+</div>
+{% endif %}
+
 {% if run.refused_reason %}
-<div class="flash err"><strong>Refused, and no list was produced.</strong><br>{{ run.refused_reason }}</div>
+<div class="flash"><strong>Refused, and no list was produced.</strong> Which is an answer, not a
+failure: below the threshold the classification is unstable enough that a shortlist would mean
+nothing.<br>{{ run.refused_reason }}</div>
 {% endif %}
 
 {% set dropped = (run.text_profile or {}).get('_dovetail_chars_dropped') %}
@@ -78,7 +107,7 @@ never cut. Everything below was measured against what remained.</div>
 <div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable %}unreachable{% endif %}">
   <div class="rhead">
     <span class="pos">{{ row.result.position }}</span>
-    <a class="vname" href="/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
+    <a class="vname" href="/app/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
     {% if row.merit|length < 2 %}<span class="badge danger">thin on merit</span>{% endif %}
     {% if not row.reachable %}<span class="badge warn">stage 2 would not have found it</span>{% endif %}
     {% if row.venue.oa_model %}<span class="badge">{{ row.venue.oa_model.value.replace('_', ' ') }}</span>{% endif %}
