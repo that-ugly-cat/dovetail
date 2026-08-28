@@ -139,6 +139,7 @@ class KeyRejected(RuntimeError):
 
 NEEDS_WORKSPACE = "needs_workspace"
 BAD_KEY = "bad_key"
+NO_CREDIT = "no_credit"
 
 
 def build_client(api_key: str, workspace_id: str | None = None):
@@ -165,6 +166,11 @@ def classify_api_error(exc) -> tuple[str, str]:
     """
     message = str(getattr(exc, "message", "") or exc)
     lowered = message.lower()
+    # Order matters: a credit failure also arrives as a 400, and answering it
+    # with "check your key" would send someone to look at the one thing that is
+    # not wrong.
+    if "credit" in lowered or "balance" in lowered:
+        return NO_CREDIT, message
     if "workspace" in lowered:
         return NEEDS_WORKSPACE, message
     if getattr(exc, "status_code", None) in (401, 403):

@@ -128,11 +128,17 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
 {% elif g.state == 'failed' %}
 <div class="flash err">
   {% if g.detail == 'needs_workspace' %}
-  <strong>Your Anthropic key needs a workspace id.</strong> It is an
-  <em>identity-linked</em> key, which belongs to you across several workspaces, so every request has
-  to name the one it acts in — and without it the API refuses even a call that asks the model to say
-  «ok». Add the id in <a href="/app/settings">settings</a>; it is in the Console URL when you are
-  inside a workspace. Nothing was spent and nothing partial was left behind.
+  <strong>Your Anthropic key needs a workspace id, and does not have a usable one.</strong> It is an
+  <em>identity-linked</em> key — scoped to «all workspaces» — so every request has to name the one it
+  acts in, and without it the API refuses even a call that asks the model to say «ok».
+  <div style="margin-top:8px">Two ways out, and the second is less work: put the id in
+  <a href="/app/settings">settings</a> (it must be the real identifier, not the slug in the Console
+  URL — <code>default</code> is refused), or issue a key scoped to <em>one</em> workspace instead,
+  which carries its own and needs nothing here.</div>
+  Nothing was spent and nothing partial was left behind.
+  {% elif g.detail == 'no_credit' %}
+  <strong>The Anthropic account has no credit left.</strong> This is your key and your balance, not
+  the shared OpenAlex budget — that one is untouched, and everything through stage 4 still works.
   {% elif g.detail == 'bad_key' %}
   <strong>The key was refused.</strong> Check it in <a href="/app/settings">settings</a> — it may
   have been revoked, or pasted with something missing.

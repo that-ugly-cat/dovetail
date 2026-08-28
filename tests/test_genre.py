@@ -365,3 +365,23 @@ def test_an_unrecognised_failure_keeps_its_class_name():
         message = "overloaded"
 
     assert genre.classify_api_error(FakeOverloaded())[0] == "FakeOverloaded"
+
+
+def test_no_credit_is_not_reported_as_a_bad_key():
+    """Both arrive as a 400, and answering one with the other's advice sends
+    somebody to check the single thing that is not wrong."""
+    class FakeNoCredit(Exception):
+        status_code = 400
+        message = "Your credit balance is too low to access the Anthropic API."
+
+    assert genre.classify_api_error(FakeNoCredit())[0] == genre.NO_CREDIT
+
+
+def test_a_slug_where_an_id_belongs_is_still_a_workspace_problem():
+    """Measured: `default` and `wrkspc_default` both come back «must be a valid
+    workspace ID», which is the same fix as having sent none."""
+    class FakeBadWorkspace(Exception):
+        status_code = 400
+        message = "anthropic-workspace-id header must be a valid workspace ID."
+
+    assert genre.classify_api_error(FakeBadWorkspace())[0] == genre.NEEDS_WORKSPACE
