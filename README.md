@@ -4,8 +4,9 @@ Finding the right journal for a paper, starting from title, abstract and word co
 
 The name is the dovetail joint: it holds because the two shapes match, not because it is glued.
 
-**Status: Phase 1 in progress.** Schema, OpenAlex and DOAJ ingestion, matcher stages 1 to 4,
-seeding from the PaperTrail vocabulary, CLI. No UI and no MCP yet: those are Phases 2 and 3.
+**Status: live** at [dovetail.borant.eu](https://dovetail.borant.eu), behind Borant ID. Schema, OpenAlex and DOAJ ingestion, matcher stages 1 to 4,
+seeding from the PaperTrail vocabulary, a CLI, an MCP surface behind per-user API keys, and a web UI
+with two roles. Deployed on borant at port 8021, standalone or behind Borant ID.
 
 The spec is in [SPEC.md](SPEC.md) — written in Italian, as the design document — and §17 records
 what changed after the adversarial review.

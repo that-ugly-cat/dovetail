@@ -494,6 +494,13 @@ Letture libere, **scritture solo come proposte**, approvazione in UI.
 | `propose_venue` / `propose_update` | depositano in coda, non scrivono | ✅ |
 | `venue_history(venue_id)` | cosa è già successo lì, da PaperTrail | ❌ **non implementato**: richiede una chiave PaperTrail lato server, che è una decisione di deploy e non di codice |
 
+**E la superficie porta una chiave propria.** Dietro Caddy `/mcp` sta fra le rotte
+`@pubbliche` — un client modello non ha browser né cookie — quindi **Borant ID non lo copre**. Un
+MCP che spende il budget OpenAlex e scrive in coda non può stare lì scoperto: ogni chiamata porta un
+`X-API-Key` per utente, hashato con SHA-256 e mostrato una volta sola. Il ruolo della chiave decide
+dentro i tool: un reader elenca tutto e legge, le chiamate che costano gli rispondono con una frase
+che spiega perché no.
+
 **Nessun tool approva.** È la garanzia che rende sicuro puntarci un agente, ed è protetta da un
 test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *delete* o *remove*.
 `approve-alias` resta sulla CLI finché non c'è la UI: proporre non è approvare, e la regola
@@ -543,6 +550,20 @@ la cui **email esiste già** in locale — cioè l'ordinaria accensione del gate
 utenti — collegare i due sarebbe esattamente ciò che la regola vieta, e morire sul vincolo di unicità
 non è una risposta. Ora nasce un profilo separato sotto un indirizzo sintetico, con una riga di log
 che chiede a una persona di unirli a mano.
+
+### Il ciclo che accendere il gateway ha creato
+
+Trovato al deploy, e non da un test: **aprire il dominio nudo dava un ciclo infinito di redirect.**
+`/` sta fra le rotte `@pubbliche`, quindi `forward_auth` lì **non scatta mai**; l'app non vede
+identità e manda a `/login`; e `/login`, in modalità gateway, rimandava a `/`.
+
+Nessuna delle due metà è sbagliata da sola, ed è per questo che è sopravvissuta a tutta la suite —
+che gira in modalità locale. Ora `/login` in gateway **disegna** invece di rimbalzare, e ciò che
+disegna è una via *dentro* il gate: un link a una rotta non pubblica, che è ciò che fa partire
+l'autenticazione. C'è un test che lo apre in gateway e pretende sia il link sia l'assenza del form.
+
+**La regola generalizzabile, che vale per chiunque entri nel perimetro:** se la radice è pubblica,
+il proprio `/login` non può rimandarci.
 
 ### L'autorizzazione sta in una dependency, mai nei template
 
@@ -617,15 +638,15 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
 
 ## 16. Fasi successive
 
-- **Fase 1** — schema DB, `venue_alias`, ingestione OpenAlex + DOAJ, matcher stadi 1-2 e stadio 3
+- **Fase 1 — fatta.** Schema DB, `venue_alias`, ingestione OpenAlex + DOAJ, matcher stadi 1-2 e stadio 3
   nella versione a topic, guard-rail, seed dalle venue di PaperTrail. Nessuna UI.
-- **Fase 1b, prima di fidarsi** — due cose insieme, perché si misurano l'una con l'altra:
-  **(a)** costruire i profili di embedding e verificare che battano i topic sul caso il caso e su
+- **Fase 1b — aperta, e da ridisegnare** (vedi §16c). Doveva essere: due cose insieme, perché si misurano l'una con l'altra:
+  **(a)** costruire i profili di embedding e verificare che battano i topic sul caso di riferimento e su
   almeno un secondo caso; **(b)** seconda validazione **con almeno un esito positivo** e col paniere
   **generato dal sistema**, non scelto a mano. Finché non passa, la shortlist è un suggerimento e
   l'output lo dichiara.
-- **Fase 2** — criteri merito/logistica, `predatory_risk`, vincoli, coda proposte, UI.
-- **Fase 3** — MCP, deploy borant, Borant ID.
+- **Fase 2 — fatta.** Criteri merito/logistica, `predatory_risk`, vincoli, coda proposte, UI a due livelli.
+- **Fase 3 — fatta, live dal 28 ago 2026.** MCP con chiavi per utente, deploy su borant alla porta **8021**, dietro Borant ID come tredicesima app del perimetro.
 - **Fase 4** — **stadio 5**: estrazione guidelines con Haiku e giudizio di genere con Sonnet, con
   entrambe le uscite che passano dalla coda di proposte. Poi anatomia e `venue_history`.
 
@@ -726,7 +747,7 @@ generaliste grandi che scompaiono. Il metro non misura «quanto è adatta questa
 
 ## 16b. Cosa ha trovato il primo giro live (27 ago 2026)
 
-Tre reperti dalla prima esecuzione vera del matcher sul caso il caso.
+Tre reperti dalla prima esecuzione vera del matcher sul caso di riferimento.
 
 **`type:journal` include telegiornali.** *FOX6 News Milwaukee* è uscita **decima in shortlist con
 tre criteri di merito**: 2811 «lavori», h-index 1, nessun editore. Corretto con il flag `is_core`
