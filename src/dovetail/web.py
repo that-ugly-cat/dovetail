@@ -47,13 +47,30 @@ from mcp.server.transport_security import TransportSecuritySettings  # noqa: E40
 from . import apikeys, mcp_server  # noqa: E402
 
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://localhost:8021")
+LOCAL_PORT = os.environ.get("DOVETAIL_PORT", "8021")
+
+
+def _allowed_hosts() -> list[str]:
+    """Hosts the MCP transport will answer to.
+
+    The check compares the whole `Host` header, **port included**, and a mismatch
+    is a 421 whose body says "Invalid Host header" and nothing about which URL is
+    wrong. Behind Caddy the header is the bare domain and matches; from the box
+    itself it is `localhost:8021`, so both spellings have to be here or nobody
+    can test the surface where it actually runs.
+    """
+    public = PUBLIC_URL.split("//")[-1].rstrip("/")
+    hosts = ["localhost", "127.0.0.1", public, f"{public}:{LOCAL_PORT}"]
+    hosts += [f"localhost:{LOCAL_PORT}", f"127.0.0.1:{LOCAL_PORT}"]
+    return sorted(set(h for h in hosts if h))
+
 
 _mcp_http = mcp_server.server.streamable_http_app(
     streamable_http_path="/",
     json_response=True,
     stateless_http=True,
     transport_security=TransportSecuritySettings(
-        allowed_hosts=["localhost", "127.0.0.1", PUBLIC_URL.split("//")[-1].rstrip("/")],
+        allowed_hosts=_allowed_hosts(),
         allowed_origins=[PUBLIC_URL],
     ),
 )
