@@ -1,8 +1,8 @@
-# Dovetail — SPEC v0.4
+# Dovetail — SPEC v0.5
 
 *Trovare la rivista giusta per un paper, partendo da titolo, abstract e word count.*
 *Creato: 27 agosto 2026 — Giovanni Spitale + Ono*
-*v0.4, 28 ago 2026: vetrina pubblica, la UI che esegue, e una stima sbagliata per difetto.*
+*v0.5, 28 ago 2026: stadio 5a, e la Fase 1b ridisegnata su misure che reggono.*
 *Storia delle revisioni in §17.*
 
 > **Lingua:** il codice, la CLI e i test sono **in inglese**; questo documento resta in italiano,
@@ -619,6 +619,44 @@ misurata una cosa non misurata; e poche decine di articoli danno un vettore piat
 penalizza contro un manoscritto appuntito — di nuovo la proprietà di §16c, vista dal lato di chi il
 profilo lo costruisce.
 
+### Stadio 5a — la domanda che il coseno non può fare
+
+Lo scope dice di **cosa** parla un paper; il genere dice **che forma** ha. Uno studio empirico e un
+saggio concettuale sullo stesso argomento hanno lo stesso coseno e stanno in riviste diverse — ed è
+esattamente il buco dei due desk reject del 2026, uno dei quali è tornato con «out of scope»
+attaccato a un paper il cui scope andava bene.
+
+Gira **solo sulle finaliste**, e tre regole lo tengono in piedi.
+
+**Non riordina mai.** Il verdetto sta accanto ai punteggi e uno positivo diventa un criterio di
+*merito*, che è la colonna di cui quei rifiuti erano scarsi; uno negativo resta una bandiera invece
+di essere travestito da vincolo misurato. Il giudizio non è riproducibile — richiesto due volte, la
+frase cambia — e una lista ordinata su qualcosa di non riproducibile non si può spiegare, che è ciò
+che `explain_match` promette. C'è un test che dà sì alla prima e no alla seconda, cioè la massima
+pressione a riordinare, e pretende che ogni posizione e ogni punteggio siano identici dopo.
+
+**Gli si dice quale domanda *non* gli si sta facendo.** Un modello a cui dai un manoscritto e una
+rivista risponde sull'argomento: è più facile, suona sicuro, e gli stadi 3 e 4 hanno già risposto. Il
+system prompt lo dice apertamente, e dice anche che il giudizio deve essere disposto a tornare
+**falso**, altrimenti l'intera passata è un timbro.
+
+**La chiave è per persona, non per macchina.** Il pattern di casa di AutoCode e LSSR: Fernet,
+decifrata in memoria quando gira un giudizio, mai loggata, mai ri-mostrata — né al proprietario né a
+chi gestisce il server. Un giudizio addebita l'account di chi ha premuto, e questa macchina non tiene
+credenziali di modello proprie: è la stessa domanda lasciata aperta per `venue_history`, risolta
+dall'altra parte perché qui un posto dove mettere la chiave c'è. A differenza di AutoCode il modulo è
+**pigro**: lo stadio 5 è opzionale, tutto fino allo stadio 4 funziona senza chiave, quindi un
+`FERNET_KEY` mancante è una funzione spenta e non un processo morto.
+
+Il costo sta prima del bottone in **due valute riportate separate**, perché escono da tasche diverse:
+chiamate al modello sulla chiave di una persona, crediti OpenAlex sul budget condiviso. Sommarle
+darebbe un numero che non significa niente. Misurato: dodici riviste, ~0,14 $, più 120 crediti per
+recuperare gli indici recenti — e l'indice si **cachea sulla venue** ed è datato come ogni altro
+campo, perché è inventario che cambia sul tempo di un fascicolo, non di una consultazione.
+
+Il manoscritto sta nel system prompt dietro un breakpoint di cache e la rivista nel messaggio utente,
+quindi undici chiamate su dodici leggono il manoscritto dalla cache.
+
 ### Dichiarare una rivista scrive dritto, e non passa dalla coda
 
 La coda esiste per ciò che un **agente** inferisce, dove chi approva non è chi ha proposto. Nel form
@@ -764,14 +802,78 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
   su `/` con l'app a `/app`, e la UI che **esegue**: consultazione con il costo dichiarato prima del
   bottone, e dichiarazione di una rivista a mano. Dettaglio in §12, e in §17 il difetto della stima
   che la prima corsa vera ha trovato.
-- **Fase 4** — **stadio 5**: estrazione guidelines con Haiku e giudizio di genere con Sonnet, con
-  entrambe le uscite che passano dalla coda di proposte. Poi anatomia e `venue_history`.
+- **Fase 1b — ridisegnata, 28 ago 2026.** Il disegno vecchio è **ritirato**: misurava un rango, che
+  la §0 dice non essere ciò che il tool produce, e confrontava due criteri invece di un criterio
+  contro la verità. Al suo posto due misure che non hanno quel problema — i **negativi noti** e la
+  **precisione a dodici giudicata in cieco**, col tasso sui decoy come controllo. Dettaglio in §16d.
+- **Fase 4** — **stadio 5a fatto** (giudizio di genere, §12); restano **5b** (estrazione guidelines
+  con Haiku, che vuole fetchare pagine web arbitrarie e un URL che per quasi tutte le venue non si
+  ha), l'anatomia e `venue_history`.
+
+**Sul modello dello stadio 5a.** La v0.3 diceva Sonnet 5 «perché è la chiamata difficile». È
+`claude-opus-5`, che è la stessa intenzione applicata al modello che oggi la soddisfa meglio; le
+chiamate sono dodici e corte, quindi la differenza di prezzo su una consultazione è di centesimi. Il
+modello viene **scritto su ogni verdetto**, così un giudizio riletto fra un anno dice cosa lo ha
+prodotto.
 
 **Ordine, e perché.** Lo stadio 5 è il pezzo che avrebbe evitato i desk reject del 2026, e sta in
 fondo lo stesso: senza inventario, profili e vincoli non ha finaliste da leggere, e farlo girare su
 259 candidate sarebbe la versione lenta e cara della stessa risposta. Se la Fase 1b dicesse che il
 punteggio di scope non separa niente, lo stadio 5 va anticipato e il resto del ranking degradato a
 filtro — quello è il bivio vero, e si decide con dei numeri, non adesso.
+
+---
+
+## 16d. Fase 1b ridisegnata (28 ago 2026)
+
+Il disegno vecchio — *in che posizione esce la rivista che ha davvero preso il paper* — non fallisce
+sull'aritmetica ma sulla domanda, due volte.
+
+**Misura un rango**, e la §0 dice che questo output non lo è: il punteggio si calcola contro un solo
+paper, l'insieme è quello che lo sweep ha pescato quel giorno, e «#447 su 3810» è un artefatto di
+quante candidate sono state recuperate. Misurare una posizione dentro quel denominatore eredita un
+significato che il tool ha già ritirato.
+
+**E confronta due criteri**, non un criterio contro la verità. Un paper finisce in una rivista per
+rapporti, inviti e velocità, che il tool non modella e non deve modellare. Quindi un disaccordo non
+si può leggere: può voler dire che il matcher sbaglia, o che il matcher ottimizza altro. È questo a
+renderla una cattiva misura, non il fatto che desse numeri scoraggianti.
+
+### Misura 1 — i negativi noti
+
+Il ground truth pulito non è «questa rivista ha detto sì», che è contaminato da tutto quanto sopra.
+È **«questa rivista ha detto no, fuori scope»**: un desk reject motivato sul fit è la dichiarazione
+della rivista sulla cosa che il tool modella. Una venue così che compare in shortlist è sbagliata in
+un modo che nessuno deve interpretare.
+
+`unreachable` e `below_cut` contano entrambi e **restano distinti**, perché dicono quale metà della
+pipeline ha fatto il lavoro: il primo significa che lo stadio 2 non l'avrebbe prodotta comunque
+fossero andati i punteggi, il secondo che è stata prodotta e poi non scelta. Il report dichiara in
+prosa che **limita i falsi positivi e basta** — non dice niente su quanto siano buone le riviste che
+il tool propone, che è il lavoro della misura 2.
+
+Vincolo sul dataset: solo rifiuti **sullo scope**. Un desk reject per lunghezza o per formato non
+dice niente sul fit e renderebbe il numero privo di senso.
+
+### Misura 2 — precisione a dodici, giudicata in cieco
+
+La promessa del prodotto è una lista che valga la pena guardare, quindi si misura se la lista valga
+la pena guardarla. Dodici finaliste mescolate con dodici decoy, spogliate di **punteggio, posizione,
+criteri e bandiere** — qualunque cosa il tool abbia calcolato direbbe al lettore quali righe sono
+sue, e la risposta misurerebbe l'accordo con un'etichetta invece del giudizio su una rivista.
+
+**Il tasso sui decoy è il reperto, non la precisione.** Chi dice sì a tutto fa 12 su 12 sulle
+finaliste, e solo il controllo lo mostra. C'è un test che simula esattamente quel giudice e pretende
+lift zero.
+
+E la prima scheda vera ha trovato un difetto nella misura stessa: pescando i decoy per **field**
+usciva *Learning Disability Quarterly* contro un paper sulla moderazione della disinformazione
+sanitaria, e un decoy che si scarta a colpo d'occhio è un punto regalato, non un controllo. Pescando
+per **subfield** escono *Digital Health*, *Informatics for Health and Social Care*, *Interactive
+Journal of Medical Research*. **La misura vale quanto sono duri i suoi decoy.**
+
+Il seed è esplicito e scritto sulla scheda: lo scoring ricostruisce lo stesso mescolamento invece di
+conservarlo, così niente su disco nel frattempo può dire al giudice la risposta.
 
 ---
 

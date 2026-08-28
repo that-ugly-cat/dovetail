@@ -165,7 +165,28 @@ match_run.status` on every page that lists runs. Check with:
 docker exec dovetail python -m dovetail.cli init-db
 ```
 
-## 8. What is not deployed
+## 8. Turning on stage 5a
+
+Stage 5a asks a model whether a journal publishes work of the same *kind* as a
+manuscript. It needs two things, and neither is a credential of this machine's.
+
+Set `FERNET_KEY` in `.env` and restart. That is the server's half: it lets the
+app store people's own Anthropic keys encrypted. Generate one with
+
+```bash
+docker exec dovetail python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+The other half is each person storing their key at `/app/settings`. A judgement
+bills the account of whoever pressed the button, and **this box holds no
+Anthropic credential of its own** — the same question left open for
+`venue_history`, settled the other way here because there is a place to put the
+key that belongs to a person rather than to the server.
+
+Losing `FERNET_KEY` means every stored key becomes unreadable and has to be
+entered again. Nothing else breaks: stages 1 to 4 never touch it.
+
+## 9. What is not deployed
 
 `venue_history` is not implemented: it would read PaperTrail, which needs a key
 server-side. That is a decision about what this box may reach, not a coding task,
