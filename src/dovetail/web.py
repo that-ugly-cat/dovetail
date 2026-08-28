@@ -12,10 +12,12 @@ it is the mistake this codebase's older sibling made once and wrote down.
 
 from __future__ import annotations
 
+import contextlib
+import os
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -38,7 +40,87 @@ from .proposals import ProposalError, approve, reject
 TEMPLATES = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES))
 
-app = FastAPI(title="Dovetail", docs_url=None, redoc_url=None)
+# The MCP transport is built before the app so its session manager exists: it is
+# created lazily by `streamable_http_app()`, and reaching for it earlier raises.
+from mcp.server.transport_security import TransportSecuritySettings  # noqa: E402
+
+from . import apikeys, mcp_server  # noqa: E402
+
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://localhost:8021")
+
+_mcp_http = mcp_server.server.streamable_http_app(
+    streamable_http_path="/",
+    json_response=True,
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=["localhost", "127.0.0.1", PUBLIC_URL.split("//")[-1].rstrip("/")],
+        allowed_origins=[PUBLIC_URL],
+    ),
+)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    """The MCP session manager has to run for the whole life of the process.
+
+    In a startup event instead of a lifespan the transport answers 500 without
+    saying why, which is one of the four ways a borant MCP deploy breaks. The
+    other three are the `@pubbliche` routes in Caddy, `PUBLIC_URL`, and the
+    trailing slash.
+    """
+    async with mcp_server.server.session_manager.run():
+        yield
+
+
+app = FastAPI(title="Dovetail", docs_url=None, redoc_url=None, lifespan=lifespan)
+app.mount("/mcp", _mcp_http)
+
+
+@app.middleware("http")
+async def mcp_api_key_gate(request: Request, call_next):
+    """`/mcp` is outside the Borant ID gate, so it carries its own key.
+
+    Caddy lists `/mcp` among the public paths — a model client has no browser and
+    no cookie — which means this middleware is the only thing between the open
+    internet and a surface that spends the OpenAlex budget. A missing or unknown
+    key is refused here, and the caller's role is what decides, inside the tools,
+    whether an expensive call goes through.
+    """
+    if not request.url.path.startswith("/mcp"):
+        return await call_next(request)
+
+    # The trailing slash, which is the fourth way one of these deploys breaks.
+    # The transport is mounted at /mcp with its own path of "/", so the real
+    # endpoint is "/mcp/" and a POST to "/mcp" earns a 307. A redirect on a POST
+    # is a bad thing to hand a client: some drop the body, some drop the
+    # Authorization header, and the failure looks like the server being broken.
+    # Rewriting here means both spellings work and nobody has to know.
+    if request.url.path == "/mcp":
+        request.scope["path"] = "/mcp/"
+        request.scope["raw_path"] = b"/mcp/"
+
+    key = request.headers.get("X-API-Key", "")
+    db.init_engine()
+    with db.session_scope() as s:
+        user = apikeys.resolve(s, key)
+        # Detached on purpose: the session closes with this block, and the tools
+        # open their own.
+        if user is not None:
+            s.expunge(user)
+    if user is None:
+        return JSONResponse({"error": "unknown or missing X-API-Key"}, status_code=401)
+
+    token = mcp_server.caller.set(user)
+    try:
+        return await call_next(request)
+    finally:
+        mcp_server.caller.reset(token)
+
+
+@app.get("/healthz")
+def healthz():
+    """Cheap and unauthenticated: it says the process is up, and nothing else."""
+    return {"ok": True}
 
 
 def get_db():

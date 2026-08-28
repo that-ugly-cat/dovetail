@@ -147,7 +147,8 @@ grammatica: sorgenti con *hints* in prosa, coda di proposte, **approvazione solo
 - **Mono-workspace**: nessun ACL, nessun parametro `workspace` nei tool MCP. Borant ID solo per il
   login alla UI. Se un giorno servirà a ITE si aggiunge un livello sopra; non si paga ora.
 - **`dovetail.borant.eu`** — record DNS creato il 27 ago 2026.
-- Porta **8015**, da confermare libera sul VPS al deploy (Contrarian 8014, LSSR 8013).
+- Porta **8021**. La 8015 era l'assunzione della v0.1 ed **era sbagliata**: è di GrantRadar,
+  verificato sul VPS il 28 ago 2026. Le 8010-8020 sono tutte occupate, la prima libera è la 8021.
 - Le quattro trappole note del deploy MCP borant valgono anche qui: lifespan, rotte `@pubbliche`,
   `PUBLIC_URL`, barra finale.
 

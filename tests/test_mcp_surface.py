@@ -73,3 +73,94 @@ def test_proposing_a_venue_without_a_name_is_refused(tmp_path, monkeypatch):
     monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "m2.db"))
     db.create_all(tmp_path / "m2.db")
     assert "error" in call("propose_venue", {"fields": {}, "rationale": "none"})
+
+
+# --- the HTTP gate --------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def http(tmp_path_factory):
+    """The app with two keys issued: `/mcp` behind Caddy is public, so this
+    middleware is the only thing in front of a surface that spends money.
+
+    Module-scoped, and not by preference: the MCP session manager refuses to
+    `.run()` twice on the same instance, so one lifespan per module is the only
+    shape that works. In a server that is the normal case — a process starts once.
+    """
+    import os
+
+    from fastapi.testclient import TestClient
+
+    tmp_path = tmp_path_factory.mktemp("mcp")
+    os.environ["JWT_SECRET"] = "test-secret"
+    os.environ["DOVETAIL_DB"] = str(tmp_path / "mcp.db")
+
+    from dovetail import apikeys
+    from dovetail.models import Role, User
+    from dovetail.web import app as web_app
+
+    db.create_all(tmp_path / "mcp.db")
+    keys = {}
+    with db.session_scope() as s:
+        for role in (Role.READER, Role.ADMIN):
+            u = User(email=f"{role.value}@example.org", hashed_password="x", role=role)
+            s.add(u)
+            s.flush()
+            keys[role.value] = apikeys.issue(s, u, "test")
+
+    # As a context manager, so the lifespan actually runs. Without it the MCP
+    # session manager is never started and every call answers "Task group is not
+    # initialized" — which is trap number one of the deploy, reproduced here by
+    # accident and worth keeping in mind: the failure says nothing about MCP.
+    with TestClient(web_app) as client:
+        yield client, keys
+
+
+def rpc(client, key, method, params=None):
+    return client.post(
+        "/mcp",
+        headers={
+            "X-API-Key": key,
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}},
+    )
+
+
+def test_the_mcp_endpoint_is_closed_without_a_key(http):
+    client, _ = http
+    assert rpc(client, "", "tools/list").status_code == 401
+    assert rpc(client, "dvt_invented", "tools/list").status_code == 401
+
+
+def test_a_reader_key_can_list_and_read(http):
+    client, keys = http
+    r = rpc(client, keys["reader"], "tools/list")
+    assert r.status_code == 200 and len(r.json()["result"]["tools"]) == 11
+
+
+def test_a_reader_key_cannot_write_to_the_queue(http):
+    """The key that lists every tool must still be refused by the ones that cost
+    something: `/mcp` sits outside the Borant ID gate, so this is the only check."""
+    client, keys = http
+    r = rpc(client, keys["reader"], "tools/call",
+            {"name": "propose_venue",
+             "arguments": {"fields": {"display_name": "X"}, "rationale": "test"}})
+    assert "denied" in r.text
+
+
+def test_an_admin_key_can(http):
+    client, keys = http
+    r = rpc(client, keys["admin"], "tools/call",
+            {"name": "propose_venue",
+             "arguments": {"fields": {"display_name": "X"}, "rationale": "test"}})
+    assert "proposal_id" in r.text and "denied" not in r.text
+
+
+def test_the_endpoint_answers_without_the_trailing_slash(http):
+    """The transport really lives at /mcp/, and a POST to /mcp would earn a 307.
+    A redirect on a POST is a bad thing to hand a client: some drop the body,
+    some drop the auth header, and it looks like the server is broken."""
+    client, keys = http
+    assert rpc(client, keys["reader"], "tools/list").status_code == 200

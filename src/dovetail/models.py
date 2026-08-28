@@ -343,3 +343,26 @@ class User(Base):
 
     def is_admin(self) -> bool:
         return self.role is Role.ADMIN
+
+
+class ApiKey(Base):
+    """A key for the MCP surface, which has no browser and no cookie.
+
+    Stored as a SHA-256 hash and never in the clear: a leaked database should not
+    be a set of working credentials. The plaintext is shown once, when it is
+    made, and after that nobody can recover it — including whoever runs the app.
+
+    It exists because `/mcp` sits among Caddy's public routes, outside the
+    Borant ID gate. Without a key of its own, the model surface would be an
+    unauthenticated way to spend the OpenAlex budget and write into the queue.
+    """
+
+    __tablename__ = "api_key"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id"), index=True)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(128))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)

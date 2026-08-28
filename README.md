@@ -69,7 +69,7 @@ which journals turned it down, which is not ours to publish. The script reads a 
 The text profile is cached on disk: `/text/topics` costs 100 OpenAlex credits against 1 for
 `/sources`, and the anonymous daily budget is 1000. A free account key makes it ten times that.
 
-## Planned stack
+## Stack
 
-FastAPI + SQLite, single workspace, Borant ID for the UI login, deployed on borant at
-`dovetail.borant.eu`, port 8015 (to be confirmed free).
+FastAPI + SQLite, single workspace, standalone or behind Borant ID, deployed on borant at
+`dovetail.borant.eu`, port 8021 (8015 turned out to be GrantRadar's).

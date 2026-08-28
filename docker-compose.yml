@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dovetail
+    restart: unless-stopped
+    # Bound to loopback: Caddy is the only way in from outside, which is what
+    # makes the trusted-proxy check meaningful.
+    ports:
+      - "127.0.0.1:8021:8021"
+    env_file:
+      - .env
+    # Guardrail on the shared 4 GB / 2-CPU box: this app is small, keep it small.
+    mem_limit: 300m
+    volumes:
+      - ./data:/app/data

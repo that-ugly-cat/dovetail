@@ -1,0 +1,13 @@
+# Pinned for the container. `uv` runs the repo locally; the image uses pip, the
+# same way the other borant apps do.
+alembic>=1.13
+bcrypt>=4.1
+fastapi>=0.115
+httpx>=0.27
+jinja2>=3.1
+mcp[cli]>=2.0
+python-jose[cryptography]>=3.3
+python-multipart>=0.0.9
+sqlalchemy>=2.0
+typer>=0.12
+uvicorn>=0.30

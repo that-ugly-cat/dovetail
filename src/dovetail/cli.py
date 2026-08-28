@@ -395,7 +395,7 @@ def create_user(
 
 
 @app.command("serve")
-def serve(host: str = typer.Option("127.0.0.1"), port: int = typer.Option(8015)):
+def serve(host: str = typer.Option("127.0.0.1"), port: int = typer.Option(8021)):
     """Run the web UI.
 
     Refuses to start without JWT_SECRET: a default secret is the same as no
@@ -408,3 +408,27 @@ def serve(host: str = typer.Option("127.0.0.1"), port: int = typer.Option(8015))
     secret_key()
     typer.echo(f"auth mode: {auth_mode()}")
     uvicorn.run("dovetail.web:app", host=host, port=port)
+
+
+@app.command("api-key")
+def api_key(
+    email: str = typer.Option(..., help="Whose key this is."),
+    label: str = typer.Option(None, help="What it is for, e.g. 'ono desktop'."),
+):
+    """Issue an MCP key. Shown once and never again: it is stored hashed."""
+    from . import apikeys
+    from .models import User
+
+    db.init_engine()
+    with db.session_scope() as s:
+        user = s.scalar(select(User).where(User.email == email.strip().lower()))
+        if user is None:
+            typer.secho(f"no user {email}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        key = apikeys.issue(s, user, label)
+    typer.echo(f"key for {email} ({user.role.value}):\n\n  {key}\n")
+    typer.secho(
+        "Copy it now. Only a hash is stored, so nobody — including whoever runs "
+        "the server — can show it to you again.",
+        fg=typer.colors.YELLOW,
+    )

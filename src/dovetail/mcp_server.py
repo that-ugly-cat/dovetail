@@ -17,6 +17,7 @@ slow and complete beats quick and biased.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -52,6 +53,32 @@ server = MCPServer(
         "anything, by design."
     ),
 )
+
+
+# Who is calling, set by the HTTP gate before the request reaches a tool. None
+# means stdio, which is a local process the operator started themselves.
+caller: ContextVar[Any] = ContextVar("dovetail_mcp_caller", default=None)
+
+
+def _needs_admin() -> dict | None:
+    """Guard for the two things that cost something.
+
+    `/mcp` sits among Caddy's public routes, outside the Borant ID gate, so this
+    is the only place these calls are checked. Returning an error rather than
+    raising is deliberate: a tool that throws hands the model a stack trace to
+    invent around, while a sentence it can read lets it correct course.
+    """
+    who = caller.get()
+    if who is None:
+        return None  # stdio: a local process, started by whoever owns the box
+    if not who.is_admin():
+        return {
+            "denied": (
+                "this call either spends the shared OpenAlex budget or writes "
+                "into the approval queue, and the key you used belongs to a reader"
+            )
+        }
+    return None
 
 
 def _venue_brief(v: Venue) -> dict[str, Any]:
@@ -361,6 +388,9 @@ def match_venues(
     survive; and venues that cannot be profiled at all, where a zero means "no
     data" and not "out of scope".
     """
+    denied = _needs_admin()
+    if denied:
+        return denied
     db.init_engine()
     with db.session_scope() as s:
         constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
@@ -417,6 +447,9 @@ def propose_venue(
     `rationale` should say where the claim comes from. It is read by whoever
     approves, and "it looked right" is not a reason a person can check.
     """
+    denied = _needs_admin()
+    if denied:
+        return denied
     if not fields.get("display_name"):
         return {"error": "display_name is required"}
     db.init_engine()
@@ -444,6 +477,9 @@ def propose_update(
     off the author guidelines. Give `source_url`, because a word limit without
     the page it came from cannot be rechecked when it changes.
     """
+    denied = _needs_admin()
+    if denied:
+        return denied
     db.init_engine()
     with db.session_scope() as s:
         if s.get(Venue, venue_id) is None:
