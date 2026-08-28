@@ -396,6 +396,13 @@ class User(Base):
     # a judgement bills the account of whoever started it, and this machine
     # holds no model credential of its own.
     anthropic_key_encrypted: Mapped[str | None] = mapped_column(Text)
+    # Which workspace that key acts in. Required for an **identity-linked** key,
+    # which belongs to a person across several workspaces and refuses every call
+    # until told which one — the SDK has no parameter for it, so it travels as a
+    # header. Not encrypted: it is an identifier, not a secret, and hiding it
+    # would make it unreadable exactly when somebody is working out why their key
+    # is being refused.
+    anthropic_workspace_id: Mapped[str | None] = mapped_column(String(128))
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.READER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

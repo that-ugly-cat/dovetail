@@ -949,16 +949,25 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
         return RedirectResponse(f"/app/runs/{run_id}?genre=empty",
                                 status_code=status.HTTP_303_SEE_OTHER)
 
-    import anthropic
-
-    client = anthropic.Anthropic(api_key=crypto.decrypt_api_key(user.anthropic_key_encrypted))
+    client = genre.build_client(
+        crypto.decrypt_api_key(user.anthropic_key_encrypted),
+        user.anthropic_workspace_id,
+    )
     try:
         verdicts, failures = genre.read_finalists(
             s, client, OpenAlexClient(), run, results
         )
-    except (APIError, OpenAlexError) as e:
-        # The whole pass died rather than one journal: a bad key, an exhausted
-        # OpenAlex budget. The code travels; the template picks the sentence.
+    except APIError as e:
+        # The whole pass died rather than one journal, and *which* whole-pass
+        # failure it was decides what the reader should do about it. A key that
+        # needs a workspace id is a form to fill in; an exhausted budget is a
+        # wait. Both used to render as the word `BadRequestError`.
+        code, _ = genre.classify_api_error(e)
+        return RedirectResponse(
+            f"/app/runs/{run_id}?genre=failed&detail={code}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except OpenAlexError as e:
         return RedirectResponse(
             f"/app/runs/{run_id}?genre=failed&detail={type(e).__name__}",
             status_code=status.HTTP_303_SEE_OTHER,
@@ -981,12 +990,14 @@ def settings(request: Request, user: User = Depends(current_user),
     return page(request, "settings.html", user, s, nav="settings",
                 crypto_ready=crypto.available(),
                 has_key=bool(user.anthropic_key_encrypted),
+                workspace_id=user.anthropic_workspace_id or "",
                 model=genre.MODEL,
                 saved=request.query_params.get("saved"))
 
 
 @app.post("/app/settings/anthropic-key")
 def save_anthropic_key(request: Request, anthropic_key: str = Form(""),
+                       workspace_id: str = Form(""),
                        user: User = Depends(current_user),
                        s: Session = Depends(get_db)):
     """Store, or clear, this user's own Anthropic key.
@@ -1005,9 +1016,18 @@ def save_anthropic_key(request: Request, anthropic_key: str = Form(""),
             "encrypted — and storing one any other way is not on offer.",
         )
     key = anthropic_key.strip()
-    user.anthropic_key_encrypted = crypto.encrypt_api_key(key) if key else None
+    # The workspace id is saved whether or not a new key came with it: it is
+    # normally discovered *after* the first call is refused, and making people
+    # re-paste a key they already stored to add it would be a small cruelty.
+    user.anthropic_workspace_id = workspace_id.strip() or None
+    if key:
+        user.anthropic_key_encrypted = crypto.encrypt_api_key(key)
+    elif not workspace_id.strip():
+        # Both fields empty is the way to remove a key.
+        user.anthropic_key_encrypted = None
     s.flush()
-    return RedirectResponse(f"/app/settings?saved={'1' if key else 'cleared'}",
+    saved = "1" if key else ("workspace" if workspace_id.strip() else "cleared")
+    return RedirectResponse(f"/app/settings?saved={saved}",
                             status_code=status.HTTP_303_SEE_OTHER)
 
 

@@ -126,9 +126,21 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
 {% elif g.state == 'empty' %}
 <div class="flash">There is no shortlist to read.</div>
 {% elif g.state == 'failed' %}
-<div class="flash err"><strong>The pass failed before finishing</strong> — <code>{{ g.detail }}</code>.
-That is the whole call rather than one journal: usually a rejected key or an exhausted OpenAlex
-budget. Nothing partial was left behind.</div>
+<div class="flash err">
+  {% if g.detail == 'needs_workspace' %}
+  <strong>Your Anthropic key needs a workspace id.</strong> It is an
+  <em>identity-linked</em> key, which belongs to you across several workspaces, so every request has
+  to name the one it acts in — and without it the API refuses even a call that asks the model to say
+  «ok». Add the id in <a href="/app/settings">settings</a>; it is in the Console URL when you are
+  inside a workspace. Nothing was spent and nothing partial was left behind.
+  {% elif g.detail == 'bad_key' %}
+  <strong>The key was refused.</strong> Check it in <a href="/app/settings">settings</a> — it may
+  have been revoked, or pasted with something missing.
+  {% else %}
+  <strong>The pass failed before finishing</strong> — <code>{{ g.detail }}</code>. That is the whole
+  call rather than one journal: usually an exhausted OpenAlex budget. Nothing partial was left behind.
+  {% endif %}
+</div>
 {% endif %}
 
 {% if buckets.shortlist and user.is_admin() %}

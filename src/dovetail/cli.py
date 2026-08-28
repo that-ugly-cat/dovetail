@@ -377,6 +377,132 @@ def validate_against_published(
     typer.echo("\n" + json.dumps(summarise(results, top_n), indent=2, ensure_ascii=False))
 
 
+@app.command("judge-venues")
+def judge_venues_cmd(
+    run_id: int = typer.Option(..., help="The consultation whose manuscript to judge against."),
+    issn: list[str] = typer.Option(None, "--issn", help="ISSN of a journal. Repeatable."),
+    name: list[str] = typer.Option(None, "--name", help="Exact name of a journal already in the table. Repeatable."),
+    as_user: str = typer.Option(
+        None, help="Use this user's stored Anthropic key instead of ANTHROPIC_API_KEY."
+    ),
+):
+    """Stage 5a on journals you name, rather than on the shortlist. **Diagnostics.**
+
+    The web button judges the shortlist, which is the product. This exists for
+    the question the product cannot ask: *what does the genre judgement say about
+    a journal the matcher never suggested?*
+
+    That is the experiment stage 5a was built for. The spec claims it is «the
+    criterion the two desk rejects of 2026 were missing» — and those two venues
+    are **unreachable at stage 2**, sharing no topic with the text, so they never
+    enter a shortlist and the button can never reach them. Without this command
+    the claim is unfalsifiable, which is a bad property for a claim to have.
+
+    Verdicts are printed and **not stored**: these journals have no row in the
+    run, and inventing one would put a venue in a consultation that the
+    consultation did not produce.
+
+    Costs 1 credit per journal not already in the table, 10 more for each recent
+    index not on record, and one model call each against your own key.
+    """
+    import os
+
+    from . import crypto
+    from .matching import genre
+    from .models import User
+
+
+    wanted = list(issn or []) + list(name or [])
+    if not wanted:
+        typer.secho("nothing to judge: pass --issn or --name", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    db.init_engine()
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            typer.secho(f"no consultation {run_id}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+        # The key: an environment variable, or a user's stored one. Never a
+        # credential of this machine's — the same rule the web surface follows.
+        raw = os.environ.get("ANTHROPIC_API_KEY")
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+        if as_user:
+            u = s.scalar(select(User).where(User.email == as_user.strip().lower()))
+            if u is None or not u.anthropic_key_encrypted:
+                typer.secho(f"{as_user} has no stored key", fg=typer.colors.RED)
+                raise typer.Exit(code=1)
+            raw = crypto.decrypt_api_key(u.anthropic_key_encrypted)
+            workspace = u.anthropic_workspace_id or workspace
+        if not raw:
+            typer.secho(
+                "no Anthropic key: set ANTHROPIC_API_KEY or pass --as-user",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        client = genre.build_client(raw, workspace)
+        oa = OpenAlexClient()
+
+        typer.echo(f"\nmanuscript: {run.title[:70]}\n")
+        for key in wanted:
+            venue = s.scalar(select(Venue).where(Venue.issn_l == key)) or s.scalar(
+                select(Venue).where(Venue.display_name == key)
+            )
+            if venue is None and "-" in key:
+                # Not in the table — which for the venues this command exists to
+                # reach is the normal case, because stage 2 never produced them.
+                try:
+                    payload = oa.source_by_issn(s, key)
+                except OpenAlexError as e:
+                    typer.secho(f"  {key}: {e}", fg=typer.colors.RED)
+                    continue
+                results = payload.get("results") or [payload]
+                if not results:
+                    typer.secho(f"  {key}: not on OpenAlex", fg=typer.colors.RED)
+                    continue
+                from .matching.pipeline import upsert_venue
+
+                venue = upsert_venue(s, results[0])
+                s.flush()
+            if venue is None:
+                typer.secho(f"  {key}: not found", fg=typer.colors.RED)
+                continue
+
+            try:
+                if genre._needs_index(venue, s):
+                    if not venue.openalex_id:
+                        raise genre.GenreUnavailable("not in OpenAlex: no recent index to read")
+                    venue.recent_titles = oa.recent_titles(s, venue.openalex_id)
+                    s.flush()
+                    from .provenance import stamp
+
+                    stamp(s, venue, ["recent_titles"], "openalex")
+                v = genre.judge(
+                    client, run.title, run.abstract, run.word_count,
+                    venue.id, venue.display_name, venue.recent_titles or [],
+                )
+            except (genre.GenreUnavailable, OpenAlexError) as e:
+                typer.secho(f"  {venue.display_name[:50]}: {e}", fg=typer.colors.YELLOW)
+                continue
+
+            colour = typer.colors.GREEN if v.fits else typer.colors.RED
+            verdict = "SAME KIND" if v.fits else "DIFFERENT KIND"
+            typer.secho(f"  {verdict:<15} {venue.display_name[:56]}", fg=colour, bold=True)
+            typer.echo(f"      confidence: {v.confidence}")
+            typer.echo(f"      manuscript reads as: {v.manuscript_kind}")
+            typer.echo(f"      journal publishes:   {v.journal_kind}")
+            typer.echo(f"      {v.sentence}")
+            typer.echo("")
+
+    typer.secho(
+        "Diagnostics: nothing above was written to the consultation. These "
+        "journals were not in it.",
+        fg=typer.colors.YELLOW,
+    )
+
+
 @app.command("blind-sheet")
 def blind_sheet_cmd(
     run_id: int = typer.Option(..., help="A consultation that already has a shortlist."),

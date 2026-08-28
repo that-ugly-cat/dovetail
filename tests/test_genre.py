@@ -317,3 +317,51 @@ def test_without_a_fernet_key_storing_one_is_refused_not_improvised(monkeypatch)
     assert crypto.available() is False
     with pytest.raises(crypto.CryptoUnavailable, match="FERNET_KEY"):
         crypto.encrypt_api_key("sk-ant-whatever")
+
+
+# --- the credential, and errors that say what to do -----------------------
+
+
+def test_the_workspace_id_travels_as_a_header():
+    """The SDK has no `workspace_id` parameter, so it goes in default_headers.
+    An identity-linked key without it fails every call — including one that asks
+    the model to say "ok"."""
+    c = genre.build_client("sk-ant-x", "wrkspc_abc")
+    assert c.default_headers.get("anthropic-workspace-id") == "wrkspc_abc"
+    # And a plain key must not grow an empty header, which is a different 400.
+    assert "anthropic-workspace-id" not in genre.build_client("sk-ant-x").default_headers
+
+
+def test_a_missing_workspace_is_named_rather_than_reported_as_a_class():
+    """`BadRequestError` on the page tells nobody anything; the API's own message
+    is completely actionable. The code travels, the template picks the sentence,
+    and the library's text passes through untranslated because it has no
+    language and translating it would make it unsearchable."""
+
+    class FakeBadRequest(Exception):
+        status_code = 400
+        message = (
+            "anthropic-workspace-id is required when authenticating with an "
+            "identity-linked API key; send the id of the workspace this request acts in."
+        )
+
+    code, detail = genre.classify_api_error(FakeBadRequest())
+    assert code == genre.NEEDS_WORKSPACE
+    assert "identity-linked" in detail
+
+
+def test_a_revoked_key_is_a_different_code_because_it_wants_a_different_fix():
+    class FakeUnauthorized(Exception):
+        status_code = 401
+        message = "invalid x-api-key"
+
+    assert genre.classify_api_error(FakeUnauthorized())[0] == genre.BAD_KEY
+
+
+def test_an_unrecognised_failure_keeps_its_class_name():
+    """Better an exception name nobody has seen than a confident wrong sentence."""
+    class FakeOverloaded(Exception):
+        status_code = 529
+        message = "overloaded"
+
+    assert genre.classify_api_error(FakeOverloaded())[0] == "FakeOverloaded"

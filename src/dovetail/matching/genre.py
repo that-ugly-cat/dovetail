@@ -127,6 +127,51 @@ class GenreUnavailable(RuntimeError):
     """Raised before spending: no key, or nothing to read the journal against."""
 
 
+class KeyRejected(RuntimeError):
+    """The credential is wrong in a way the caller can fix, and this says how.
+
+    A bare `BadRequestError` on the page tells nobody anything. The first live
+    call failed with «anthropic-workspace-id is required when authenticating with
+    an identity-linked API key», which is completely actionable — and was being
+    rendered as the string `BadRequestError`.
+    """
+
+
+NEEDS_WORKSPACE = "needs_workspace"
+BAD_KEY = "bad_key"
+
+
+def build_client(api_key: str, workspace_id: str | None = None):
+    """The Anthropic client, with the workspace header when there is one.
+
+    The SDK has no `workspace_id` parameter — it goes in `default_headers`. An
+    identity-linked key without it fails **every** call, including one that asks
+    the model to say "ok", which is how this was diagnosed: four probes of
+    increasing simplicity all returned the same 400, so it was never about the
+    request body.
+    """
+    import anthropic
+
+    headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
+    return anthropic.Anthropic(api_key=api_key, default_headers=headers)
+
+
+def classify_api_error(exc) -> tuple[str, str]:
+    """Turn an SDK exception into (code, detail).
+
+    The code travels; the template picks the sentence. The library's own text
+    comes through untranslated in the detail, because `BadRequestError` is of no
+    language and translating it would make it impossible to search for.
+    """
+    message = str(getattr(exc, "message", "") or exc)
+    lowered = message.lower()
+    if "workspace" in lowered:
+        return NEEDS_WORKSPACE, message
+    if getattr(exc, "status_code", None) in (401, 403):
+        return BAD_KEY, message
+    return type(exc).__name__, message
+
+
 def _manuscript_block(title: str, abstract: str, word_count: int | None) -> str:
     words = f"\nLength: about {word_count:,} words." if word_count else ""
     return f"Title: {title}\n\nAbstract: {abstract}{words}"

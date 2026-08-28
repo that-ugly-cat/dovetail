@@ -6,6 +6,8 @@ budget.</p>
 
 {% if saved == '1' %}<div class="flash ok"><strong>Key stored.</strong> It is encrypted, and no
 screen will show it again — not to you and not to whoever runs the server.</div>
+{% elif saved == 'workspace' %}<div class="flash ok">Workspace id saved. The stored key was left
+alone — you normally find out you need one after a call has already been refused.</div>
 {% elif saved == 'cleared' %}<div class="flash">Key removed. Genre judgements will be offered again
 once there is one.</div>{% endif %}
 
@@ -25,9 +27,18 @@ once there is one.</div>{% endif %}
       <input name="anthropic_key" type="password" autocomplete="off"
         placeholder="{% if has_key %}stored — type a new one to replace it{% else %}sk-ant-…{% endif %}">
     </label>
+    <label>Workspace id <span class="muted">— only for an identity-linked key</span>
+      <input name="workspace_id" value="{{ workspace_id }}" placeholder="wrkspc_…" autocomplete="off">
+    </label>
+    <p class="muted small" style="margin:-4px 0 0">Leave it empty unless the API refuses the key
+    saying it needs one. An identity-linked key belongs to you across several workspaces, so every
+    request has to name the one it acts in; a plain API key carries its own and needs nothing here.
+    It is an identifier rather than a secret, so it is stored in the clear and shown back — which is
+    the point, since you only go looking for it after a call has been refused.</p>
     <div class="btnrow" style="margin-top:12px">
-      <button class="btn" type="submit">{% if has_key %}Replace{% else %}Store{% endif %}</button>
+      <button class="btn" type="submit">{% if has_key %}Save{% else %}Store{% endif %}</button>
       {% if has_key %}<span class="badge ok">a key is stored</span>{% endif %}
+      {% if workspace_id %}<span class="badge">workspace set</span>{% endif %}
     </div>
   </form>
   {% endif %}
