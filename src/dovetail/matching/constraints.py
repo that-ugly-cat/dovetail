@@ -61,11 +61,55 @@ def evaluate(
             Outcome("exclude_venues", EXCLUDED, "this paper has already been rejected here")
         )
 
-    # -- is this even a venue? -----------------------------------------------
-    # `is_core` is OpenAlex's curated subset. Without this check the first live
-    # run put **FOX6 News Milwaukee** tenth in the shortlist with three merit
-    # criteria: a TV news outlet typed `journal`, 2811 "works", h-index 1. The
-    # `type:journal` filter is not enough.
+    # -- is this the kind of thing you submit a paper to? --------------------
+    #
+    # Two different facts, and they used to be collapsed into one message.
+    #
+    # **What it is** is categorical. You do not submit a manuscript for peer
+    # review to Zenodo, Figshare, PubMed or OSF Preprints — they are repositories,
+    # and the sweep pulls them in because Zenodo carries 12.2 million works and
+    # therefore touches every topic there is. That is not a quality judgement and
+    # it does not age, so it is worth saying in its own words rather than through
+    # a curation flag that happens to catch it.
+    #
+    # `book series` and `conference` are **marked, not excluded**: they are real
+    # places a paper can go, just outside what this tool models (SPEC §13). And a
+    # missing type marks too, by the rule at the top of this file.
+    kind = (venue.venue_type or "").strip().lower()
+    if kind in {"repository", "ebook platform"}:
+        outcomes.append(
+            Outcome(
+                "venue_type",
+                EXCLUDED,
+                f"a {kind}, not a journal: papers are deposited there, not "
+                f"submitted to it for review",
+            )
+        )
+    elif kind in {"book series", "conference"}:
+        outcomes.append(
+            Outcome(
+                "venue_type",
+                NEEDS_CHECK,
+                f"a {kind}: a real venue, but outside what this tool models — "
+                f"it knows about journals",
+            )
+        )
+    elif not kind:
+        outcomes.append(
+            Outcome("venue_type", NEEDS_CHECK, "no type on record: check what this is")
+        )
+
+    # **Whether the record is trustworthy** is the other fact, and `is_core` is
+    # OpenAlex's answer to it. Without this check the first live run put **FOX6
+    # News Milwaukee** tenth in the shortlist with three merit criteria: a TV
+    # news outlet typed `journal`, 2811 "works", h-index 1.
+    #
+    # Measured 28 Aug 2026, on the worry that it might be a mainstream-only
+    # filter: it is not. The twelve finalists of a real run carry 66 to 2,232
+    # works and are all core, while the non-core side is *ChemInform*, *Who's
+    # Who*, *Inpharma Weekly* — and a **duplicate** BMJ record with 389k works
+    # whose two canonical twins are both core. It de-duplicates and curates; it
+    # does not favour size.
     #
     # It excludes, but **here and not in the stage-2 query**, so it stays visible
     # among the excluded instead of vanishing without trace.
@@ -74,8 +118,8 @@ def evaluate(
             Outcome(
                 "is_core",
                 EXCLUDED,
-                "outside OpenAlex's curated subset: `type:journal` includes news "
-                "outlets and aggregators",
+                "outside OpenAlex's curated subset: an abstracting service, a "
+                "magazine, or a duplicate of a record that is in it",
             )
         )
 

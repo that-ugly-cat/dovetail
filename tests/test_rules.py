@@ -31,6 +31,7 @@ class FakeVenue:
     h_index: int | None = 40
     host_organization_name: str | None = "A publisher"
     is_core: bool | None = True
+    venue_type: str | None = "journal"
     publication_time_weeks: int | None = None
     article_types: list | None = None
 
@@ -144,6 +145,46 @@ def test_a_news_outlet_is_excluded():
     criteria: 2811 "works", h-index 1, no publisher."""
     outcomes = constraints_mod.evaluate(FakeVenue(is_core=False), {})
     assert any(o.excludes() and o.constraint == "is_core" for o in outcomes)
+
+
+def test_a_repository_is_excluded_for_what_it_is_and_not_for_its_curation():
+    """Two different facts, and they used to be one message.
+
+    The sweep drags Zenodo, Figshare, PubMed and OSF Preprints in because Zenodo
+    carries 12.2 million works and therefore touches every topic. They are
+    excluded because of **what they are** — you deposit a paper there, you do not
+    submit it for review — which is categorical, does not age, and is worth
+    saying in its own words rather than through a curation flag that happens to
+    catch it too.
+    """
+    outcomes = constraints_mod.evaluate(FakeVenue(venue_type="repository"), {})
+    kinds = {o.constraint: o for o in outcomes}
+    assert kinds["venue_type"].outcome == constraints_mod.EXCLUDED
+    assert "deposited" in kinds["venue_type"].reason
+    # And it says so on its own, without needing is_core to agree.
+    assert "curated" not in kinds["venue_type"].reason
+
+
+def test_a_book_series_is_marked_and_not_excluded():
+    """It is a real place a paper can go — just outside what this tool models.
+    Excluding it would state a judgement the tool has not made."""
+    outcomes = constraints_mod.evaluate(FakeVenue(venue_type="book series"), {})
+    kinds = {o.constraint: o for o in outcomes}
+    assert kinds["venue_type"].outcome == constraints_mod.NEEDS_CHECK
+    assert not any(o.excludes() for o in outcomes)
+
+
+def test_a_missing_type_marks_like_every_other_missing_field():
+    outcomes = constraints_mod.evaluate(FakeVenue(venue_type=None), {})
+    kinds = {o.constraint: o for o in outcomes}
+    assert kinds["venue_type"].outcome == constraints_mod.NEEDS_CHECK
+    assert not any(o.excludes() for o in outcomes)
+
+
+def test_a_journal_raises_nothing_about_its_type():
+    assert not [
+        o for o in constraints_mod.evaluate(FakeVenue(), {}) if o.constraint == "venue_type"
+    ]
 
 
 def test_unknown_is_core_does_not_exclude():

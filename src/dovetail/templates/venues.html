@@ -12,6 +12,12 @@
 <div class="card">
   <form class="searchbar" method="get" action="/app/venues">
     <input class="q" name="q" value="{{ args.q }}" placeholder="name or ISSN">
+    <select name="kind">
+      <option value="any" {% if args.kind == 'any' %}selected{% endif %}>any kind</option>
+      {% for k, n in kinds %}
+      <option value="{{ k }}" {% if args.kind == k %}selected{% endif %}>{{ k }} ({{ '{:,}'.format(n) }})</option>
+      {% endfor %}
+    </select>
     <select name="oa">
       <option value="">any access</option>
       {% for m in oa_models %}<option value="{{ m }}" {% if args.oa == m %}selected{% endif %}>{{ m.replace('_', ' ') }}</option>{% endfor %}
@@ -48,13 +54,18 @@
   </form>
   <p class="muted small" style="margin:10px 0 0">Search is lexical: a miss means «not with these
   words», never «does not exist». The default order is by size, which is the same bias stage 2 has to
-  fight — it is here because it puts recognisable names first, not because bigger is better.</p>
+  fight — it is here because it puts recognisable names first, not because bigger is better. And the
+  default <strong>kind</strong> is <code>journal</code>: the sweep also drags in repositories, because
+  Zenodo carries 12.2 million works and therefore touches every topic there is.</p>
 </div>
 
 <div class="pager">
+  {# "records" and not "journals": the table holds repositories too, and the
+     counter is the one place where calling them journals would be invisible. #}
   <span class="count">
-    {% if total == grand_total %}{{ '{:,}'.format(total) }} journals
-    {% else %}{{ '{:,}'.format(total) }} of {{ '{:,}'.format(grand_total) }} journals{% endif %}
+    {% if total == grand_total %}{{ '{:,}'.format(total) }} records
+    {% else %}{{ '{:,}'.format(total) }}{% if args.kind and args.kind != 'any' %} {{ args.kind }}{% endif %}
+      of {{ '{:,}'.format(grand_total) }} records{% endif %}
   </span>
   {% if pages > 1 %}
     <span class="count">· page {{ page_no }} of {{ pages }}</span>
@@ -65,7 +76,7 @@
 
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
-    <th>Journal</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
+    <th>Journal</th><th>Kind</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
     <th class="n">Works</th><th class="n">h</th><th>Profile</th><th>ANVUR</th><th>Risk</th>
   </tr></thead>
   <tbody>
@@ -76,6 +87,9 @@
       {% if not v.is_core %}<span class="badge warn" title="type:journal includes news bulletins">not core</span>{% endif %}
       <div class="muted small">{{ v.host_organization_name or 'publisher not declared' }}</div>
     </td>
+    <td>{% if v.venue_type == 'journal' %}<span class="muted small">journal</span>
+        {% elif v.venue_type %}<span class="badge warn">{{ v.venue_type }}</span>
+        {% else %}<span class="badge warn">no type</span>{% endif %}</td>
     <td class="mono muted">{{ v.issn_l or '—' }}</td>
     <td>{% if v.oa_model %}<span class="badge {{ 'ok' if v.oa_model.value == 'full_oa' }}">{{ v.oa_model.value.replace('_', ' ') }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="n">{% if v.apc_usd %}{{ '{:,}'.format(v.apc_usd) }}<span class="muted small"> USD</span>{% else %}<span class="muted">unknown</span>{% endif %}</td>
@@ -90,7 +104,7 @@
         {% else %}<span class="muted">—</span>{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="9" class="empty">Nothing matches those filters.</td></tr>
+  <tr><td colspan="10" class="empty">Nothing matches those filters.</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
@@ -106,4 +120,9 @@
 <p class="note">An unknown APC is not a free journal: the field is missing on roughly nine journals in
 ten, which is why no constraint here excludes on it. A journal with no profile is not out of scope
 either — it is a journal nothing is known about.</p>
+<p class="note">Anything that is not a <code>journal</code> is kept in the table and never
+shortlisted: a repository is somewhere a paper is <em>deposited</em>, not somewhere it is submitted
+for review, and stage 4 says so in those words. Keeping them visible rather than filtering them out
+of the sweep is the same rule as everywhere else here — a venue excluded upstream cannot be
+inspected, and this list is the place to inspect what the sweep brought back.</p>
 {% endblock %}

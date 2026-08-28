@@ -322,9 +322,16 @@ def _inventory(s: Session) -> dict:
     rest of the tool is built to keep.
     """
     total = _count(s)
+    journals = _count(s, Venue.venue_type == "journal")
     profiled = _count(s, HAS_PROFILE)
     return {
         "total": total,
+        # Counted apart because the table is not all journals and the label used
+        # to say it was. The sweep drags in repositories — Zenodo touches every
+        # topic — and calling 79 repositories "journals known" is the kind of
+        # small untruth that makes the bigger numbers hard to trust.
+        "journals": journals,
+        "not_journals": total - journals,
         "profiled": profiled,
         "unprofiled": total - profiled,
         "core": _count(s, Venue.is_core.is_(True)),
@@ -375,6 +382,21 @@ def dashboard(request: Request, user: User = Depends(current_user),
 
 PER_PAGE = 50
 
+
+def venue_kinds(s: Session) -> list[tuple[str, int]]:
+    """The `venue_type` values actually present, with their counts.
+
+    Read from the data rather than hard-coded: OpenAlex can add a type, and a
+    filter offering a value nothing has — or hiding one everything has — is
+    worse than no filter.
+    """
+    rows = s.execute(
+        select(Venue.venue_type, func.count())
+        .group_by(Venue.venue_type)
+        .order_by(func.count().desc())
+    ).all()
+    return [(k or "(no type)", n) for k, n in rows]
+
 SORTS = {
     "works": Venue.works_count.desc().nullslast(),
     "hindex": Venue.h_index.desc().nullslast(),
@@ -391,6 +413,7 @@ def venues(
     profile: str = "",
     core: str = "",
     risk: str = "",
+    kind: str = "journal",
     sort: str = "works",
     p: int = 1,
     user: User = Depends(current_user),
@@ -405,6 +428,14 @@ def venues(
     and leaving it unlabelled would be the same mistake in the browsing surface.
     """
     filters = []
+    # Declared, not silent. The table legitimately holds repositories,
+    # ebook platforms and book series — the sweep pulls Zenodo in because it
+    # carries 12.2 million works and therefore touches every topic — but a
+    # screen called "Journals" that lists PubMed without saying what it is
+    # invites the reader to think Dovetail might suggest it. The default is
+    # `journal`, the filter says so, and "any kind" is one click away.
+    if kind and kind != "any":
+        filters.append(Venue.venue_type == kind)
     if q:
         like = f"%{q}%"
         filters.append(or_(Venue.display_name.ilike(like), Venue.issn_l.ilike(like)))
@@ -443,8 +474,10 @@ def venues(
         total=total, page_no=p, pages=pages, per_page=PER_PAGE,
         grand_total=_count(s),
         args={"q": q, "oa": oa, "doaj": doaj, "profile": profile,
-              "core": core, "risk": risk, "sort": sort},
+              "core": core, "risk": risk, "kind": kind, "sort": sort},
         oa_models=[m.value for m in OAModel],
+        kinds=venue_kinds(s),
+        kind=kind,
     )
 
 

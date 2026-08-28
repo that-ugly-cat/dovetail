@@ -6,9 +6,10 @@
 <h3>Inventory</h3>
 <div class="grid">
   <div class="stat">
-    <div class="n">{{ '{:,}'.format(inv.total) }}</div>
+    <div class="n">{{ '{:,}'.format(inv.journals) }}</div>
     <div class="lbl">journals known</div>
-    <div class="foot">{{ '{:,}'.format(inv.core) }} flagged core by OpenAlex</div>
+    <div class="foot">{{ '{:,}'.format(inv.core) }} flagged core by OpenAlex{% if inv.not_journals %},
+      and <a href="/app/venues?kind=any">{{ inv.not_journals }} things that are not journals</a>{% endif %}</div>
   </div>
   <div class="stat">
     <div class="n {% if inv.unprofiled %}warn{% endif %}">{{ '{:,}'.format(inv.profiled) }}</div>
@@ -29,6 +30,9 @@
 
 <p class="note">A journal with no profile scores zero the same way an unrelated one does, and the two
 zeros mean opposite things. That is why they are counted apart here and marked apart everywhere else.
+The same reason the repositories are counted apart from the journals: the sweep drags them in because
+Zenodo carries 12.2 million works, and calling them journals would be a small untruth propping up the
+bigger numbers.
 {% if inv.last_touched %}Newest field on record: {{ inv.last_touched.strftime('%d %b %Y') }}.{% endif %}</p>
 
 <h3>Work</h3>
