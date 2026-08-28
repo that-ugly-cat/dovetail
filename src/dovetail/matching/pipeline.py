@@ -374,14 +374,30 @@ def run_match(
     if sweep is not None:
         run.constraints = {**(run.constraints or constraints), "_sweep": sweep}
 
-    for i, r in enumerate(shortlist + excluded_shown + unclassifiable, start=1):
+    # Numbered **inside** each basket, and the basket recorded.
+    #
+    # This used to be one running counter over the three lists concatenated,
+    # which threw the basket away one step after `cut` computed it and stated an
+    # order between rows that are not comparable — a venue with no profile is
+    # not "below" a scored one, it is not on the same axis. It showed up the
+    # first time a hand-declared journal reached a run: score 0.0000, position
+    # 13, in a shortlist capped at twelve.
+    numbered = (
+        [("shortlist", r) for r in shortlist]
+        + [("excluded", r) for r in excluded_shown]
+        + [("unclassifiable", r) for r in unclassifiable]
+    )
+    counters: dict[str, int] = {}
+    for bucket, r in numbered:
+        counters[bucket] = counters.get(bucket, 0) + 1
         result = MatchResult(
             run_id=run.id,
             venue_id=r.venue.id,
             score_topic=r.score.topic,
             score_subfield=r.score.subfield,
             score_field=r.score.field,
-            position=i,
+            bucket=bucket,
+            position=counters[bucket],
             venue_snapshot={
                 "topics": r.venue.topics,
                 "works_count": r.venue.works_count,

@@ -252,9 +252,30 @@ class MatchResult(Base):
     score_topic: Mapped[float] = mapped_column(Float, default=0.0)
     score_subfield: Mapped[float] = mapped_column(Float, default=0.0)
     score_field: Mapped[float] = mapped_column(Float, default=0.0)
-    # Position in the list this run produced, not a rank: the score is
+
+    # Which of the three baskets `cut` put this row in:
+    #
+    #   `shortlist`       — scored, survived the constraints, inside the cut.
+    #   `excluded`        — a constraint removed it, and it is shown anyway
+    #                       because fewer than three venues passed. An empty
+    #                       list is not an answer.
+    #   `unclassifiable`  — no profile, so it cannot be scored at all. Its zero
+    #                       means «I don't know», not «out of scope».
+    #
+    # `cut` has always returned three lists and the CLI has always printed them
+    # under three headers. Persistence concatenated them into one running
+    # counter, so the basket was thrown away one step after being computed —
+    # which is how a hand-declared journal with no profile came out looking like
+    # the thirteenth of a shortlist capped at twelve, on the first run after the
+    # web form that declares one. The distinction the whole tool is built to
+    # keep was being flattened in the surface that reads it.
+    bucket: Mapped[str] = mapped_column(
+        String(16), default="shortlist", server_default="shortlist", index=True
+    )
+    # Position **within its own basket**. Not a rank even there: the score is
     # computed against this one paper and the set is whatever stage 2 reached
-    # that day. See SPEC.md §0.
+    # that day. See SPEC.md §0. Numbering across baskets, which is what this
+    # used to do, states an order between things that are not comparable.
     position: Mapped[int | None] = mapped_column(Integer)
 
     # Venue profiles change at every refresh: without a snapshot, hindsight

@@ -19,7 +19,10 @@
   {% if run.status == 'running' %}<span class="badge warn">running</span>
   {% elif run.status == 'failed' %}<span class="badge danger">failed</span>
   {% elif run.status == 'refused' %}<span class="badge warn">refused</span>
-  {% else %}<span class="badge">{{ rows|length }} shortlisted</span>{% endif %}
+  {% else %}<span class="badge">{{ buckets.shortlist|length }} shortlisted</span>
+    {% if buckets.excluded %}<span class="badge warn">{{ buckets.excluded|length }} excluded</span>{% endif %}
+    {% if buckets.unclassifiable %}<span class="badge">{{ buckets.unclassifiable|length }} unclassifiable</span>{% endif %}
+  {% endif %}
 </div>
 
 {% if run.status == 'running' %}
@@ -111,8 +114,7 @@ never cut. Everything below was measured against what remained.</div>
   </div>
 </div>
 
-<h2>The list</h2>
-{% for row in rows %}
+{% macro result(row) %}
 <div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable %}unreachable{% endif %}">
   <div class="rhead">
     <span class="pos">{{ row.result.position }}</span>
@@ -162,9 +164,38 @@ never cut. Everything below was measured against what remained.</div>
   </div>
   {% endif %}
 </div>
+{% endmacro %}
+
+{# Three groups and not one list, because they are not on the same axis.
+   Concatenated, a journal with no profile reads as the worst of the shortlist —
+   which is how a hand-declared venue with score 0.0000 came out as «13» in a
+   list capped at twelve. #}
+<h2>The list</h2>
+{% if buckets.shortlist %}
+  {% for row in buckets.shortlist %}{{ result(row) }}{% endfor %}
+{% elif total_rows %}
+  <div class="card"><p class="muted" style="margin:0">Nothing passed the constraints. What follows
+  is everything that did not, with the reason attached — an empty list is not an answer.</p></div>
 {% else %}
-<div class="card"><p class="empty" style="padding:0">This run produced no shortlist.</p></div>
-{% endfor %}
+  <div class="card"><p class="empty" style="padding:0">This run produced no list.</p></div>
+{% endif %}
+
+{% if buckets.excluded %}
+<h2>Excluded, and shown anyway</h2>
+<p class="sub">Fewer than three journals passed the constraints, so these are here with the
+constraint that removed each one. Returning an empty list would be a worse answer than returning
+this one.</p>
+{% for row in buckets.excluded %}{{ result(row) }}{% endfor %}
+{% endif %}
+
+{% if buckets.unclassifiable %}
+<h2>Unclassifiable</h2>
+<p class="sub">No constraint excludes these, and no score applies to them: there is not enough on
+record to build a profile. <strong>Their zero means «I don't know», not «out of scope»</strong> —
+which is why they are not numbered among the others rather than placed last. Open one's record and
+build it a profile from articles it has published, and the next run will score it like the rest.</p>
+{% for row in buckets.unclassifiable %}{{ result(row) }}{% endfor %}
+{% endif %}
 
 <p class="note">A journal standing on fewer than two criteria of merit is marked, however well it
 does on logistics. That rule comes from a real choice that rested on three logistical reasons and one

@@ -516,6 +516,98 @@ def new_venue(
                             status_code=status.HTTP_303_SEE_OTHER)
 
 
+def parse_articles(raw: str) -> list[dict]:
+    """Articles pasted into a textarea, separated by a line of `---`.
+
+    First line of each block is the title, the rest is the abstract. A textarea
+    rather than JSON because the person filling it is copying from a journal's
+    website, and asking them to escape quotes to do that would be asking them to
+    do the computer's job.
+    """
+    out = []
+    for block in raw.replace("\r\n", "\n").split("\n---\n"):
+        lines = [ln for ln in block.strip().split("\n") if ln.strip()]
+        if not lines:
+            continue
+        out.append({"title": lines[0].strip(), "abstract": " ".join(lines[1:]).strip()})
+    return out
+
+
+@app.get("/app/venues/{venue_id}/profile", response_class=HTMLResponse)
+def profile_venue_form(request: Request, venue_id: int, user: User = Depends(require_admin),
+                       s: Session = Depends(get_db)):
+    venue = s.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such venue")
+    return page(request, "venue_profile.html", user, s, nav="venues",
+                venue=venue, form={}, error=None, report=None,
+                per_article=config.COST_TEXT,
+                min_words=config.MIN_ABSTRACT_WORDS,
+                remaining=db.credits_remaining(s), budget=config.daily_budget())
+
+
+@app.post("/app/venues/{venue_id}/profile")
+def profile_venue(
+    request: Request,
+    venue_id: int,
+    articles: str = Form(""),
+    user: User = Depends(require_admin),
+    s: Session = Depends(get_db),
+):
+    """Build a journal's scope profile from articles it actually published.
+
+    Synchronous, unlike a consultation, and the difference is one of scale
+    rather than of principle: five to ten calls against a hundred-odd. It is the
+    same reasoning either way — how long a browser is asked to wait, and how
+    long a SQLite write session is held while other pages read.
+    """
+    from .matching.pipeline import Refusal, guard_rail
+    from .sources.openalex import OpenAlexClient, OpenAlexError, RemoteBudgetExhausted
+    from . import manual
+
+    venue = s.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such venue")
+
+    def render(error=None, report=None):
+        return page(request, "venue_profile.html", user, s, nav="venues",
+                    venue=venue, form={"articles": articles}, error=error, report=report,
+                    per_article=config.COST_TEXT,
+                    min_words=config.MIN_ABSTRACT_WORDS,
+                    remaining=db.credits_remaining(s), budget=config.daily_budget())
+
+    parsed = parse_articles(articles)
+    if not parsed:
+        return render("Nothing to classify: paste at least one article.")
+
+    # The same guard rail stage 1 applies, and applied here for the same reason:
+    # below the threshold classification is unstable, so an article too short to
+    # classify would spend 100 credits to add noise to the profile. Free to
+    # check, so it is checked before anything is spent.
+    for i, art in enumerate(parsed, start=1):
+        try:
+            guard_rail(art["abstract"])
+        except Refusal as e:
+            return render(f"Article {i} («{art['title'][:60]}»): {e}")
+
+    cost = len(parsed) * config.COST_TEXT
+    remaining = db.credits_remaining(s)
+    if cost > remaining:
+        return render(
+            f"Not enough budget: {len(parsed)} articles cost {cost} credits and "
+            f"{remaining} are left of {config.daily_budget()} for today. It resets "
+            f"at midnight UTC."
+        )
+
+    try:
+        report = manual.profile_from_texts(s, OpenAlexClient(), venue, parsed)
+    except (db.BudgetExhausted, RemoteBudgetExhausted) as e:
+        return render(f"Budget: {e}")
+    except OpenAlexError as e:
+        return render(f"OpenAlex refused a call: {e}")
+    return render(report=report)
+
+
 @app.get("/app/venues/{venue_id}", response_class=HTMLResponse)
 def venue_detail(request: Request, venue_id: int, declared: str = "",
                  user: User = Depends(current_user), s: Session = Depends(get_db)):
@@ -736,13 +828,19 @@ def run_detail(request: Request, run_id: int, user: User = Depends(current_user)
     run = s.get(MatchRun, run_id)
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such run")
-    rows = []
+    # Three groups, kept apart the way `cut` produced them and the way the CLI
+    # has always printed them. Drawn as one ordered list, a venue with no
+    # profile reads as the worst of the shortlist rather than as something that
+    # is not on that axis at all.
+    buckets: dict[str, list] = {"shortlist": [], "excluded": [], "unclassifiable": []}
     for res in s.scalars(
-        select(MatchResult).where(MatchResult.run_id == run_id).order_by(MatchResult.position)
+        select(MatchResult)
+        .where(MatchResult.run_id == run_id)
+        .order_by(MatchResult.bucket, MatchResult.position)
     ):
         crits = list(s.scalars(select(Criterion).where(Criterion.result_id == res.id)))
         venue = s.get(Venue, res.venue_id)
-        rows.append(
+        buckets.setdefault(res.bucket, []).append(
             {
                 "result": res,
                 "venue": venue,
@@ -763,7 +861,8 @@ def run_detail(request: Request, run_id: int, user: User = Depends(current_user)
         request, "run.html", user, s,
         nav="runs",
         run=run,
-        rows=rows,
+        buckets=buckets,
+        total_rows=sum(len(v) for v in buckets.values()),
         # The manuscript's own profile: the input every score below is measured
         # against, and until now the one thing the page did not show.
         text_topics=(run.text_profile or {}).get("topics") or [],

@@ -355,6 +355,81 @@ def test_a_run_started_from_the_web_is_never_left_saying_running(client, monkeyp
         assert run.finished_at is not None
 
 
+# --- the three baskets ----------------------------------------------------
+
+
+def test_a_venue_with_no_profile_is_not_the_last_of_the_shortlist(client):
+    """The defect this column exists to prevent, seen from the page.
+
+    `cut` returns three lists and the CLI prints them under three headers.
+    Persistence used to concatenate them with one running counter, so a
+    hand-declared journal with no profile came out as position **13** of a
+    shortlist capped at twelve — a zero meaning «I don't know» read as «worst of
+    the ones we found». They are not on the same axis, so they are not numbered
+    against each other.
+    """
+    from dovetail.models import MatchResult
+
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        run = MatchRun(title="A paper", abstract="x", status="done")
+        s.add(run)
+        s.flush()
+        for i, (name, bucket) in enumerate(
+            [
+                ("Scored Journal", "shortlist"),
+                ("Also Scored", "shortlist"),
+                ("Barred By A Constraint", "excluded"),
+                ("No Profile At All", "unclassifiable"),
+            ]
+        ):
+            v = Venue(display_name=name)
+            s.add(v)
+            s.flush()
+            s.add(
+                MatchResult(
+                    run_id=run.id,
+                    venue_id=v.id,
+                    bucket=bucket,
+                    # Each basket numbers from 1: the point of the fix.
+                    position=1 if bucket != "shortlist" else i + 1,
+                    score_topic=0.0 if bucket == "unclassifiable" else 0.5,
+                    flags=["insufficient profile"] if bucket == "unclassifiable" else [],
+                )
+            )
+        run_id = run.id
+
+    page = client.get(f"/app/runs/{run_id}").text
+    assert "Excluded, and shown anyway" in page
+    assert "Unclassifiable" in page
+    # The unclassifiable venue must appear after its own heading, not inside the
+    # shortlist that precedes it.
+    assert page.index("Unclassifiable") < page.index("No Profile At All")
+    assert page.index("Scored Journal") < page.index("Excluded, and shown anyway")
+
+
+def test_the_header_counts_the_shortlist_and_not_every_row(client):
+    """«13 shortlisted» on a list capped at twelve was the first visible symptom."""
+    from dovetail.models import MatchResult
+
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        run = MatchRun(title="A paper", abstract="x", status="done")
+        s.add(run)
+        s.flush()
+        for bucket in ("shortlist", "unclassifiable"):
+            v = Venue(display_name=f"V {bucket}")
+            s.add(v)
+            s.flush()
+            s.add(MatchResult(run_id=run.id, venue_id=v.id, bucket=bucket, position=1))
+        run_id = run.id
+
+    page = client.get(f"/app/runs/{run_id}").text
+    assert "1 shortlisted" in page
+    assert "1 unclassifiable" in page
+    assert "2 shortlisted" not in page
+
+
 # --- declaring a journal by hand ------------------------------------------
 
 
@@ -370,6 +445,79 @@ def test_new_is_not_read_as_a_venue_id(client):
     sign_in(client, "admin@example.org", "pw-admin")
     assert client.get("/app/venues/new").status_code == 200
     assert client.get("/app/runs/new").status_code == 200
+
+
+def test_a_declared_journal_is_not_a_dead_end(client):
+    """Declaring one and never being able to profile it is a path to nowhere.
+
+    A journal with no profile cannot be scored at all, so a form that creates one
+    and no way to give it a profile produces a row that can only ever come out
+    unclassifiable.
+    """
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post("/app/venues/new", data={"display_name": "Nowhere Journal"})
+    assert r.status_code == 303
+    venue_id = int(r.headers["location"].split("/")[3].split("?")[0])
+
+    record = client.get(f"/app/venues/{venue_id}")
+    assert f"/app/venues/{venue_id}/profile" in record.text
+    assert client.get(f"/app/venues/{venue_id}/profile").status_code == 200
+
+
+def test_only_an_admin_can_profile_a_journal(client):
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post("/app/venues/new", data={"display_name": "Gated Journal"})
+    venue_id = int(r.headers["location"].split("/")[3].split("?")[0])
+
+    sign_in(client, "reader@example.org", "pw-reader")
+    assert client.get(f"/app/venues/{venue_id}/profile").status_code == 403
+    assert client.post(
+        f"/app/venues/{venue_id}/profile", data={"articles": "T\n" + "word " * 100}
+    ).status_code == 403
+
+
+def test_articles_are_read_as_title_then_abstract(client):
+    from dovetail.web import parse_articles
+
+    parsed = parse_articles("First title\nIts abstract.\nMore of it.\n---\nSecond title\nAnother.")
+    assert parsed == [
+        {"title": "First title", "abstract": "Its abstract. More of it."},
+        {"title": "Second title", "abstract": "Another."},
+    ]
+    assert parse_articles("   \n  \n") == []
+
+
+def test_a_short_article_is_refused_before_a_single_credit_is_spent(client):
+    """The same guard rail stage 1 applies, and for the same reason. Free to
+    check, and an article too short to classify would spend 100 credits to add
+    noise to the profile."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post("/app/venues/new", data={"display_name": "Short Journal"})
+    venue_id = int(r.headers["location"].split("/")[3].split("?")[0])
+
+    r = client.post(
+        f"/app/venues/{venue_id}/profile",
+        data={"articles": "A real title\n" + "word " * 100 + "\n---\nSecond\ntoo short"},
+    )
+    assert r.status_code == 200
+    assert "Article 2" in r.text and "too short" in r.text
+    with db.session_scope() as s:
+        assert db.credits_spent(s) == 0, "it spent before finishing the free checks"
+        assert s.get(Venue, venue_id).topics is None
+
+
+def test_profiling_more_articles_than_the_budget_covers_is_refused_with_the_number(client):
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post("/app/venues/new", data={"display_name": "Costly Journal"})
+    venue_id = int(r.headers["location"].split("/")[3].split("?")[0])
+    with db.session_scope() as s:
+        db.spend(s, config.daily_budget() - config.COST_TEXT)  # enough for exactly one
+
+    two = ("A title\n" + "word " * 100) + "\n---\n" + ("Another\n" + "word " * 100)
+    r = client.post(f"/app/venues/{venue_id}/profile", data={"articles": two})
+    assert r.status_code == 200
+    assert "Not enough budget" in r.text
+    assert str(2 * config.COST_TEXT) in r.text
 
 
 def test_declaring_a_journal_keeps_unknown_as_a_third_answer(client):

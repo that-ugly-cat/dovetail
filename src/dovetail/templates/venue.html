@@ -9,7 +9,8 @@
 {% if declared %}
 <div class="flash ok"><strong>Declared.</strong> It is in the table, stamped <code>manual</code> and
 dated. It stays <strong>unclassifiable</strong> — it cannot be scored and its zero means «I don't
-know» — until it has a profile built from articles it actually published.</div>
+know» — until it has a profile built from articles it actually published.
+<div style="margin-top:10px"><a class="btn btn-small" href="/app/venues/{{ venue.id }}/profile">Give it one now</a></div></div>
 {% endif %}
 
 <div class="btnrow" style="margin-bottom:16px">
@@ -74,9 +75,19 @@ know» — until it has a profile built from articles it actually published.</di
     The counts are multi-label and can sum past the total, so they are not comparable between journals
     without normalising.
   </p>
+  {% if user.is_admin() and venue.topics|length < 25 %}
+  <p style="margin:10px 0 0"><a class="btn btn-link btn-small" href="/app/venues/{{ venue.id }}/profile">Rebuild from articles</a></p>
+  {% endif %}
   {% else %}
-  <p class="muted" style="margin-bottom:0">No profile. This journal cannot be scored, and a zero here
-  would mean «no data», not «out of scope». <code>dovetail profile-venue</code> builds one.</p>
+  <p class="muted">No profile. This journal cannot be scored, and a zero here would mean «no data»,
+  not «out of scope» — so it comes out of a consultation under <strong>unclassifiable</strong>, in
+  its own group, rather than last in the list.</p>
+  {% if user.is_admin() %}
+  <p style="margin-bottom:0"><a class="btn btn-small" href="/app/venues/{{ venue.id }}/profile">Build one from its articles</a></p>
+  {% else %}
+  <p class="muted small" style="margin-bottom:0">Building one needs an admin: it spends the shared
+  OpenAlex budget, 100 credits per article.</p>
+  {% endif %}
   {% endif %}
 </div>
 
@@ -108,13 +119,15 @@ through the queue and never from a sweep.</p></div>
 {% if appearances %}
 <h2>Where it has come up</h2>
 <div class="card pad0 table-wrap"><table class="table">
-  <thead><tr><th>Consultation</th><th class="n">Position</th><th class="n">Topic</th>
+  <thead><tr><th>Consultation</th><th>Where it landed</th><th class="n">Topic</th>
     <th class="n">Subfield</th><th>When</th></tr></thead>
   <tbody>
   {% for res, run in appearances %}
   <tr>
     <td><a class="name" href="/app/runs/{{ run.id }}">{{ run.title[:70] }}</a></td>
-    <td class="n muted">{{ res.position }}</td>
+    <td>{% if res.bucket == 'shortlist' %}<span class="muted">shortlist, #{{ res.position }}</span>
+        {% elif res.bucket == 'excluded' %}<span class="badge warn">excluded</span>
+        {% else %}<span class="badge">unclassifiable</span>{% endif %}</td>
     <td class="n mono">{{ '%.4f'|format(res.score_topic) }}</td>
     <td class="n mono muted">{{ '%.4f'|format(res.score_subfield) }}</td>
     <td class="muted small">{{ run.created_at.strftime('%d %b %Y') }}</td>
@@ -123,7 +136,9 @@ through the queue and never from a sweep.</p></div>
   </tbody>
 </table></div>
 <p class="note">Positions from different consultations are not comparable: each is computed against
-its own paper, over whatever set the sweep of that day reached.</p>
+its own paper, over whatever set the sweep of that day reached. And a row marked
+<em>unclassifiable</em> was not ranked at all — it had no profile that day, so its zero meant «I
+don't know».</p>
 {% endif %}
 
 <h2>Where each field came from</h2>

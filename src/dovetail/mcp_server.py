@@ -284,10 +284,23 @@ def explain_match(run_id: int, venue_id: int) -> dict:
         return {
             "run_id": run_id,
             "venue": venue.display_name if venue else venue_id,
+            "bucket": res.bucket,
+            "bucket_note": {
+                "shortlist": "scored, passed the constraints, inside the cut",
+                "excluded": (
+                    "a constraint removed it; it is here because fewer than three "
+                    "venues passed and an empty list is not an answer"
+                ),
+                "unclassifiable": (
+                    "no profile, so no score applies: its zero means «I don't know», "
+                    "NOT «out of scope». Do not compare it with a scored venue"
+                ),
+            }.get(res.bucket, res.bucket),
             "position": res.position,
             "position_note": (
-                "position inside this run's list. Not a rank: the score is computed "
-                "against this one paper and the set is whatever the sweep reached"
+                "position inside its own bucket. Not a rank even there: the score is "
+                "computed against this one paper and the set is whatever the sweep "
+                "reached. Positions from different buckets are not comparable"
             ),
             "scope": {
                 "topic": round(res.score_topic, 4),

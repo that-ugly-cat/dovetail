@@ -1,0 +1,82 @@
+{% extends "base.html" %}{% block title %}Profile {{ venue.display_name }} — Dovetail{% endblock %}
+{% block body %}
+<h1>Give {{ venue.display_name }} a profile</h1>
+<p class="sub">From the articles it has <strong>actually published</strong>, classified one by one.
+The same idea as building a profile from a corpus rather than from a declared taxonomy — done with
+the instrument already at hand.</p>
+
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+{% if report %}
+<div class="flash ok">
+  <strong>Profiled.</strong> {{ report.articles_classified }} article{{ 's' if report.articles_classified != 1 }}
+  classified, <strong>{{ report.topics_found }} topics</strong> found, {{ report.credits_spent }} credits spent.
+  <div class="small" style="margin-top:6px">{{ report.caveat }}</div>
+</div>
+<p><a class="btn" href="/app/venues/{{ venue.id }}">See the record</a></p>
+{% endif %}
+
+{% if venue.topics %}
+<div class="flash">This journal already has a profile of {{ venue.topics|length }} topics. Profiling
+it again <strong>replaces</strong> that profile with the one built from what you paste below; it does
+not add to it.</div>
+{% endif %}
+
+<div class="card">
+  <h2>What it costs</h2>
+  <p class="muted" style="margin:0"><strong>{{ per_article }} credits per article</strong>, because
+  each one is a separate classification. {{ '{:,}'.format(remaining) }} of
+  {{ '{:,}'.format(budget) }} are left today.</p>
+  <p class="muted small" id="tally" style="margin:8px 0 0"></p>
+</div>
+
+<form method="post" action="/app/venues/{{ venue.id }}/profile">
+  <div class="card">
+    <label>Articles
+      <textarea name="articles" id="articles" rows="18" required
+        placeholder="Title of the first article&#10;Its abstract, on the following lines.&#10;&#10;---&#10;&#10;Title of the second article&#10;Its abstract.">{{ form.articles or '' }}</textarea>
+    </label>
+    <p class="muted small" style="margin:-4px 0 0">One article per block, separated by a line
+    containing only <code>---</code>. The <strong>first line of a block is the title</strong> and
+    everything after it is the abstract. Each abstract needs at least {{ min_words }} words: below
+    that the classification is unstable, and an article too short to classify would spend
+    {{ per_article }} credits to add noise.</p>
+
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn" type="submit">Classify and build the profile</button>
+      <a class="btn btn-link" href="/app/venues/{{ venue.id }}">Cancel</a>
+    </div>
+  </div>
+</form>
+
+<p class="note"><strong>Five to ten is the right size, taken from different years.</strong> Ten
+articles from the same special issue describe that issue, not the journal — and the profile they
+produce would then send the wrong papers here for as long as nobody rebuilds it.</p>
+<p class="note">The coverage figure stays empty, deliberately. On a journal indexed by OpenAlex it
+means «how much of the output these topics cover», and here the sample <em>is</em> everything that is
+known — calling that coverage would dress an unmeasured thing as a measurement.</p>
+<p class="note">A profile built this way starts at a disadvantage the score does not correct for: the
+cosine is invariant to scale but not to shape, so a handful of articles gives a flat vector, and a
+flat vector scores low against a pointed manuscript. It measures how <em>concentrated</em> a journal
+looks, and a small sample never looks concentrated.</p>
+
+<script>
+// A live count of what the paste will cost. The static rate above is the real
+// answer if this never runs; this only saves counting the separators by hand.
+(function () {
+  var box = document.getElementById('articles'), out = document.getElementById('tally');
+  if (!box || !out) return;
+  var rate = {{ per_article }}, left = {{ remaining }};
+  function tally() {
+    var n = box.value.split(/\n---\n/).filter(function (b) { return b.trim().length; }).length;
+    if (!n) { out.textContent = ''; return; }
+    var cost = n * rate;
+    out.textContent = n + ' article' + (n === 1 ? '' : 's') + ' → ' + cost + ' credits'
+      + (cost > left ? ', which is more than is left today' : '');
+    out.className = cost > left ? 'err small' : 'muted small';
+  }
+  box.addEventListener('input', tally);
+  tally();
+})();
+</script>
+{% endblock %}
