@@ -1,4 +1,19 @@
-"""Phase 1b: does the scope score actually rank the right venue high?
+"""RETIRED as validation, kept as diagnostics. See `validation.py` for what replaced it.
+
+The design fails on the question, not on the code: rank-of-true-venue measures a
+**rank**, which SPEC §0 says this output is not, and it compares two criteria
+rather than one criterion against truth — a paper lands in a journal for
+relationships, invitations and speed, which this tool does not model and should
+not. Agreement here is therefore not evidence, and disagreement is not a fault.
+
+It answers one question that is still worth asking: *is the true venue reachable
+at all*. That is a fact about stage 2, and stage 2 is the part Phase 0 did
+validate. Read nothing else off it.
+
+The original docstring follows, because its statement of the circularity is
+still correct and still applies to anyone tempted to revive this.
+
+Phase 1b: does the scope score actually rank the right venue high?
 
 The Phase 0 validation could only show that low scores track venues that
 rejected the paper. It could never show the other half — that high scores track

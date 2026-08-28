@@ -12,7 +12,7 @@ from . import config, db, seed as seed_mod
 from .db import BudgetExhausted
 from .matching import criteria as criteria_mod
 from .matching.pipeline import Refusal, run_match
-from .models import Proposal, ProposalStatus, Venue
+from .models import MatchResult, MatchRun, Proposal, ProposalStatus, Venue
 from .sources.doaj import DoajClient
 from .sources.enrich import enrich_from_doaj
 from .sources.openalex import (
@@ -319,12 +319,29 @@ def validate_against_published(
     top_n: int = typer.Option(12),
     discover: bool = typer.Option(True),
 ):
-    """Phase 1b: where does the journal that actually published each paper rank?
+    """RETIRED as validation. Kept as diagnostics, and it prints why.
 
-    Costs about 102 credits per paper. Read the caveat it prints: the numbers are
-    optimistic by construction, because each journal's profile was built from its
-    own works, this paper included.
+    This asked where the journal that really published a paper comes out, and
+    the question does not work: a paper lands somewhere for relationships,
+    invitations and speed, none of which the tool models, so a disagreement
+    cannot be read as the matcher being wrong rather than the matcher optimising
+    something else. It also measures a **rank**, which SPEC §0 says this output
+    is not.
+
+    What replaced it: `check-negatives` and `blind-sheet` / `score-sheet`. See
+    the module docstring of `validation.py`.
+
+    Still useful for one thing — seeing *whether the true venue is reachable at
+    all* — which is why it is here rather than deleted. Costs about 102 credits
+    per paper.
     """
+    typer.secho(
+        "Note: this is diagnostics, not validation — see `check-negatives` and "
+        "`blind-sheet`. A paper lands in a journal for reasons this tool does "
+        "not model, so agreement here is not evidence and disagreement is not a "
+        "fault.",
+        fg=typer.colors.YELLOW,
+    )
     from .validate import rank_of_true_venue, summarise
 
     db.init_engine()
@@ -358,6 +375,112 @@ def validate_against_published(
                 typer.echo(f"                {r.note}")
 
     typer.echo("\n" + json.dumps(summarise(results, top_n), indent=2, ensure_ascii=False))
+
+
+@app.command("blind-sheet")
+def blind_sheet_cmd(
+    run_id: int = typer.Option(..., help="A consultation that already has a shortlist."),
+    seed: int = typer.Option(..., help="Any integer. Write it down: scoring needs it."),
+    out: Path = typer.Option(None, help="Where to write the sheet (default: stdout)."),
+):
+    """Phase 1b, measure 2: a sheet mixing the finalists with decoys, to judge blind.
+
+    Costs nothing — the consultation already ran. The decoys are the control: if
+    they are accepted as often as the finalists, the list added nothing, and no
+    amount of agreement on the finalists alone would have shown it.
+    """
+    from .validation import blind_sheet, sheet_markdown
+
+    db.init_engine()
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            typer.secho(f"no consultation {run_id}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        rows = blind_sheet(s, run, seed=seed)
+        if not rows:
+            typer.secho("that consultation has no shortlist to judge", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=1)
+        text = sheet_markdown(rows, run, seed)
+        decoys = sum(1 for r in rows if r.is_decoy)
+
+    if out:
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"{out}: {len(rows)} rows, {decoys} of them decoys")
+        typer.secho("Do not read the file's source. Fill the y/n column.", fg=typer.colors.YELLOW)
+    else:
+        typer.echo(text)
+
+
+@app.command("score-sheet")
+def score_sheet_cmd(
+    run_id: int = typer.Option(...),
+    seed: int = typer.Option(..., help="The same seed the sheet was built with."),
+    marks: Path = typer.Option(..., help="The filled sheet, or a list like `1y 2n 3y`."),
+):
+    """Phase 1b, measure 2: score a filled sheet.
+
+    Rebuilds the same shuffle from the same seed, so which rows were decoys is
+    recovered rather than stored — nothing sitting on disk in the meantime can
+    tell the judge the answer.
+    """
+    from .validation import blind_sheet, parse_marks, score_sheet
+
+    db.init_engine()
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            typer.secho(f"no consultation {run_id}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        rows = blind_sheet(s, run, seed=seed)
+    report = score_sheet(rows, parse_marks(marks.read_text(encoding="utf-8")))
+    typer.echo(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+@app.command("check-negatives")
+def check_negatives_cmd(
+    run_id: int = typer.Option(..., help="The consultation for the paper in question."),
+    cases: Path = typer.Option(
+        ..., help='JSON: [{"paper": "...", "venue_name": "...", '
+                  '"venue_openalex_id": "S123", "reason": "desk reject, out of scope"}]'
+    ),
+):
+    """Phase 1b, measure 1: did the tool suggest a journal that then said no?
+
+    The one direction of this validation nothing contaminates. A desk reject
+    motivated on scope is the journal's own statement about fit — which is the
+    thing the tool models — so a venue like that appearing in a shortlist is
+    wrong in a way nobody has to interpret.
+
+    Only cases rejected **on scope** belong in the file. A desk reject for length
+    or format says nothing about fit and would make the number meaningless.
+    """
+    from .validation import NegativeCase, check_negatives, summarise_negatives
+
+    db.init_engine()
+    payload = json.loads(cases.read_text(encoding="utf-8"))
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            typer.secho(f"no consultation {run_id}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        results = list(
+            s.scalars(select(MatchResult).where(MatchResult.run_id == run_id))
+        )
+        shortlisted = {r.venue_id for r in results if r.bucket == "shortlist"}
+        reachable = {r.venue_id for r in results if r.score_topic > 0}
+        outcomes = check_negatives(
+            s,
+            (run.text_profile or {}).get("topics") or [],
+            [NegativeCase(**c) for c in payload],
+            shortlisted,
+            reachable,
+        )
+
+    for o in outcomes:
+        colour = typer.colors.GREEN if o.caught else typer.colors.RED
+        typer.secho(f"  {o.verdict:>12}  {o.venue_name[:44]:<46} {o.detail}", fg=colour)
+    typer.echo("\n" + json.dumps(summarise_negatives(outcomes), indent=2, ensure_ascii=False))
 
 
 @app.command("create-user")
