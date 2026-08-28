@@ -186,6 +186,19 @@ key that belongs to a person rather than to the server.
 Losing `FERNET_KEY` means every stored key becomes unreadable and has to be
 entered again. Nothing else breaks: stages 1 to 4 never touch it.
 
+**Not every Anthropic key is the same kind of thing.** A key scoped to «all
+workspaces» is *identity-linked* and refuses every call — including one that
+asks the model to say "ok" — until the request names a workspace, which the SDK
+has no parameter for and which travels as a header. The slug in the Console URL
+(`default`) is not the id and is rejected too. Two ways out: put the real id in
+`/app/settings`, or **issue a key scoped to one workspace**, which carries its
+own and needs nothing. The second is less work and is what this deployment uses.
+
+The app names the three failures apart, because they want three different fixes:
+`needs_workspace` is a form to fill in, `bad_key` a credential to check,
+`no_credit` a balance to top up. All three used to render as the word
+`BadRequestError`.
+
 ## 9. What is not deployed
 
 `venue_history` is not implemented: it would read PaperTrail, which needs a key

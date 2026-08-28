@@ -170,8 +170,9 @@ Campi da API (rinfrescabili in blocco) e campi da guidelines (uno alla volta, vi
 | `works_count` | OpenAlex | |
 | `h_index`, `2yr_mean_citedness` | OpenAlex `summary_stats` | annidati, non di primo livello |
 | `topics[]` con `count` e `share` | OpenAlex | **troncato a 25 per ogni rivista** — vedi §6 |
-| `corpus_embedding` | derivato | profilo di scope dagli ultimi ~200 abstract; porta **modello ed etichetta di versione**, perché cambiare modello invalida tutti i profili insieme |
-| `corpus_sampled_at`, `corpus_n` | derivato | quando e su quanti lavori è stato costruito |
+| `topics_coverage` | OpenAlex | quanta parte dell'output quei 25 topic coprono; `None` su un profilo costruito a mano, perché lì il campione *è* tutto ciò che si sa |
+| `recent_titles[]` | OpenAlex | titoli e anni degli ultimi ~25 lavori. È ciò che lo **stadio 5a** legge per giudicare la forma; cacheato qui perché è inventario, costa 10 crediti a rivista e cambia sul tempo di un fascicolo |
+| ~~`corpus_embedding`, `corpus_sampled_at`, `corpus_n`~~ | — | **mai costruiti.** La v0.3 li prevedeva per sostituire la tassonomia con gli embedding; il punteggio è rimasto il coseno sui topic a tre livelli. Restano elencati perché la §6 li nomina ancora come previsti, e perché il piano non è stato abbandonato ma non eseguito |
 | `license[]`, `review_process`, `publication_time_weeks`, `has_waiver` | DOAJ | solo full OA |
 | `anvur_class` | ANVUR | per settore, rilevante 11/C2 |
 | `indexed_in[]` | NLM / Scopus | |
@@ -204,6 +205,36 @@ referenze, didascalie — la fonte più comune di errore), `abstract_limit`, `re
 - **`venue_snapshot`** — i profili di topic delle venue in shortlist al momento della corsa. I
   profili cambiano a ogni rinfresco: senza snapshot, tornare indietro dopo un esito confronta
   l'esito di ieri con i dati di oggi, che è esattamente ciò che la tabella esiste per evitare.
+  (Sta su `match_result`, non qui.)
+- **`status`** (`running` | `done` | `refused` | `failed`), con `error_code`, `error_detail` e
+  `finished_at`. Una consultazione avviata dal web risponde **prima di aver finito**, quindi la riga
+  esiste mentre è ancora vuota — e quello stato è altrimenti indistinguibile da una corsa il cui
+  processo è morto a metà. Vedi §12.
+- **`refused_reason`** — il rifiuto è una risposta, e viene conservato come le altre.
+
+### `match_result`
+Una riga per venue valutata e conservata. Oltre a `score_topic`, `score_subfield`, `score_field`,
+`venue_snapshot`, `excluded_by` e `flags`:
+
+- **`bucket`** (`shortlist` | `excluded` | `unclassifiable`) e **`position` dentro il cestino.**
+  `cut` restituisce tre liste e la persistenza le concatenava con un contatore unico, il che
+  buttava via il cestino un passo dopo averlo calcolato — e faceva uscire una rivista senza profilo
+  come «tredicesima» di una shortlist tagliata a dodici. Numerare fra cestini afferma un ordine fra
+  cose non confrontabili. Vedi §6, stadio 4.
+- **`genre_verdict`** — l'esito dello **stadio 5a**, accanto ai punteggi e mai fuso con loro: il
+  giudizio non è riproducibile, e una lista ordinata su qualcosa di non riproducibile non si può
+  spiegare. Vedi §12 e §16e.
+
+### `app_user`
+Oltre a identità e ruolo:
+
+- **`anthropic_key_encrypted`** — Fernet, con la chiave del server in `FERNET_KEY`. Per **persona**
+  e non per macchina: un giudizio addebita chi lo ha avviato, e questa macchina non tiene
+  credenziali di modello proprie.
+- **`anthropic_workspace_id`** — **non cifrato**, perché è un identificatore e non un segreto:
+  nasconderlo lo renderebbe illeggibile proprio a chi sta cercando di capire perché la chiave viene
+  rifiutata. Serve solo alle chiavi *identity-linked*; una chiave normale se lo porta dietro. Vedi
+  §12.
 
 ### `criterion`
 Per ogni `match_result`: `kind` (`merito` | `logistica`), `label`, `weight`, `evidence` (da quale
