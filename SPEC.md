@@ -385,7 +385,7 @@ taglio. Due chiamate di natura diversa:
 - **Giudizio di genere, con Sonnet 5.** Legge l'abstract (o l'anatomia, se c'è) contro l'indice
   recente della rivista e risponde a una domanda sola: *questa rivista pubblica cose fatte così?* Non
   «di questo argomento», che l'hanno già detto gli stadi 3 e 4. È il criterio di merito che ai due
-  desk reject del 2026 mancava, e va al modello grande perché è la chiamata difficile.
+  desk reject del 2026 mancava (**smentito, §16e**), e va al modello grande perché è la chiamata difficile.
 
 Il giudizio di genere **non riordina** la shortlist. Alza una bandiera accanto alla venue e scrive
 la frase che la motiva, che finisce fra i criteri di merito di §9. Ordinare su un giudizio non
@@ -622,9 +622,9 @@ profilo lo costruisce.
 ### Stadio 5a — la domanda che il coseno non può fare
 
 Lo scope dice di **cosa** parla un paper; il genere dice **che forma** ha. Uno studio empirico e un
-saggio concettuale sullo stesso argomento hanno lo stesso coseno e stanno in riviste diverse — ed è
-esattamente il buco dei due desk reject del 2026, uno dei quali è tornato con «out of scope»
-attaccato a un paper il cui scope andava bene.
+saggio concettuale sullo stesso argomento hanno lo stesso coseno e stanno in riviste diverse.
+
+> **La ragione per cui è stato costruito è falsa, misurato il 28 ago 2026.** Vedi §16e.
 
 Gira **solo sulle finaliste**, e tre regole lo tengono in piedi.
 
@@ -816,11 +816,52 @@ chiamate sono dodici e corte, quindi la differenza di prezzo su una consultazion
 modello viene **scritto su ogni verdetto**, così un giudizio riletto fra un anno dice cosa lo ha
 prodotto.
 
-**Ordine, e perché.** Lo stadio 5 è il pezzo che avrebbe evitato i desk reject del 2026, e sta in
-fondo lo stesso: senza inventario, profili e vincoli non ha finaliste da leggere, e farlo girare su
+**Ordine, e perché.** ~~Lo stadio 5 è il pezzo che avrebbe evitato i desk reject del 2026~~ — **falso,
+misurato il 28 ago 2026, vedi §16e** — e sta in fondo lo stesso: senza inventario, profili e vincoli non ha finaliste da leggere, e farlo girare su
 259 candidate sarebbe la versione lenta e cara della stessa risposta. Se la Fase 1b dicesse che il
 punteggio di scope non separa niente, lo stadio 5 va anticipato e il resto del ranking degradato a
 filtro — quello è il bivio vero, e si decide con dei numeri, non adesso.
+
+---
+
+## 16e. Lo stadio 5a non era il criterio mancante (28 ago 2026)
+
+Lo stadio 5a è stato costruito su un'affermazione precisa: *è il criterio che ai due desk reject del
+2026 mancava*. Eseguito, l'affermazione è **falsa**, e vale la pena averla scritta in modo
+falsificabile invece che in modo suggestivo.
+
+Interrogato su **Venue A** e **Venue B** — le due che hanno rimbalzato il caso di validazione — il
+giudizio risponde **«stessa forma» tutte e due le volte, con confidenza alta**, e ha ragione:
+pubblicano entrambe survey a vignette su atteggiamenti morali, e il manoscritto è una survey a
+vignette su atteggiamenti morali. Il giudizio cita casi precisi dai loro indici recenti.
+
+**Quei rifiuti erano sull'argomento, non sulla forma.** Ed è ciò che la Fase 0 aveva già trovato:
+nessuna delle due condivide un solo topic col testo, quindi lo stadio 2 non le produce mai. Il
+criterio mancante c'era dal primo giorno.
+
+### Cosa lo stadio 5a fa davvero, dalla stessa corsa
+
+Sulle dodici finaliste ha risposto **dieci «stessa forma» e due «forma diversa»**:
+
+| | |
+|---|---|
+| *Philosophical Psychology* | saggi concettuali contro un manoscritto empirico |
+| *Journal of Vaccines & Immunization* | immunologia di laboratorio, nessuna scienza sociale |
+
+Entrambe corrette, ed entrambe **irraggiungibili da qualunque punteggio il tool calcoli**: erano in
+shortlist con tre criteri di merito ciascuna. Quindi lo stadio 5a si guadagna il posto **dentro una
+shortlist che lo scope ha già reso plausibile**, non come guardia contro i fallimenti che l'hanno
+motivato.
+
+È una rivendicazione più piccola, ed è quella che i numeri sostengono. La regola che ne esce vale
+oltre questo tool:
+
+> **Un pezzo costruito su una ragione può funzionare per un'altra, e finché non lo si esegue le due
+> cose sono indistinguibili.**
+
+Ed è anche il motivo per cui `judge-venues` resta: una venue che il matcher non propone mai è
+invisibile a ogni superficie che legge una shortlist, e un'affermazione che niente può raggiungere è
+un'affermazione che niente può testare.
 
 ---
 

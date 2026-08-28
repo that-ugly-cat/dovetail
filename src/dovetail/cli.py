@@ -392,11 +392,17 @@ def judge_venues_cmd(
     the question the product cannot ask: *what does the genre judgement say about
     a journal the matcher never suggested?*
 
-    That is the experiment stage 5a was built for. The spec claims it is «the
-    criterion the two desk rejects of 2026 were missing» — and those two venues
-    are **unreachable at stage 2**, sharing no topic with the text, so they never
-    enter a shortlist and the button can never reach them. Without this command
-    the claim is unfalsifiable, which is a bad property for a claim to have.
+    That is the experiment stage 5a was built for, and on 28 Aug 2026 it **ran
+    and falsified the claim**. The spec said stage 5a was «the criterion the two
+    desk rejects of 2026 were missing»; asked about those two venues it answers
+    *same kind* both times, with high confidence and correctly — they publish
+    exactly this form. The rejections were about subject, which stage 2 already
+    catches by never producing either venue.
+
+    The command stays, because the next claim of this shape will need the same
+    treatment: a venue the matcher never suggests is invisible to every surface
+    that reads a shortlist, and a claim nothing can reach is a claim nothing can
+    test.
 
     Verdicts are printed and **not stored**: these journals have no row in the
     run, and inventing one would put a venue in a consultation that the

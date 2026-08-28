@@ -149,8 +149,13 @@ def test_a_judgement_never_reorders_the_list(run_with_shortlist):
 
 
 def test_a_positive_verdict_becomes_a_criterion_of_merit(run_with_shortlist):
-    """It is the column the two desk rejects were short of, so that is where it
-    goes — and only when it is positive."""
+    """Merit and not logistics, and only when the verdict is positive.
+
+    Merit because genre is a claim about the work rather than about the
+    transaction — not, as this docstring used to say, because it is the column
+    the 2026 desk rejects were short of. That reason was measured on 28 Aug 2026
+    and is false: both rejecting venues come back *same kind*.
+    """
     from sqlalchemy import select
 
     run_id, _ = run_with_shortlist

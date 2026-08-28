@@ -2,9 +2,25 @@
 
 The question stages 3 and 4 cannot ask. Scope says what a paper is **about**;
 genre says what **shape** it is. An empirical study and a conceptual essay on the
-same subject score identically on the cosine and belong in different journals —
-and getting that wrong is what two desk rejects in 2026 were, one of them
-returned with the words «out of scope» attached to a paper whose scope was fine.
+same subject score identically on the cosine and belong in different journals.
+
+**What this module is NOT for, measured on 28 Aug 2026.** It was built claiming
+to be «the criterion the two desk rejects of 2026 were missing». It is not.
+Asked about Venue A and Venue B — the two that turned the validation case down —
+it answers *same kind*, both times, with high confidence and good reasons: they
+publish vignette surveys of moral attitudes and the manuscript is one. The
+judgement is right and the claim was wrong. Those rejections were about
+**subject**, which stage 2 already catches by never producing either venue: they
+share no topic with the text at all. The criterion that was missing had been
+there since Phase 0.
+
+**What it is for, from the same run.** On the twelve finalists it answered *same
+kind* ten times and *different kind* twice — *Philosophical Psychology*
+(conceptual essays against an empirical manuscript) and *Journal of Vaccines &
+Immunization* (laboratory immunology). Both correct, and neither reachable by any
+score the tool computes. So it earns its place **inside a shortlist that scope
+has already made plausible**, not as a guard against the failures that motivated
+it. That is a smaller claim and it is the one the numbers support.
 
 Three rules hold this module in place.
 
