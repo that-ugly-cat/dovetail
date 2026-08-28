@@ -802,10 +802,10 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
   su `/` con l'app a `/app`, e la UI che **esegue**: consultazione con il costo dichiarato prima del
   bottone, e dichiarazione di una rivista a mano. Dettaglio in §12, e in §17 il difetto della stima
   che la prima corsa vera ha trovato.
-- **Fase 1b — ridisegnata, 28 ago 2026.** Il disegno vecchio è **ritirato**: misurava un rango, che
-  la §0 dice non essere ciò che il tool produce, e confrontava due criteri invece di un criterio
-  contro la verità. Al suo posto due misure che non hanno quel problema — i **negativi noti** e la
-  **precisione a dodici giudicata in cieco**, col tasso sui decoy come controllo. Dettaglio in §16d.
+- **Fase 1b — ridisegnata e in parte misurata, 28 ago 2026.** Il disegno vecchio è **ritirato**
+  (§16d). Al suo posto due misure: i **negativi noti**, che hanno dato **4/4 tutte irraggiungibili**
+  su tre paper (§16f), e la **precisione a dodici giudicata in cieco**, che è pronta e **non ha
+  ancora un numero** perché aspetta un'ora di giudizio umano.
 - **Fase 4** — **stadio 5a fatto** (giudizio di genere, §12); restano **5b** (estrazione guidelines
   con Haiku, che vuole fetchare pagine web arbitrarie e un URL che per quasi tutte le venue non si
   ha), l'anatomia e `venue_history`.
@@ -821,6 +821,44 @@ misurato il 28 ago 2026, vedi §16e** — e sta in fondo lo stesso: senza invent
 259 candidate sarebbe la versione lenta e cara della stessa risposta. Se la Fase 1b dicesse che il
 punteggio di scope non separa niente, lo stadio 5 va anticipato e il resto del ranking degradato a
 filtro — quello è il bivio vero, e si decide con dei numeri, non adesso.
+
+---
+
+## 16f. Il primo numero della Fase 1b (28 ago 2026)
+
+**4 su 4, tutte `unreachable`.** La misura 1 girata su tutto ciò che il corpus contiene.
+
+| paper | rivista | motivazione della rivista | esito |
+|---|---|---|---|
+| Fragility of Moral Key Terms | Venue B | «Out of Scope for the journal» | irraggiungibile |
+| Il problema del 42 | PNAS Opinion | «did not find the proposed piece to be a good fit» | irraggiungibile |
+| Il problema del 42 | Nature Machine Intelligence | «would find a better outlet in another journal» | irraggiungibile |
+| PSA screening (Soc Sci Med 2026) | Public Understanding of Science | «outside our journal scope… una rivista di public health sarebbe adatta» | irraggiungibile |
+
+Tre paper diversi, panieri generati dal sistema da oltre quattromila candidate ciascuno, e **nessuna
+delle quattro venue sarebbe mai stata proposta**: non condividono un solo topic col testo, quindi lo
+stadio 2 non le produce. Zero finite in shortlist.
+
+**Cosa questo è.** Un rafforzamento reale del risultato di Fase 0, che era n=1 su un paniere scelto a
+mano: adesso è n=3 paper su panieri generati. E valida di nuovo lo **stadio 2**, non il punteggio.
+
+**Cosa questo non è.** Quattro non è un campione, è il **corpus intero** — e il motivo per cui è
+quattro non riguarda le riviste ma la registrazione: su 53 rifiuti in PaperTrail solo **6 portano una
+motivazione della rivista**, e 4 nominano lo scope. Il campo *ragione* non esiste sulle submission,
+quindi la motivazione vive in una nota scritta quando capita di incollare la lettera, e tutte e
+quattro sono da giugno 2025 in poi.
+
+> **Un dataset costruito così misura l'abitudine ad annotare di chi lo tiene, non il comportamento
+> delle riviste.** Il collo di bottiglia della validazione di Dovetail è un campo mancante in un
+> altro strumento.
+
+E resta la metà che nessuno ha ancora misurato: questo limita i **falsi positivi** e basta. Che le
+riviste proposte siano buone lo dice solo la scheda in cieco.
+
+Una nota dal caso PSA, che non entra nella misura ma vale: PUS ha suggerito «public health o health
+psychology», Dovetail ha proposto riviste di urologia e cancro alla prostata, e il paper è poi uscito
+su *Social Science & Medicine*. Tre opinioni diverse su dove stesse quel lavoro, e nessuna delle tre
+è il tipo di dato che questa misura sa leggere.
 
 ---
 
