@@ -385,3 +385,19 @@ def test_a_slug_where_an_id_belongs_is_still_a_workspace_problem():
         message = "anthropic-workspace-id header must be a valid workspace ID."
 
     assert genre.classify_api_error(FakeBadWorkspace())[0] == genre.NEEDS_WORKSPACE
+
+
+def test_a_blank_workspace_sends_no_header_at_all():
+    """A plain key carries its own workspace, so the normal case is no header.
+
+    And whitespace counts as blank: `"   "` would otherwise go out as an *empty*
+    header, which produces exactly the 400 the header exists to prevent and
+    gives no hint why.
+    """
+    for blank in (None, "", "   ", "\t\n"):
+        client = genre.build_client("sk-ant-legacy", blank)
+        assert "anthropic-workspace-id" not in client.default_headers, repr(blank)
+
+    assert genre.build_client("sk-ant-x", "  wrkspc_real  ").default_headers[
+        "anthropic-workspace-id"
+    ] == "wrkspc_real"

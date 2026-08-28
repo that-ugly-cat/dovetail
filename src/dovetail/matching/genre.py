@@ -150,11 +150,21 @@ def build_client(api_key: str, workspace_id: str | None = None):
     the model to say "ok", which is how this was diagnosed: four probes of
     increasing simplicity all returned the same 400, so it was never about the
     request body.
+
+    **A plain (legacy) key needs none of this.** It carries its own workspace, so
+    leaving the id empty is the normal case and sends no header at all — which is
+    why the field is optional rather than the feature being conditional.
     """
     import anthropic
 
+    # Stripped, and blank treated as absent. A workspace id of `"   "` — from a
+    # stray space in an env var, or a form field somebody tabbed through — would
+    # otherwise send an **empty header**, which produces exactly the 400 the
+    # header exists to prevent and gives no hint why. The web form already
+    # strips before storing; this is the boundary every caller goes through.
+    workspace_id = (workspace_id or "").strip()
     headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
-    return anthropic.Anthropic(api_key=api_key, default_headers=headers)
+    return anthropic.Anthropic(api_key=api_key.strip(), default_headers=headers)
 
 
 def classify_api_error(exc) -> tuple[str, str]:
