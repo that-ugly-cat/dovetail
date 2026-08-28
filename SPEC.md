@@ -479,18 +479,24 @@ Ogni **campo** porta la propria `verified_at`, non il record.
 
 Letture libere, **scritture solo come proposte**, approvazione in UI.
 
-| tool | cosa fa |
-|---|---|
-| `match_venues(title, abstract, word_count, constraints, full_text?)` | la shortlist, con criteri e avvertenze |
-| `explain_match(run_id, venue_id)` | coseno di embedding e punteggi per topic ai tre livelli, il verdetto di genere dello stadio 5 con la frase che lo motiva, i criteri, e cosa l'ha quasi esclusa |
-| `list_runs(limit)` | le consultazioni passate — mancava in v0.1, e `explain_match` presupponeva di conoscere già il `run_id` |
-| `get_venue(venue_id)` | record completo con `verified_at` per campo |
-| `list_article_types(venue_id)` | i tipi e i limiti — mancava in v0.1 |
-| `search_venues(q, filters)` | lessicale: un buco significa «non con queste parole» |
-| `venue_history(venue_id)` | da PaperTrail, via `venue_alias` |
-| `list_sources()` | sorgenti con hints |
-| `refresh_venue(venue_id)` / `budget_status()` | rinfresco puntuale e stato del budget OpenAlex |
-| `propose_venue` / `propose_update` / `propose_alias` / `list_proposals` | la coda |
+| tool | cosa fa | stato |
+|---|---|---|
+| `match_venues(title, abstract, word_count, funder, max_apc, discover)` | la lista con criteri e avvertenze | ✅ |
+| `explain_match(run_id, venue_id)` | punteggi ai tre livelli, criteri, vincoli, e lo **snapshot** del momento | ✅ |
+| `list_runs(limit)` | le consultazioni passate, con i vincoli di ciascuna | ✅ |
+| `get_venue(venue_id)` | record completo con `verified_at` **per campo** e la fonte di ogni timbro | ✅ |
+| `list_article_types(venue_id)` | tipi e limiti di parole | ✅ (tabella quasi sempre vuota) |
+| `search_venues(q, limit)` | ricerca lessicale su nome e ISSN | ✅ |
+| `budget_status()` | crediti residui, da guardare prima di `match_venues` | ✅ |
+| `list_sources()` | sorgenti con i loro hints | ✅ |
+| `list_proposals(status)` | la coda | ✅ |
+| `propose_venue` / `propose_update` | depositano in coda, non scrivono | ✅ |
+| `venue_history(venue_id)` | cosa è già successo lì, da PaperTrail | ❌ **non implementato**: richiede una chiave PaperTrail lato server, che è una decisione di deploy e non di codice |
+
+**Nessun tool approva.** È la garanzia che rende sicuro puntarci un agente, ed è protetta da un
+test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *delete* o *remove*.
+`approve-alias` resta sulla CLI finché non c'è la UI: proporre non è approvare, e la regola
+«l'approvazione vive nella UI» non è stata piegata per comodità.
 
 `record_outcome` **non esiste**: gli esiti stanno in PaperTrail, e duplicarli creerebbe due verità.
 
