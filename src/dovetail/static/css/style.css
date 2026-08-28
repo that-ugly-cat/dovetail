@@ -1,0 +1,250 @@
+/* Dovetail — the borant tools' dark palette.
+ *
+ * Not the corporate identity of borant.eu: that navy-and-orange on white is the
+ * company's face towards people arriving from outside. This is the face the
+ * tools show to whoever works inside them, and it is shared with LSSR, AutoCode,
+ * ArguMap, PaperTrail and TheList so a template moved between two of them does
+ * not bring its own vocabulary along.
+ *
+ * The class names are the inherited ones: .topbar .container .card .btn
+ * .btn-primary .btn-danger .btn-small .btn-link .table .badge .flash.
+ */
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --card-hover: #1e2235;
+  --text: #e2e8f0;
+  --muted: #a0aec0;
+  --muted-2: #718096;
+  --muted-3: #4a5568;
+  --border: #2d3148;
+  --primary: #0a3c8a;
+  --primary-hover: #0d4fa8;
+  --accent: #4a6fa5;
+  --accent-light: #63b3ed;
+  --danger: #fc8181;
+  --danger-bg: #2d1515;
+  --danger-border: #7b2020;
+  --ok: #68d391;
+  --ok-bg: #15291c;
+  --warn: #f6ad55;
+  --warn-bg: #2d2415;
+  --radius: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  font-size: 15px; line-height: 1.5;
+}
+
+/* ── chrome ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card); border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 56px; gap: 16px;
+}
+.topbar .brand { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
+.topbar nav { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.topbar nav a {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 4px 2px; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.topbar nav a:hover, .topbar nav a.on { color: var(--text); border-bottom-color: var(--accent); }
+.topbar .who { color: var(--muted-2); font-size: 13px; }
+.topbar form { margin: 0; }
+.dot {
+  background: var(--primary); color: #fff; border-radius: 10px;
+  padding: 0 6px; font-size: 11px; vertical-align: 1px;
+}
+
+.container { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+.container.wide { max-width: 1240px; }
+.narrow { max-width: 420px; margin: 40px auto; }
+
+h1 { font-size: 24px; margin: 8px 0 6px; }
+h2 { font-size: 16px; margin: 28px 0 10px; }
+h3 { font-size: 13px; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+a { color: var(--accent-light); }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.muted { color: var(--muted-2); }
+.small { font-size: 13px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
+.num { font-variant-numeric: tabular-nums; }
+.hidden { display: none; }
+code {
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 1px 6px; border-radius: 4px; font-size: 13px;
+}
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+/* ── the notes that carry the doctrine ──
+ * Dovetail says more about its own limits than most tools, and those sentences
+ * are the product as much as the numbers are. They get a left rule, not a box:
+ * a box reads as a warning, and most of them are not warnings.
+ */
+.note {
+  border-left: 2px solid var(--border); padding: 2px 0 2px 14px;
+  color: var(--muted-2); font-size: 13.5px; margin: 14px 0;
+}
+.flash {
+  background: var(--warn-bg); border: 1px solid #4a3a1a; color: #e8d5b0;
+  padding: 10px 14px; border-radius: var(--radius); margin: 12px 0;
+}
+.flash.err { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.flash.ok { background: var(--ok-bg); border-color: #2a5a3a; color: var(--ok); }
+.err, .red { color: var(--danger); }
+.warn { color: var(--warn); }
+.ok { color: var(--ok); }
+.empty { color: var(--muted-3); padding: 24px 0; }
+
+/* ── cards and stat grids ──
+ * `minmax(0, 1fr)` and never a bare `1fr`: the implicit minimum of `1fr` is
+ * `auto`, i.e. the content's own minimum width, so a long journal name in a
+ * cell pushes the page sideways instead of letting the table scroll inside its
+ * own wrapper.
+ */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+}
+.card.pad0 { padding: 0; }
+.card h2 { margin-top: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.grid > * { min-width: 0; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.stat .n { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat .n.warn { color: var(--warn); }
+.stat .n.err { color: var(--danger); }
+.stat .lbl { color: var(--muted-2); font-size: 13px; }
+.stat .foot { color: var(--muted-3); font-size: 12px; margin-top: 4px; }
+
+/* ── badges ── */
+.badge, .chip, .pill {
+  display: inline-block; padding: 1px 9px; border-radius: 999px;
+  font-size: 12px; text-decoration: none; white-space: nowrap;
+  border: 1px solid var(--border); color: var(--muted); background: transparent;
+}
+.badge.on, .chip.on, .pill.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.badge.ok { border-color: #2a5a3a; color: var(--ok); }
+.badge.warn { border-color: var(--warn); color: var(--warn); }
+.badge.danger { border-color: var(--danger-border); background: var(--danger-bg); color: var(--danger); }
+.badge.accent { border-color: var(--accent); color: var(--accent-light); }
+a.chip:hover { border-color: var(--accent); color: var(--text); }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; }
+.filters .lbl {
+  font-size: 11px; text-transform: uppercase; color: var(--muted-3);
+  margin-left: 10px; letter-spacing: .05em;
+}
+
+/* ── tables ──
+ * Every table lives in a .table-wrap so a wide one scrolls inside itself. The
+ * wrapper is the half that is easy to forget, and forgetting it is how a page
+ * ends up scrolling sideways as a whole.
+ */
+.table-wrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td {
+  text-align: left; padding: 9px 10px;
+  border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.table th {
+  color: var(--muted-2); font-weight: 500; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .05em; white-space: nowrap;
+}
+.table tbody tr:hover { background: var(--card-hover); }
+.table td.n, .table th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.table tr.dim td { opacity: .55; }
+.table .name { color: var(--text); text-decoration: none; font-weight: 500; }
+.table .name:hover { color: var(--accent-light); }
+
+/* ── forms ── */
+label { display: block; margin: 10px 0; font-size: 13px; color: var(--muted); }
+label.check { display: flex; align-items: center; gap: 8px; }
+label.check input { width: auto; margin: 0; }
+input, select, textarea {
+  width: 100%; margin-top: 4px; padding: 7px 10px; font: inherit; font-size: 14px;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+textarea { resize: vertical; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 12px; }
+form.inline { display: inline; }
+form.searchbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0; }
+form.searchbar input, form.searchbar select { margin: 0; width: auto; }
+form.searchbar input.q { min-width: 260px; flex: 1; }
+
+.btn {
+  display: inline-block; background: var(--primary); color: #fff; border: none;
+  padding: 8px 16px; border-radius: 6px; font: inherit; font-size: 14px;
+  cursor: pointer; text-decoration: none;
+}
+.btn:hover { background: var(--primary-hover); }
+.btn-primary { background: var(--primary); }
+.btn-small { padding: 5px 12px; font-size: 13px; }
+.btn-link, .btn.ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.btn-link:hover, .btn.ghost:hover { background: transparent; color: var(--text); border-color: var(--accent); }
+.btn-danger { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-danger:hover { background: transparent; color: var(--danger); border-color: var(--danger-border); }
+.btnrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── pagination ── */
+.pager { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.pager .count { color: var(--muted-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ── a result row: merit on one side, logistics on the other ──
+ * The two columns are the tool's one original idea, so they are drawn as two
+ * columns and never merged into a list. A venue standing on fewer than two
+ * criteria of merit gets a red inset rule down its left edge — an inset shadow
+ * and not a border, which is how PaperTrail does it and for a reason worth
+ * copying: a border adds to the box and shifts every row on the page.
+ */
+.res { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; }
+.res:hover { background: var(--card-hover); }
+.res.thin { box-shadow: inset 3px 0 0 var(--danger); }
+.res.unreachable { opacity: .72; }
+.res .rhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.res .pos { color: var(--muted-3); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 26px; }
+.res .vname { color: var(--text); text-decoration: none; font-weight: 600; font-size: 15px; }
+.res .vname:hover { color: var(--accent-light); }
+.res .scores { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--muted-2); }
+.res .scores b { display: block; color: var(--text); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.res .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 20px; margin-top: 10px; }
+.res .cols > div { min-width: 0; }
+.res .crit { list-style: none; margin: 3px 0 0; padding: 0; font-size: 13.5px; }
+.res .crit li { padding: 1px 0; }
+.res .crit li .ev { color: var(--muted-3); }
+.res .crit.none { color: var(--muted-3); }
+.res .why { margin-top: 8px; font-size: 13px; }
+.res .why div { padding: 1px 0; }
+
+/* ── the topic profile, as bars ── */
+.bars { list-style: none; margin: 0; padding: 0; }
+.bars li { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 13.5px; }
+.bars .bar {
+  flex: 0 0 90px; height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) var(--w), var(--border) var(--w));
+}
+.bars .lab { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bars .val { margin-left: auto; color: var(--muted-2); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+/* ── the landing, for whoever is not signed in ── */
+.landing { text-align: center; padding-top: 56px; }
+.hero { font-size: 40px; margin-bottom: 8px; }
+.lede { color: var(--muted); font-size: 17px; max-width: 580px; margin: 0 auto 36px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; text-align: left; }
+.cards > * { min-width: 0; }
+.cards .card p { color: var(--muted-2); font-size: 14px; margin: 0; }
+.cta { margin: 36px 0 8px; }
+
+@media (max-width: 720px) {
+  .topbar { height: auto; padding: 10px 16px; flex-wrap: wrap; }
+  .container { padding: 16px 12px 48px; }
+  .res .scores { margin-left: 0; }
+}

@@ -4,34 +4,54 @@
 <p class="sub">Nothing reaches the table without passing through here. Agents and scripts propose;
 a person decides.</p>
 
-<div class="card">
-  {% for st in ['pending','approved','rejected'] %}
-  <a href="/proposals?status_filter={{ st }}" class="{{ 'on' if status_filter == st }}">{{ st }}</a>
-  {% if not loop.last %}·{% endif %}
+<div class="filters">
+  {% for st in ['pending', 'approved', 'rejected'] %}
+  <a class="chip {{ 'on' if status_filter == st }}" href="/proposals?status_filter={{ st }}">
+    {{ st }}{% if counts.get(st) %} · {{ counts[st] }}{% endif %}</a>
   {% endfor %}
 </div>
 
 {% if not user.is_admin() %}
-<p class="note">You are signed in as a reader: you can see what is waiting, and approving it needs
-an admin. That is not a hidden button — the route itself declines.</p>
+<div class="flash">You are signed in as a reader: you can see what is waiting, and approving it needs
+an admin. That is not a hidden button — the route itself declines.</div>
 {% endif %}
 
 {% for p in proposals %}
 <div class="card">
-  <div><span class="tag">{{ p.kind }}</span> <span class="tag">confidence: {{ p.confidence }}</span>
+  <div class="btnrow">
+    <span class="badge accent">{{ p.kind }}</span>
+    <span class="badge {{ 'ok' if p.confidence == 'high' else ('warn' if p.confidence == 'low' else '') }}">confidence: {{ p.confidence }}</span>
     {% if p.venue_id and venues.get(p.venue_id) %}
-      · <a href="/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}</div>
-  <div class="mono dim" style="margin:.4rem 0">{{ p.fields }}</div>
-  <div style="white-space:pre-wrap">{{ p.rationale }}</div>
-  {% if p.source_url %}<div class="dim"><a href="{{ p.source_url }}">{{ p.source_url }}</a></div>{% endif %}
+      <a class="chip" href="/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}
+    <span class="muted small" style="margin-left:auto">{{ p.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+  </div>
+
+  <div class="table-wrap" style="margin-top:12px"><table class="table">
+    <thead><tr><th>Field</th><th>Proposed value</th></tr></thead>
+    <tbody>
+    {% for k, v in (p.fields or {}).items() %}
+    <tr><td class="mono">{{ k }}</td><td>{{ v }}</td></tr>
+    {% else %}
+    <tr><td colspan="2" class="muted">No fields carried.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+
+  <p style="white-space:pre-wrap; margin:12px 0 0">{{ p.rationale }}</p>
+  {% if p.source_url %}<p class="small" style="margin:6px 0 0"><a href="{{ p.source_url }}" rel="noreferrer">{{ p.source_url }}</a></p>{% endif %}
+
   {% if p.status.value == 'pending' and user.is_admin() %}
-  <div style="margin-top:.6rem">
-    <form class="inline" method="post" action="/proposals/{{ p.id }}/approve"><button>Approve</button></form>
-    <form class="inline" method="post" action="/proposals/{{ p.id }}/reject"><button class="danger">Reject</button></form>
+  <div class="btnrow" style="margin-top:14px">
+    <form class="inline" method="post" action="/proposals/{{ p.id }}/approve"><button class="btn btn-small">Approve</button></form>
+    <form class="inline" method="post" action="/proposals/{{ p.id }}/reject"><button class="btn btn-danger btn-small">Reject</button></form>
   </div>
   {% endif %}
 </div>
 {% else %}
-<p class="dim">Nothing {{ status_filter }}.</p>
+<div class="card"><p class="empty" style="padding:0">Nothing {{ status_filter }}.</p></div>
 {% endfor %}
+
+<p class="note">Approving writes the proposed fields onto the journal's record and dates them.
+Rejecting leaves the record alone and keeps the proposal, so the same suggestion arriving twice is
+visible as such.</p>
 {% endblock %}

@@ -1,17 +1,36 @@
 {% extends "base.html" %}{% block title %}Consultations — Dovetail{% endblock %}
 {% block body %}
 <h1>Consultations</h1>
-<p class="sub">Each one is kept with the profile it used and a snapshot of the journals it scored,
-so an outcome can be read back against the data of the day and not of today.</p>
-<div class="card wrap"><table>
-  <tr><th>#</th><th>Manuscript</th><th>Words</th><th>Constraints</th><th>Results</th><th>When</th></tr>
+<p class="sub">Each one is kept with the profile it used and a snapshot of the journals it scored, so
+an outcome can be read back against the data of the day and not of today.</p>
+
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr>
+    <th>#</th><th>Manuscript</th><th class="n">Words</th><th>Constraints</th>
+    <th class="n">Shortlisted</th><th>When</th>
+  </tr></thead>
+  <tbody>
   {% for r in runs %}
-  <tr><td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
-      <td>{{ r.title[:64] }}{% if r.refused_reason %}<div class="warn">refused: {{ r.refused_reason[:90] }}</div>{% endif %}</td>
-      <td class="dim">{{ r.word_count or '—' }}</td>
-      <td class="dim mono">{% for k,v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}{{ k }}={{ v }} {% endif %}{% endfor %}</td>
-      <td class="dim">{{ r.results|length }}</td>
-      <td class="dim">{{ r.created_at.strftime('%d %b %H:%M') }}</td></tr>
-  {% else %}<tr><td colspan="6" class="dim">No consultations yet.</td></tr>{% endfor %}
+  <tr {% if r.refused_reason %}class="dim"{% endif %}>
+    <td class="n"><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+    <td>
+      <a class="name" href="/runs/{{ r.id }}">{{ r.title[:90] }}</a>
+      {% if r.refused_reason %}<div class="warn small">refused: {{ r.refused_reason[:120] }}</div>{% endif %}
+    </td>
+    <td class="n muted">{{ '{:,}'.format(r.word_count) if r.word_count else '—' }}</td>
+    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
+    <td class="n muted">{{ counts.get(r.id, 0) }}</td>
+    <td class="muted small">{{ r.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="empty">
+    No consultation has been run yet. They start from the CLI or over MCP —
+    <code>dovetail match --title … --abstract-file …</code>
+  </td></tr>
+  {% endfor %}
+  </tbody>
 </table></div>
+
+<p class="note">A refused run is kept like any other. Refusing to produce a list when the text is too
+short to classify is an answer, and one worth being able to look up later.</p>
 {% endblock %}

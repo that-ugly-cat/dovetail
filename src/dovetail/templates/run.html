@@ -1,50 +1,137 @@
 {% extends "base.html" %}{% block title %}Consultation {{ run.id }} — Dovetail{% endblock %}
+{% block main_class %}wide{% endblock %}
 {% block body %}
-<h1>Consultation {{ run.id }}</h1>
+<div class="head">
+  <h1>Consultation {{ run.id }}</h1>
+  <span class="muted small">{{ run.created_at.strftime('%d %b %Y, %H:%M') }} UTC</span>
+</div>
 <p class="sub">{{ run.title }}</p>
 
-{% if run.refused_reason %}
-<div class="card"><strong class="warn">Refused, and no list was produced.</strong>
-<p class="dim">{{ run.refused_reason }}</p></div>
-{% endif %}
-
-{% set sweep = (run.constraints or {}).get('_sweep') %}
-{% if sweep %}
-<div class="card"><strong>Coverage</strong>
-  <div class="dim">{{ sweep.fetched }} journals looked at, out of a pool of {{ sweep.pool }},
-  in {{ sweep.pages }} pages{% if sweep.added_by_volume %}, plus {{ sweep.added_by_volume }} reached
-  by grouping works rather than by journal profile{% endif %}.
-  {% if sweep.truncated %}<span class="warn">The sweep was cut short: the list below is not the
-  whole pool.</span>{% else %}The whole pool was swept.{% endif %}</div>
+<div class="btnrow" style="margin-bottom:16px">
+  {% if run.word_count %}<span class="badge">{{ '{:,}'.format(run.word_count) }} words</span>{% endif %}
+  {% for k, v in (run.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge accent">{{ k }}: {{ v }}</span>{% endif %}{% endfor %}
+  <span class="badge">{{ rows|length }} shortlisted</span>
 </div>
+
+{% if run.refused_reason %}
+<div class="flash err"><strong>Refused, and no list was produced.</strong><br>{{ run.refused_reason }}</div>
 {% endif %}
 
-<div class="card wrap"><table>
-  <tr><th></th><th>Journal</th><th>Topic</th><th>Subfield</th><th>Merit</th><th>Logistics</th></tr>
-  {% for row in rows %}
-  <tr>
-    <td class="dim">{{ row.result.position }}</td>
-    <td><a href="/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
-      {% if row.merit|length < 2 %}<span class="red"> — thin on merit</span>{% endif %}
-      {% if not row.result.score_topic and not row.result.score_subfield %}
-        <div class="dim">no profile: this is «I don't know», not «out of scope»</div>{% endif %}
-      {% for c in row.result.excluded_by or [] %}
-        <div class="{{ 'red' if c.outcome == 'excluded' else 'warn' }}">{{ c.outcome }} · {{ c.constraint }}:
-        <span class="dim">{{ c.reason }}</span></div>
+{% set dropped = (run.text_profile or {}).get('_dovetail_chars_dropped') %}
+{% if dropped %}
+<div class="flash">The classification ran on a shortened text: <strong>{{ dropped }} characters</strong>
+were dropped at a word boundary, because <code>/text/*</code> refuses more than 2000. The title was
+never cut. Everything below was measured against what remained.</div>
+{% endif %}
+
+<div class="row">
+  <div class="card">
+    <h2>What the manuscript is, measured</h2>
+    {% if text_topics %}
+    <ul class="bars">
+      {% for t in text_topics %}
+      <li>
+        <span class="bar" style="--w: {{ (t.score * 100)|round(1) }}%"></span>
+        <span class="lab">{{ t.display_name }}
+          <span class="muted small">· {{ t.subfield.display_name }} · {{ t.field.display_name }}</span>
+        </span>
+        <span class="val">{{ '%.3f'|format(t.score) }}</span>
+      </li>
       {% endfor %}
-      {% for f in row.result.flags or [] %}<div class="dim">! {{ f }}</div>{% endfor %}
-    </td>
-    <td class="mono">{{ '%.4f'|format(row.result.score_topic) }}</td>
-    <td class="mono dim">{{ '%.4f'|format(row.result.score_subfield) }}</td>
-    <td>{% for c in row.merit %}<div>{{ c.label }}</div>{% else %}<span class="dim">—</span>{% endfor %}</td>
-    <td class="dim">{% for c in row.logistics %}<div>{{ c.label }}</div>{% else %}—{% endfor %}</td>
-  </tr>
-  {% endfor %}
-</table></div>
+    </ul>
+    <p class="muted small" style="margin-bottom:0">This is the input. Every score on the right is a
+    cosine against it, so a journal that looks wrong here will look wrong everywhere below.</p>
+    {% else %}
+    <p class="muted" style="margin-bottom:0">No profile was kept for this run.</p>
+    {% endif %}
+  </div>
+
+  {% set sweep = (run.constraints or {}).get('_sweep') %}
+  <div class="card">
+    <h2>How much was looked at</h2>
+    {% if sweep %}
+    <ul class="bars">
+      <li><span class="lab">Pool of candidates</span><span class="val">{{ '{:,}'.format(sweep.pool) }}</span></li>
+      <li><span class="lab">Journals actually fetched</span><span class="val">{{ '{:,}'.format(sweep.fetched) }}</span></li>
+      <li><span class="lab">Pages of results</span><span class="val">{{ sweep.pages }}</span></li>
+      {% if sweep.added_by_volume %}
+      <li><span class="lab">Reached by grouping works instead</span><span class="val">{{ sweep.added_by_volume }}</span></li>
+      {% endif %}
+    </ul>
+    {% if sweep.truncated %}
+      <p class="warn small" style="margin-bottom:0">The sweep was cut short: the list below is not
+      the whole pool, and a journal missing from it may simply never have been fetched.</p>
+    {% else %}
+      <p class="muted small" style="margin-bottom:0">The whole pool was swept.</p>
+    {% endif %}
+    {% else %}
+    <p class="muted">This run predates the coverage report, so how much of the pool it reached was
+    not recorded.</p>
+    <p class="muted small" style="margin-bottom:0">A limited sweep that does not say so reads as
+    «we looked at everything», which is why later runs carry these numbers.</p>
+    {% endif %}
+  </div>
+</div>
+
+<h2>The list</h2>
+{% for row in rows %}
+<div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable %}unreachable{% endif %}">
+  <div class="rhead">
+    <span class="pos">{{ row.result.position }}</span>
+    <a class="vname" href="/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
+    {% if row.merit|length < 2 %}<span class="badge danger">thin on merit</span>{% endif %}
+    {% if not row.reachable %}<span class="badge warn">stage 2 would not have found it</span>{% endif %}
+    {% if row.venue.oa_model %}<span class="badge">{{ row.venue.oa_model.value.replace('_', ' ') }}</span>{% endif %}
+    <span class="scores">
+      <span>topic<b>{{ '%.4f'|format(row.result.score_topic) }}</b></span>
+      <span>subfield<b>{{ '%.4f'|format(row.result.score_subfield) }}</b></span>
+      <span>field<b>{{ '%.4f'|format(row.result.score_field) }}</b></span>
+    </span>
+  </div>
+
+  {% if not row.result.score_topic and not row.result.score_subfield %}
+  <div class="warn small" style="margin-top:6px">No profile: this zero is «I don't know», not «out of scope».</div>
+  {% endif %}
+
+  <div class="cols">
+    <div>
+      <h3>Merit ({{ row.merit|length }})</h3>
+      <ul class="crit {% if not row.merit %}none{% endif %}">
+        {% for c in row.merit %}<li>{{ c.label }}{% if c.evidence %} <span class="ev small">— {{ c.evidence }}</span>{% endif %}</li>
+        {% else %}<li>nothing of merit holds this one up</li>{% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3>Logistics ({{ row.logistics|length }})</h3>
+      <ul class="crit {% if not row.logistics %}none{% endif %}">
+        {% for c in row.logistics %}<li>{{ c.label }}{% if c.evidence %} <span class="ev small">— {{ c.evidence }}</span>{% endif %}</li>
+        {% else %}<li>—</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% if row.result.excluded_by or row.result.flags %}
+  <div class="why">
+    {% for c in row.result.excluded_by or [] %}
+    <div class="{{ 'err' if c.outcome == 'excluded' else 'warn' }}">
+      <span class="badge {{ 'danger' if c.outcome == 'excluded' else 'warn' }}">{{ c.outcome }}</span>
+      <strong>{{ c.constraint }}</strong> <span class="muted">{{ c.reason }}</span>
+    </div>
+    {% endfor %}
+    {% for f in row.result.flags or [] %}
+    <div class="muted small">! {{ f }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="card"><p class="empty" style="padding:0">This run produced no shortlist.</p></div>
+{% endfor %}
 
 <p class="note">A journal standing on fewer than two criteria of merit is marked, however well it
-does on logistics. That rule comes from a real choice that rested on three logistical reasons and
-one about merit — and it was the one about merit that failed.</p>
+does on logistics. That rule comes from a real choice that rested on three logistical reasons and one
+about merit — and it was the one about merit that failed.</p>
 <p class="note">The score measures how <em>concentrated</em> a journal is on this subject, not how
-suitable it is. Those are different things, and the score itself is not yet validated.</p>
+suitable it is. The cosine is invariant to scale but not to shape, so against a narrow manuscript it
+rewards narrow journals. Those are different things, and the score itself is not yet validated.</p>
 {% endblock %}

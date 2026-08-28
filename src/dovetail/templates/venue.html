@@ -3,62 +3,137 @@
 <h1>{{ venue.display_name }}</h1>
 <p class="sub">{{ venue.host_organization_name or 'Publisher not declared' }}
   {% if venue.issn_l %}· <span class="mono">{{ venue.issn_l }}</span>{% endif %}
-  {% if venue.homepage_url %}· <a href="{{ venue.homepage_url }}">site</a>{% endif %}</p>
+  {% if venue.country_code %}· {{ venue.country_code }}{% endif %}
+  {% if venue.homepage_url %}· <a href="{{ venue.homepage_url }}" rel="noreferrer">site</a>{% endif %}</p>
+
+<div class="btnrow" style="margin-bottom:16px">
+  {% if venue.is_core %}<span class="badge ok">core</span>
+  {% else %}<span class="badge warn">not flagged core</span>{% endif %}
+  {% if venue.is_in_doaj %}<span class="badge ok">in DOAJ</span>{% endif %}
+  {% if venue.anvur_class %}<span class="badge">ANVUR {{ venue.anvur_class }}</span>{% endif %}
+  {% for ix in venue.indexed_in or [] %}<span class="badge">{{ ix }}</span>{% endfor %}
+</div>
 
 <div class="grid">
-  <div class="card"><div class="dim">Open access</div>
-    <strong>{{ (venue.oa_model.value if venue.oa_model else 'unknown').replace('_',' ') }}</strong></div>
-  <div class="card"><div class="dim">APC</div>
-    <strong>{% if venue.apc_usd %}{{ venue.apc_usd }} USD{% else %}unknown{% endif %}</strong></div>
-  <div class="card"><div class="dim">Works / h-index</div>
-    <strong>{{ venue.works_count or '—' }} / {{ venue.h_index if venue.h_index is not none else '—' }}</strong></div>
-  <div class="card"><div class="dim">Time to publication</div>
-    <strong>{% if venue.publication_time_weeks %}{{ venue.publication_time_weeks }} weeks{% else %}—{% endif %}</strong>
-    <div class="dim" style="font-size:.8rem">self-declared, to publication — not the decision latency</div></div>
+  <div class="stat">
+    <div class="n" style="font-size:18px">{{ (venue.oa_model.value if venue.oa_model else 'unknown').replace('_', ' ') }}</div>
+    <div class="lbl">open access</div>
+    {% if venue.oa_flip_year %}<div class="foot">flipped in {{ venue.oa_flip_year }}</div>{% endif %}
+  </div>
+  <div class="stat">
+    <div class="n">{% if venue.apc_usd %}{{ '{:,}'.format(venue.apc_usd) }}{% else %}—{% endif %}</div>
+    <div class="lbl">APC in USD</div>
+    <div class="foot">{% if venue.apc_usd %}{% if venue.has_waiver %}waivers available{% else %}no waiver recorded{% endif %}{% else %}missing, which is not the same as free{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(venue.works_count) if venue.works_count else '—' }}</div>
+    <div class="lbl">works</div>
+    <div class="foot">h-index {{ venue.h_index if venue.h_index is not none else '—' }}{% if venue.two_yr_mean_citedness %}, 2-yr citedness {{ '%.2f'|format(venue.two_yr_mean_citedness) }}{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{% if venue.publication_time_weeks %}{{ venue.publication_time_weeks }}{% else %}—{% endif %}</div>
+    <div class="lbl">weeks to publication</div>
+    <div class="foot">self-declared, to publication — not the decision latency</div>
+  </div>
 </div>
 
 {% if venue.predatory_risk and venue.predatory_risk.get('flags') %}
-<div class="card"><strong class="{{ 'red' if venue.predatory_risk.level == 'high' else 'warn' }}">
-  Risk flags ({{ venue.predatory_risk.level }})</strong>
-  <ul class="dim">{% for f in venue.predatory_risk.flags %}<li>{{ f }}</li>{% endfor %}</ul>
-  <div class="dim">No single one of these convicts. Together they need a person to close them.</div>
+<div class="card">
+  <h2 class="{{ 'err' if venue.predatory_risk.level == 'high' else 'warn' }}">
+    Risk flags — {{ venue.predatory_risk.level }}</h2>
+  <ul class="crit">{% for f in venue.predatory_risk.flags %}<li>{{ f }}</li>{% endfor %}</ul>
+  <p class="muted small" style="margin-bottom:0">No single one of these convicts. Together they need
+  a person to close them.</p>
 </div>
-{% endif %}
-
-<h2>Article types</h2>
-{% if article_types %}
-<div class="card wrap"><table>
-  <tr><th>Type</th><th>Words</th><th>What the count includes</th><th>Unsolicited</th><th>Checked</th></tr>
-  {% for a in article_types %}
-  <tr><td>{{ a.name }}</td><td>{{ a.word_limit or '—' }}</td>
-      <td class="dim">{{ a.word_limit_scope or 'not recorded' }}</td>
-      <td class="dim">{{ 'yes' if a.unsolicited else ('no' if a.unsolicited is not none else '—') }}</td>
-      <td class="dim">{{ a.verified_at.strftime('%d %b %Y') if a.verified_at else '—' }}</td></tr>
-  {% endfor %}
-</table></div>
-{% else %}
-<p class="dim">Nobody has read this journal's author guidelines yet. That is not the same as
-«it has no limits»: no API carries this field.</p>
 {% endif %}
 
 <h2>Scope, as published</h2>
 <div class="card">
-  {% for t in (venue.topics or [])[:12] %}
-  <div><strong>{{ t.count }}</strong> <span class="dim">{{ t.display_name }} — {{ t.subfield }}</span></div>
-  {% else %}<p class="dim">No profile. This journal cannot be scored: a zero here would mean
-  «no data», not «out of scope».</p>{% endfor %}
-  {% if venue.topics %}<div class="dim" style="margin-top:.5rem">Truncated to 25 by OpenAlex; on a
-  broad journal that is a fraction of what it publishes.</div>{% endif %}
+  {% if venue.topics %}
+  <ul class="bars">
+    {% for t in venue.topics[:15] %}
+    <li>
+      <span class="bar" style="--w: {{ (t.count / topic_total * 100)|round(1) }}%"></span>
+      <span class="lab">{{ t.display_name }} <span class="muted small">· {{ t.subfield }}</span></span>
+      <span class="val">{{ '{:,}'.format(t.count) }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted small" style="margin-bottom:0">
+    {{ venue.topics|length }} topics on record{% if venue.topics|length >= 25 %}, which is the ceiling:
+    OpenAlex truncates this list at 25 whatever the size of the journal, so on a broad one it is a
+    fraction of what gets published{% endif %}.
+    {% if venue.topics_coverage %} Measured coverage of its output:
+    <strong>{{ '%.1f'|format(venue.topics_coverage * 100) }}%</strong>.{% endif %}
+    The counts are multi-label and can sum past the total, so they are not comparable between journals
+    without normalising.
+  </p>
+  {% else %}
+  <p class="muted" style="margin-bottom:0">No profile. This journal cannot be scored, and a zero here
+  would mean «no data», not «out of scope». <code>dovetail profile-venue</code> builds one.</p>
+  {% endif %}
 </div>
 
-<h2>Where each field came from</h2>
-<div class="card wrap"><table>
-  <tr><th>Field</th><th>Source</th><th>Checked</th></tr>
-  {% for v in venue.verifications|sort(attribute='field_name') %}
-  <tr><td class="mono">{{ v.field_name }}</td>
-      <td class="dim">{{ v.source }}</td>
-      <td class="dim">{{ v.verified_at.strftime('%d %b %Y') }}</td></tr>
+<h2>Article types</h2>
+{% if article_types %}
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr><th>Type</th><th class="n">Words</th><th>What the count includes</th>
+    <th class="n">Abstract</th><th class="n">Refs</th><th>Unsolicited</th><th>Checked</th></tr></thead>
+  <tbody>
+  {% for a in article_types %}
+  <tr>
+    <td>{{ a.name }}{% if a.source_url %} <a class="small" href="{{ a.source_url }}" rel="noreferrer">source</a>{% endif %}</td>
+    <td class="n">{{ '{:,}'.format(a.word_limit) if a.word_limit else '—' }}</td>
+    <td class="muted small">{{ a.word_limit_scope or 'not recorded' }}</td>
+    <td class="n muted">{{ a.abstract_limit or '—' }}</td>
+    <td class="n muted">{{ a.refs_limit or '—' }}</td>
+    <td class="muted">{{ 'yes' if a.unsolicited else ('no' if a.unsolicited is not none else '—') }}</td>
+    <td class="muted small">{{ a.verified_at.strftime('%d %b %Y') if a.verified_at else '—' }}</td>
+  </tr>
   {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<div class="card"><p class="muted" style="margin:0">Nobody has read this journal's author guidelines
+yet. That is not the same as «it has no limits»: no API carries this field, which is why it arrives
+through the queue and never from a sweep.</p></div>
+{% endif %}
+
+{% if appearances %}
+<h2>Where it has come up</h2>
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr><th>Consultation</th><th class="n">Position</th><th class="n">Topic</th>
+    <th class="n">Subfield</th><th>When</th></tr></thead>
+  <tbody>
+  {% for res, run in appearances %}
+  <tr>
+    <td><a class="name" href="/runs/{{ run.id }}">{{ run.title[:70] }}</a></td>
+    <td class="n muted">{{ res.position }}</td>
+    <td class="n mono">{{ '%.4f'|format(res.score_topic) }}</td>
+    <td class="n mono muted">{{ '%.4f'|format(res.score_subfield) }}</td>
+    <td class="muted small">{{ run.created_at.strftime('%d %b %Y') }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<p class="note">Positions from different consultations are not comparable: each is computed against
+its own paper, over whatever set the sweep of that day reached.</p>
+{% endif %}
+
+<h2>Where each field came from</h2>
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr><th>Field</th><th>Source</th><th>Checked</th></tr></thead>
+  <tbody>
+  {% for v in venue.verifications|sort(attribute='field_name') %}
+  <tr>
+    <td class="mono">{{ v.field_name }}</td>
+    <td class="muted">{{ v.source }}{% if v.source_url %} · <a class="small" href="{{ v.source_url }}" rel="noreferrer">link</a>{% endif %}</td>
+    <td class="muted small">{{ v.verified_at.strftime('%d %b %Y') }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="empty">Nothing on this record has been dated.</td></tr>
+  {% endfor %}
+  </tbody>
 </table></div>
 <p class="note">Freshness belongs to a field, not to a record: a journal can carry topics from
 yesterday and a word limit from eight months ago. Anything older than {{ stale_days }} days is

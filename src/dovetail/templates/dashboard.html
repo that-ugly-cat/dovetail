@@ -3,35 +3,89 @@
 <h1>Overview</h1>
 <p class="sub">A list of candidate journals for a paper, with the criteria that hold each one up.</p>
 
+<h3>Inventory</h3>
 <div class="grid">
-  <div class="card"><div class="num">{{ venues }}</div><div class="dim">journals known</div></div>
-  <div class="card"><div class="num">{{ runs }}</div><div class="dim">consultations</div></div>
-  <div class="card"><div class="num {% if pending %}warn{% endif %}">{{ pending }}</div>
-    <div class="dim">waiting for a person</div></div>
-  <div class="card"><div class="num">{{ budget.classifications }}</div>
-    <div class="dim">classifications left today</div></div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(inv.total) }}</div>
+    <div class="lbl">journals known</div>
+    <div class="foot">{{ '{:,}'.format(inv.core) }} flagged core by OpenAlex</div>
+  </div>
+  <div class="stat">
+    <div class="n {% if inv.unprofiled %}warn{% endif %}">{{ '{:,}'.format(inv.profiled) }}</div>
+    <div class="lbl">with a topic profile</div>
+    <div class="foot">{{ '{:,}'.format(inv.unprofiled) }} cannot be scored at all</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(inv.doaj) }}</div>
+    <div class="lbl">in DOAJ</div>
+    <div class="foot">{{ '{:,}'.format(inv.apc_known) }} carry an APC figure</div>
+  </div>
+  <div class="stat">
+    <div class="n {% if not inv.with_guidelines %}warn{% endif %}">{{ '{:,}'.format(inv.with_guidelines) }}</div>
+    <div class="lbl">with guidelines read</div>
+    <div class="foot">article types and word limits, which no API carries</div>
+  </div>
 </div>
 
-<div class="card">
-  <strong>OpenAlex budget</strong>
-  <div class="dim">{{ budget.spent }} of {{ budget.total }} credits spent, {{ budget.remaining }} left.
-  Resets at midnight UTC.
-  {% if not budget.keyed %}<span class="warn">No API key set: the anonymous budget is a tenth of what
-  a free account gets.</span>{% endif %}</div>
+<p class="note">A journal with no profile scores zero the same way an unrelated one does, and the two
+zeros mean opposite things. That is why they are counted apart here and marked apart everywhere else.
+{% if inv.last_touched %}Newest field on record: {{ inv.last_touched.strftime('%d %b %Y') }}.{% endif %}</p>
+
+<h3>Work</h3>
+<div class="grid">
+  <div class="stat">
+    <div class="n">{{ runs_total }}</div>
+    <div class="lbl">consultations</div>
+    <div class="foot"><a href="/runs">all of them</a></div>
+  </div>
+  <div class="stat">
+    <div class="n {% if pending %}warn{% endif %}">{{ pending }}</div>
+    <div class="lbl">waiting for a person</div>
+    <div class="foot"><a href="/proposals">the queue</a></div>
+  </div>
+  <div class="stat">
+    <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
+    <div class="lbl">classifications left today</div>
+    <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(budget.spent) }}</div>
+    <div class="lbl">credits spent today</div>
+    <div class="foot">resets at midnight UTC</div>
+  </div>
 </div>
+
+{% if not budget.keyed %}
+<div class="flash">No OpenAlex API key is set, so this instance runs on the anonymous budget — a tenth
+of what a free account gets. The key has to be created by hand; the tool does not register accounts.</div>
+{% endif %}
 
 <h2>Recent consultations</h2>
 {% if recent %}
-<div class="card wrap"><table>
-  <tr><th>#</th><th>Manuscript</th><th>Constraints</th><th>When</th></tr>
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr><th>#</th><th>Manuscript</th><th>Constraints</th><th class="n">Shortlisted</th><th>When</th></tr></thead>
+  <tbody>
   {% for r in recent %}
-  <tr><td><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
-      <td>{{ r.title[:70] }}{% if r.refused_reason %} <span class="warn">— refused</span>{% endif %}</td>
-      <td class="dim mono">{% for k,v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}{{ k }}={{ v }} {% endif %}{% endfor %}</td>
-      <td class="dim">{{ r.created_at.strftime('%d %b %H:%M') }}</td></tr>
+  <tr>
+    <td class="n"><a href="/runs/{{ r.id }}">{{ r.id }}</a></td>
+    <td>
+      <a class="name" href="/runs/{{ r.id }}">{{ r.title[:80] }}</a>
+      {% if r.refused_reason %}<div class="warn small">refused — no list was produced</div>{% endif %}
+    </td>
+    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
+    <td class="n muted">{{ result_counts.get(r.id, 0) }}</td>
+    <td class="muted small">{{ r.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+  </tr>
   {% endfor %}
+  </tbody>
 </table></div>
-{% else %}<p class="dim">Nothing yet.</p>{% endif %}
+{% else %}
+<div class="card">
+  <p class="muted" style="margin-top:0">No consultation has been run on this instance yet.</p>
+  <p class="muted small" style="margin-bottom:0">They are started from the CLI or over MCP:
+  <code>dovetail match --title … --abstract-file …</code></p>
+</div>
+{% endif %}
 
 <p class="note">A consultation is a list, not a ranking: the score is computed against one paper and
 the set is whatever the sweep reached that day, so a position means nothing outside its own run.</p>

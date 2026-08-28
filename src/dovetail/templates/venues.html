@@ -1,31 +1,106 @@
 {% extends "base.html" %}{% block title %}Journals — Dovetail{% endblock %}
+{% block main_class %}wide{% endblock %}
 {% block body %}
+{% macro qs(over) %}{% set a = dict(args, **over) %}?{% for k, v in a.items() %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}{% endmacro %}
+
 <h1>Journals</h1>
 <p class="sub">Whatever past sweeps and hand-declared venues have put in the table. Not a census.</p>
+
 <div class="card">
-  <form method="get" action="/venues">
-    <input name="q" value="{{ q }}" placeholder="name or ISSN" style="min-width:18rem">
-    <button type="submit">Search</button>
-    <span class="dim">Lexical: a miss means «not with these words», never «does not exist».</span>
+  <form class="searchbar" method="get" action="/venues">
+    <input class="q" name="q" value="{{ args.q }}" placeholder="name or ISSN">
+    <select name="oa">
+      <option value="">any access</option>
+      {% for m in oa_models %}<option value="{{ m }}" {% if args.oa == m %}selected{% endif %}>{{ m.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    <select name="profile">
+      <option value="">profile: any</option>
+      <option value="yes" {% if args.profile == 'yes' %}selected{% endif %}>has a profile</option>
+      <option value="no" {% if args.profile == 'no' %}selected{% endif %}>no profile</option>
+    </select>
+    <select name="doaj">
+      <option value="">DOAJ: any</option>
+      <option value="yes" {% if args.doaj == 'yes' %}selected{% endif %}>in DOAJ</option>
+      <option value="no" {% if args.doaj == 'no' %}selected{% endif %}>not in DOAJ</option>
+    </select>
+    <select name="core">
+      <option value="">core: any</option>
+      <option value="yes" {% if args.core == 'yes' %}selected{% endif %}>core only</option>
+      <option value="no" {% if args.core == 'no' %}selected{% endif %}>not core</option>
+    </select>
+    <select name="risk">
+      <option value="">risk: any</option>
+      <option value="high" {% if args.risk == 'high' %}selected{% endif %}>high</option>
+      <option value="low" {% if args.risk == 'low' %}selected{% endif %}>low</option>
+    </select>
+    <select name="sort">
+      <option value="works" {% if args.sort == 'works' %}selected{% endif %}>by size</option>
+      <option value="hindex" {% if args.sort == 'hindex' %}selected{% endif %}>by h-index</option>
+      <option value="name" {% if args.sort == 'name' %}selected{% endif %}>by name</option>
+    </select>
+    <button class="btn btn-small" type="submit">Filter</button>
+    {% if args.q or args.oa or args.doaj or args.profile or args.core or args.risk %}
+      <a class="btn btn-link btn-small" href="/venues">Clear</a>
+    {% endif %}
   </form>
+  <p class="muted small" style="margin:10px 0 0">Search is lexical: a miss means «not with these
+  words», never «does not exist». The default order is by size, which is the same bias stage 2 has to
+  fight — it is here because it puts recognisable names first, not because bigger is better.</p>
 </div>
-<div class="card wrap"><table>
-  <tr><th>Journal</th><th>ISSN</th><th>Open access</th><th>APC</th><th>ANVUR</th><th>Risk</th></tr>
+
+<div class="pager">
+  <span class="count">
+    {% if total == grand_total %}{{ '{:,}'.format(total) }} journals
+    {% else %}{{ '{:,}'.format(total) }} of {{ '{:,}'.format(grand_total) }} journals{% endif %}
+  </span>
+  {% if pages > 1 %}
+    <span class="count">· page {{ page_no }} of {{ pages }}</span>
+    {% if page_no > 1 %}<a class="btn btn-link btn-small" href="{{ qs({'p': page_no - 1}) }}">Previous</a>{% endif %}
+    {% if page_no < pages %}<a class="btn btn-link btn-small" href="{{ qs({'p': page_no + 1}) }}">Next</a>{% endif %}
+  {% endif %}
+</div>
+
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr>
+    <th>Journal</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
+    <th class="n">Works</th><th class="n">h</th><th>Profile</th><th>ANVUR</th><th>Risk</th>
+  </tr></thead>
+  <tbody>
   {% for v in venues %}
   <tr>
-    <td><a href="/venues/{{ v.id }}">{{ v.display_name }}</a>
-        <div class="dim">{{ v.host_organization_name or 'publisher not declared' }}</div></td>
-    <td class="mono dim">{{ v.issn_l or '—' }}</td>
-    <td>{{ (v.oa_model.value if v.oa_model else '—').replace('_',' ') }}</td>
-    <td class="dim">{% if v.apc_usd %}{{ v.apc_usd }} USD{% else %}<span class="dim">unknown</span>{% endif %}</td>
-    <td class="dim mono">{{ v.anvur_class or '—' }}</td>
+    <td>
+      <a class="name" href="/venues/{{ v.id }}">{{ v.display_name }}</a>
+      {% if not v.is_core %}<span class="badge warn" title="type:journal includes news bulletins">not core</span>{% endif %}
+      <div class="muted small">{{ v.host_organization_name or 'publisher not declared' }}</div>
+    </td>
+    <td class="mono muted">{{ v.issn_l or '—' }}</td>
+    <td>{% if v.oa_model %}<span class="badge {{ 'ok' if v.oa_model.value == 'full_oa' }}">{{ v.oa_model.value.replace('_', ' ') }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="n">{% if v.apc_usd %}{{ '{:,}'.format(v.apc_usd) }}<span class="muted small"> USD</span>{% else %}<span class="muted">unknown</span>{% endif %}</td>
+    <td class="n muted">{{ '{:,}'.format(v.works_count) if v.works_count else '—' }}</td>
+    <td class="n muted">{{ v.h_index if v.h_index is not none else '—' }}</td>
+    <td>{% if v.topics %}<span class="muted small">{{ v.topics|length }} topics</span>
+        {% else %}<span class="badge warn">none</span>{% endif %}</td>
+    <td class="muted mono">{{ v.anvur_class or '—' }}</td>
     <td>{% set lvl = (v.predatory_risk or {}).get('level') %}
-        {% if lvl == 'high' %}<span class="red">high</span>
-        {% elif lvl == 'low' %}<span class="warn">low</span>
-        {% else %}<span class="dim">—</span>{% endif %}</td>
+        {% if lvl == 'high' %}<span class="badge danger">high</span>
+        {% elif lvl == 'low' %}<span class="badge warn">low</span>
+        {% else %}<span class="muted">—</span>{% endif %}</td>
   </tr>
+  {% else %}
+  <tr><td colspan="9" class="empty">Nothing matches those filters.</td></tr>
   {% endfor %}
+  </tbody>
 </table></div>
-<p class="note">An unknown APC is not a free journal: the field is missing on roughly nine journals
-in ten, which is why no constraint here excludes on it.</p>
+
+{% if pages > 1 %}
+<div class="pager">
+  <span class="count">page {{ page_no }} of {{ pages }}</span>
+  {% if page_no > 1 %}<a class="btn btn-link btn-small" href="{{ qs({'p': page_no - 1}) }}">Previous</a>{% endif %}
+  {% if page_no < pages %}<a class="btn btn-link btn-small" href="{{ qs({'p': page_no + 1}) }}">Next</a>{% endif %}
+</div>
+{% endif %}
+
+<p class="note">An unknown APC is not a free journal: the field is missing on roughly nine journals in
+ten, which is why no constraint here excludes on it. A journal with no profile is not out of scope
+either — it is a journal nothing is known about.</p>
 {% endblock %}

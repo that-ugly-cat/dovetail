@@ -1,27 +1,35 @@
 {% extends "base.html" %}{% block title %}Users — Dovetail{% endblock %}
 {% block body %}
 <h1>Users</h1>
-<p class="sub">A reader looks. An admin spends the OpenAlex budget and turns proposals into facts.</p>
-<div class="card wrap"><table>
-  <tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th><th>Active</th></tr>
+<p class="sub">A reader looks. An admin spends the OpenAlex budget and turns proposals into facts.
+The split is by what a thing <em>costs</em>, not by seniority.</p>
+
+<div class="card pad0 table-wrap"><table class="table">
+  <thead><tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th><th>Active</th><th>Since</th></tr></thead>
+  <tbody>
   {% for u in users %}
-  <tr>
-    <td>{{ u.email }}</td>
-    <td class="dim">{{ u.name or '—' }}</td>
-    <td class="dim">{{ 'Borant ID' if u.borant_sub else 'local' }}</td>
+  <tr {% if not u.is_active %}class="dim"{% endif %}>
+    <td>{{ u.email }}{% if u.id == user.id %} <span class="badge accent">you</span>{% endif %}</td>
+    <td class="muted">{{ u.name or '—' }}</td>
+    <td>{% if u.borant_sub %}<span class="badge">Borant ID</span>{% else %}<span class="badge">local</span>{% endif %}</td>
     <td>
       <form class="inline" method="post" action="/admin/users/{{ u.id }}/role">
-        <select name="role" onchange="this.form.submit()" {% if u.id == user.id %}disabled{% endif %}>
+        <select name="role" onchange="this.form.submit()" {% if u.id == user.id %}disabled{% endif %} style="width:auto">
           <option value="reader" {% if u.role.value == 'reader' %}selected{% endif %}>reader</option>
           <option value="admin" {% if u.role.value == 'admin' %}selected{% endif %}>admin</option>
         </select>
       </form>
-      {% if u.id == user.id %}<span class="dim">you</span>{% endif %}
     </td>
-    <td class="dim">{{ 'yes' if u.is_active else 'no' }}</td>
+    <td class="muted">{{ 'yes' if u.is_active else 'no' }}</td>
+    <td class="muted small">{{ u.created_at.strftime('%d %b %Y') }}</td>
   </tr>
   {% endfor %}
+  </tbody>
 </table></div>
+
 <p class="note">You cannot remove your own admin role here. Locking yourself out is not a permission
 question, it is a mistake the app declines to make on your behalf.</p>
+<p class="note">Someone the gateway vouches for arrives as a reader, and a local account is never
+matched to a gateway subject by email — that is how one person ends up with another person's account.
+Linking the two is done once, by hand, with <code>map_borant.py</code>.</p>
 {% endblock %}
