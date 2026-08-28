@@ -1,8 +1,9 @@
-# Dovetail — SPEC v0.3
+# Dovetail — SPEC v0.4
 
 *Trovare la rivista giusta per un paper, partendo da titolo, abstract e word count.*
 *Creato: 27 agosto 2026 — Giovanni Spitale + Ono*
-*v0.3, 27 ago 2026: architettura a tre strati. Storia delle revisioni in §17.*
+*v0.4, 28 ago 2026: vetrina pubblica, la UI che esegue, e una stima sbagliata per difetto.*
+*Storia delle revisioni in §17.*
 
 > **Lingua:** il codice, la CLI e i test sono **in inglese**; questo documento resta in italiano,
 > perche e il posto dove si ragiona, nel registro del wiki. Dove la spec cita un identificatore,
@@ -512,8 +513,32 @@ test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *
 
 ## 12. UI
 
-Cinque schermate: la coda, le consultazioni passate, la scheda di una rivista con **una data per
-campo**, l'elenco delle riviste, e gli utenti. Più la via d'ingresso.
+Sette schermate dietro il gate — la panoramica, l'elenco delle riviste, la scheda di una rivista con
+**una data per campo**, le consultazioni, una consultazione, la coda, gli utenti — più due form di
+scrittura e, davanti a tutto, una vetrina pubblica.
+
+### La vetrina, e la regola che la tiene
+
+`/` è **pubblica e non guarda mai chi la legge**; l'app vive a `/app`, dietro il gate; il bottone
+della vetrina punta lì. È la forma che tutte le app del perimetro hanno dal 24 agosto 2026, e la
+ragione non è di ordine.
+
+Sul ramo pubblico di Caddy gli header d'identità vengono tolti per costruzione. Quindi una vetrina
+che consultasse `user` sarebbe **sempre** sloggata dietro il gate e **a volte** loggata standalone:
+la stessa pagina con due comportamenti, e la differenza invisibile a ogni test che gira in locale.
+Non guardando, la pagina è identica nelle due modalità, ed è questo che permette a **un solo
+bottone** di coprire i quattro casi — gated o standalone, già dentro o no. C'è un test che la scarica
+anonima e poi con un cookie da admin e confronta i due risultati byte per byte.
+
+Il bottone punta a un path **gated** e non a `/login`: una pagina che non può riconoscere nessuno,
+con un bottone che rimanda a sé stessa, è un anello da cui non si entra. E nemmeno all'URL del gate,
+che funzionerebbe e cablerebbe Borant ID dentro un'app che deve funzionare senza.
+
+**Il blocco Caddy non è cambiato spostando l'app**, ed è la proprietà che ha reso lo spostamento
+poco rischioso: `path /` matcha la radice esatta, quindi tutto sotto `/app` cade nell'handler gated
+come ci cadevano `/venues` e `/runs`. La lista dei path pubblici resta la lista dei path dove
+**nessun metodo ha bisogno di sapere chi sta chiedendo**, e ognuno di quelli rimasti supera ancora
+la prova.
 
 ### Due livelli, e la divisione è per quanto costano
 
@@ -523,6 +548,53 @@ fa spende crediti OpenAlex o cambia un fatto.
 **Admin** esegue consultazioni (che spendono da un budget giornaliero condiviso), dichiara riviste a
 mano, e approva la coda. Approvare è quella che conta: è il punto in cui un suggerimento diventa
 qualcosa che il tool ripeterà come vero.
+
+### La consultazione risponde prima di aver finito
+
+Lo sweep è un centinaio di chiamate e un minuto scarso: troppo per tenere fermo un browser, e molto
+troppo per tenere aperta una sessione di scrittura SQLite mentre altre pagine leggono. Quindi la riga
+viene committata come `running`, il browser ci viene mandato sopra, e il lavoro continua fuori dalla
+richiesta.
+
+Da cui la colonna `status` su `match_run`, con `error_code` e `error_detail` accanto. Serve perché
+**una corsa ancora viva e una corsa il cui processo è morto a metà sono altrimenti la stessa
+immagine** — una riga che esiste e non contiene niente — e vogliono reazioni opposte: aspettare, o
+guardare cosa è andato storto. Ogni modo in cui il lavoro può finire viene scritto sulla riga,
+compreso quello imprevisto; c'è un test che uccide `run_match` a metà volo e pretende che la riga non
+resti a dire `running`. L'errore viaggia come **codice** più il testo grezzo della libreria, mai come
+frase: chi lo produce non sa in che lingua verrà letto.
+
+I due controlli gratuiti stanno **prima** di qualunque scrittura. Il guard-rail sull'abstract corto
+non costa niente da valutare, quindi fallirlo non deve lasciare una corsa rifiutata in tabella; il
+budget esaurito viene rifiutato con il numero, invece che attraverso un 429 letto dopo. Il rifiuto
+più profondo — una classificazione troppo incerta — si può sapere solo dopo aver speso, e quello
+viene registrato.
+
+### Il costo sta prima del bottone, ed è stato sbagliato una volta
+
+Accanto a ciò che spende ci va ciò che stima, gratis, perché **un costo visto dopo non è una
+decisione**. La stima è aritmetica sui costi letti dalle intestazioni di rate limit, non un modello.
+
+La prima versione stava nel layer web e **era sbagliata per difetto**: contava lo sweep paginato e
+nessuna delle altre due chiamate che lo stadio 2 fa. Il form prometteva «al massimo 125» e la prima
+corsa vera ne ha spesi **133**. Una stima per difetto è peggio di nessuna stima, perché è quella a
+cui si crede.
+
+Ora i termini stanno in `pipeline.cost_terms`, **accanto alle chiamate che li generano**, uno per
+chiamata: 100 per la classificazione, 25 per lo sweep, 10 per il raggruppamento delle opere, 2 per il
+recupero dei record che quel raggruppamento nomina. Tetto 137. E un test legge il sorgente di
+`generate_candidates` e fallisce se chiama qualcosa che la stima non prezza — che è esattamente la
+deriva avvenuta, quindi è la cosa da intercettare invece di un commento che chiede di ricordarsene.
+
+### Dichiarare una rivista scrive dritto, e non passa dalla coda
+
+La coda esiste per ciò che un **agente** inferisce, dove chi approva non è chi ha proposto. Nel form
+chi compila è chi approverebbe, quindi il passaggio in più sarebbe teatro. Lo stampiglio dice
+`manual`, che è un'affermazione datata e attribuita come le altre.
+
+**«Non lo so» sopravvive al form come terza risposta.** Un vincolo non esclude mai su un campo
+assente: marca. Trasformare una casella non spuntata in un `False` convertirebbe «nessuno ha
+guardato» in «no», che è l'unica sostituzione che questo tool esiste per rifiutare.
 
 ### Standalone o dietro Borant ID
 
@@ -564,6 +636,14 @@ l'autenticazione. C'è un test che lo apre in gateway e pretende sia il link sia
 
 **La regola generalizzabile, che vale per chiunque entri nel perimetro:** se la radice è pubblica,
 il proprio `/login` non può rimandarci.
+
+**E la forma definitiva della risposta, arrivata con la vetrina:** in gateway una pagina che richiede
+identità e non ce l'ha risponde **503**, non 401 e non un redirect. Una richiesta che arriva lì senza
+identità significa che `forward_auth` non ha girato, cioè un guasto di configurazione — quindi il
+messaggio è rivolto all'**operatore** e nomina `BORANT_TRUSTED_PROXY` e i path da controllare. Il
+401 esiste solo fuori da gateway, dove `/login` si rende senza aver bisogno di nessuno, e il gestore
+che redirige **non guarda `Accept`**: quella è la versione che passa i propri test e lascia l'anello
+in piedi, perché httpx quell'header non lo manda.
 
 ### L'autorizzazione sta in una dependency, mai nei template
 
@@ -647,6 +727,10 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
   l'output lo dichiara.
 - **Fase 2 — fatta.** Criteri merito/logistica, `predatory_risk`, vincoli, coda proposte, UI a due livelli.
 - **Fase 3 — fatta, live dal 28 ago 2026.** MCP con chiavi per utente, deploy su borant alla porta **8021**, dietro Borant ID come tredicesima app del perimetro.
+- **Fase 3b — fatta, 28 ago 2026.** Palette di casa, i dati esposti nelle schermate, vetrina pubblica
+  su `/` con l'app a `/app`, e la UI che **esegue**: consultazione con il costo dichiarato prima del
+  bottone, e dichiarazione di una rivista a mano. Dettaglio in §12, e in §17 il difetto della stima
+  che la prima corsa vera ha trovato.
 - **Fase 4** — **stadio 5**: estrazione guidelines con Haiku e giudizio di genere con Sonnet, con
   entrambe le uscite che passano dalla coda di proposte. Poi anatomia e `venue_history`.
 
@@ -840,6 +924,45 @@ escluderebbe una rivista valida per più settori.
 ---
 
 ## 17. Storia delle revisioni
+
+### v0.4 — la UI smette di essere solo una finestra (28 ago 2026)
+
+**La faccia.** Dovetail era l'unica app del perimetro su palette chiara, e la portava inline nel
+template base: niente `/static`, niente impronta `?v=`, e un vocabolario di classi tutto suo dove
+ogni tool fratello usa `.topbar .container .card .btn .table .badge .flash`. Ora legge la palette
+scura di casa da un foglio vero, con l'impronta che serve perché la zona cacha gli statici quattro
+ore — senza, un deploy corregge il CSS all'origine mentre tutti continuano a vedere il vecchio.
+
+**Le schermate mostravano quasi niente del database.** La panoramica contava riviste, corse e
+proposte; adesso separa le riviste **punteggiabili** da quelle che non lo sono, che è la stessa
+distinzione che il matcher tiene ovunque. L'elenco mostrava le prime 200 in ordine alfabetico su
+16.721, senza conteggio né filtri; adesso filtra, ordina, pagina e dice quante sono — con
+l'ordinamento predefinito per dimensione **dichiarato**, perché è la stessa deformazione che lo
+stadio 2 deve combattere e lasciarla implicita sarebbe ripeterla nella superficie di lettura. La
+pagina di una consultazione mostrava due punteggi su tre e niente dell'input; adesso disegna il
+profilo del manoscritto, la copertura dello sweep, la raggiungibilità dallo stadio 2 e i caratteri
+che `/text/*` ha costretto a buttare.
+
+**La vetrina, e con lei la fine del ciclo.** Dettaglio in §12. La proprietà che conta è che il
+blocco Caddy non è cambiato.
+
+**La UI esegue.** Consultazione e dichiarazione di una rivista erano solo CLI e MCP: un admin entrava
+e poteva leggere e approvare, cioè non la cosa per cui il tool esiste. Dettaglio in §12, insieme alla
+colonna `status` che serve perché una corsa viva e una morta a metà sono altrimenti la stessa
+immagine.
+
+**E il difetto che ha trovato la prima corsa vera.** La stima prometteva «al massimo 125» e la corsa
+ne ha spesi **133**: contava lo sweep paginato e nessuna delle altre due chiamate dello stadio 2.
+Vale la pena scriverlo qui e non solo in §12, perché la forma dell'errore si ripeterà altrove: **le
+due metà erano in file diversi**, il prezzo nel layer web e le chiamate nel client, e nessuna delle
+due poteva vedere l'altra. La correzione non è il numero giusto, è l'aver spostato i termini accanto
+alle chiamate e aver messo un test che legge il sorgente dello stadio 2 e fallisce se chiama
+qualcosa che la stima non prezza.
+
+Sempre dalla stessa corsa: la card di copertura diceva «4.250 recuperate su un pool di 4.130», un
+numero più grande del suo insieme. I due meccanismi non sono uno una frazione dell'altro — una
+rivista entra nel filtro per topic solo se quel topic sta fra i suoi primi 25, quindi ciò che il
+raggruppamento per opere raggiunge sta **fuori** da quel pool per costruzione.
 
 ### v0.3 — tre strati invece di uno
 
