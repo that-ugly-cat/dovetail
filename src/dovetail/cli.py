@@ -311,8 +311,6 @@ def venues():
         typer.echo(f"\n{len(rows)} venues")
 
 
-if __name__ == "__main__":  # pragma: no cover
-    app()
 
 
 @app.command("validate-against-published")
@@ -432,3 +430,12 @@ def api_key(
         "the server — can show it to you again.",
         fg=typer.colors.YELLOW,
     )
+
+
+# Must stay the last thing in this file. With commands defined below it, running
+# the module as `python -m dovetail.cli` executes `app()` before they are
+# registered and they simply do not exist — which is invisible through the
+# console entry point, where the module is imported whole first, and shows up
+# only inside the container, where DEPLOY.md says to use `python -m`.
+if __name__ == "__main__":  # pragma: no cover
+    app()

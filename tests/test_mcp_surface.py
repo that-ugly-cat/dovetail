@@ -164,3 +164,23 @@ def test_the_endpoint_answers_without_the_trailing_slash(http):
     some drop the auth header, and it looks like the server is broken."""
     client, keys = http
     assert rpc(client, keys["reader"], "tools/list").status_code == 200
+
+
+def test_every_cli_command_survives_python_dash_m():
+    """`if __name__ == "__main__"` has to be the last thing in cli.py.
+
+    With commands defined below it, `python -m dovetail.cli` runs `app()` before
+    they are registered and they are simply absent. Through the console entry
+    point everything works, because the module is imported whole first — so the
+    failure appears only in the container, which is exactly where DEPLOY.md says
+    to use `python -m`. It cost one deploy step to find.
+    """
+    import subprocess
+    import sys
+
+    out = subprocess.run(
+        [sys.executable, "-m", "dovetail.cli", "--help"],
+        capture_output=True, text=True, timeout=90,
+    ).stdout
+    for command in ("create-user", "api-key", "serve", "validate-against-published"):
+        assert command in out, f"{command} is missing when run as a module"
