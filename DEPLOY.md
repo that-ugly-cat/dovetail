@@ -62,7 +62,17 @@ dovetail.borant.eu {
 }
 ```
 
-Then `caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy`.
+Validate on a **copy** and touch the live file only if it passes. On a box
+serving two dozen sites that is the difference between a harmless mistake and
+Caddy refusing to come back up:
+
+```bash
+sudo bash -c 'cp /etc/caddy/Caddyfile /tmp/cf.new   && cat /opt/apps/dovetail/caddy-block.txt >> /tmp/cf.new   && caddy validate --adapter caddyfile --config /tmp/cf.new   && cp /tmp/cf.new /etc/caddy/Caddyfile   && systemctl reload caddy && echo OK'
+```
+
+`--adapter caddyfile` is not optional: without it `validate` assumes JSON and
+fails on the first `#` with a message about JSON that has nothing to do with what
+is wrong.
 
 Note what `@pubbliche` means for `/mcp`: it is **outside** the Borant ID gate, so
 it is protected by its own per-user API key and by nothing else. That middleware
