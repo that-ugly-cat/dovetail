@@ -79,19 +79,28 @@ never cut. Everything below was measured against what remained.</div>
   <div class="card">
     <h2>How much was looked at</h2>
     {% if sweep %}
+    {# Two mechanisms, counted apart. The second reaches journals that are
+       outside the first one's pool by construction — a journal only matches the
+       topics filter if the topic is among its top 25, and that list is
+       truncated — so adding the two totals together, or reading one as a
+       fraction of the other, would say something false. #}
     <ul class="bars">
-      <li><span class="lab">Pool of candidates</span><span class="val">{{ '{:,}'.format(sweep.pool) }}</span></li>
-      <li><span class="lab">Journals actually fetched</span><span class="val">{{ '{:,}'.format(sweep.fetched) }}</span></li>
-      <li><span class="lab">Pages of results</span><span class="val">{{ sweep.pages }}</span></li>
-      {% if sweep.added_by_volume %}
-      <li><span class="lab">Reached by grouping works instead</span><span class="val">{{ sweep.added_by_volume }}</span></li>
-      {% endif %}
+      <li><span class="lab">Journals the topic filter can see</span><span class="val">{{ '{:,}'.format(sweep.pool) }}</span></li>
+      <li><span class="lab">of which fetched, in {{ sweep.pages }} page{{ 's' if sweep.pages != 1 }}</span>
+          <span class="val">{{ '{:,}'.format(sweep.fetched - (sweep.added_by_volume or 0)) }}</span></li>
+      <li><span class="lab">Plus, from grouping works by journal</span>
+          <span class="val">{% if sweep.added_by_volume %}{{ sweep.added_by_volume }}{% else %}0{% endif %}</span></li>
+      <li><span class="lab"><strong>Scored in total</strong></span>
+          <span class="val">{{ '{:,}'.format(sweep.fetched) }}</span></li>
     </ul>
     {% if sweep.truncated %}
       <p class="warn small" style="margin-bottom:0">The sweep was cut short: the list below is not
       the whole pool, and a journal missing from it may simply never have been fetched.</p>
     {% else %}
-      <p class="muted small" style="margin-bottom:0">The whole pool was swept.</p>
+      <p class="muted small" style="margin-bottom:0">The whole pool was swept. The second mechanism
+      reaches journals the first cannot — a journal matches the topic filter only if the topic is
+      among its top 25 — so its journals are <em>outside</em> that pool, not a share of it. Measured
+      over seven papers, it adds candidates and has never yet changed an outcome.</p>
     {% endif %}
     {% else %}
     <p class="muted">This run predates the coverage report, so how much of the pool it reached was

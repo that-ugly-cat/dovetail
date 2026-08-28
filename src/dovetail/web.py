@@ -567,24 +567,30 @@ def estimate_run(s: Session, discover: bool) -> dict:
 
     The house rule for a tool that spends: next to the thing that spends there
     has to be a thing that estimates, and it has to be free — a cost seen
-    afterwards is not a decision. Every number here comes from the rate-limit
-    headers OpenAlex returns, read on 27 Aug 2026, so this is arithmetic and not
-    a guess.
+    afterwards is not a decision.
+
+    The terms come from `pipeline.cost_terms`, which lives beside the calls that
+    make them. They were computed here once, and that version was wrong on its
+    first live run: it counted the paginated sweep and neither of the other two
+    calls stage 2 makes. An estimate that is under is worse than none, because
+    it is the one people believe.
     """
-    classify = config.COST_TEXT
-    sweep = config.MAX_CANDIDATE_PAGES * config.COST_SOURCES if discover else 0
+    from .matching.pipeline import cost_terms
+
+    terms = cost_terms(discover)
+    total = sum(t["credits"] for t in terms)
     remaining = db.credits_remaining(s)
     return {
-        "classify": classify,
-        "sweep": sweep,
-        "sweep_pages": config.MAX_CANDIDATE_PAGES if discover else 0,
-        "total": classify + sweep,
+        "terms": terms,
+        "total": total,
         "remaining": remaining,
         "budget": config.daily_budget(),
-        # The sweep is a ceiling, not a bill: it stops when the pool runs out.
-        # Stage 1 is the one that cannot be skipped, so it is the one the check
-        # below is about.
-        "affordable": remaining >= classify,
+        # A ceiling and not a bill: the sweep stops when the pool runs out, and
+        # the recovery batches only happen if the grouping found something the
+        # first mechanism missed. Stage 1 is the call that cannot be skipped, so
+        # it is the one affordability is about.
+        "classify": config.COST_TEXT,
+        "affordable": remaining >= config.COST_TEXT,
     }
 
 

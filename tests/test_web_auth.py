@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dovetail import auth, config, db
+from dovetail.matching import pipeline
 from dovetail.models import MatchRun, Role, User, Venue
 from dovetail.web import app
 
@@ -259,7 +260,48 @@ def test_the_cost_is_shown_before_the_button_and_not_after(client):
     r = client.get("/app/runs/new")
     assert r.status_code == 200
     assert str(config.COST_TEXT) in r.text
-    assert str(config.MAX_CANDIDATE_PAGES * config.COST_SOURCES) in r.text
+    assert str(pipeline.cost_ceiling(discover=True)) in r.text
+
+
+def test_the_estimate_names_every_call_that_spends():
+    """The guard against the drift that already happened once.
+
+    The first estimate was written in the web layer and counted the paginated
+    sweep alone, missing the two other calls stage 2 makes. A form promising «at
+    most 125» then watched a real run spend 133 — and an estimate that is under
+    is worse than none, because it is the one people believe.
+
+    So instead of trusting a comment to stay true, this reads the source of
+    `generate_candidates` and fails if it calls anything the estimate does not
+    name. Adding a call to stage 2 without pricing it now breaks the suite.
+    """
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(pipeline.generate_candidates))
+    called = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "client"
+    }
+    priced = {t["call"] for t in pipeline.cost_terms(discover=True)}
+    assert called <= priced, f"stage 2 calls {called - priced} and the estimate does not price it"
+
+
+def test_the_ceiling_is_above_what_a_real_run_spent():
+    """Pinned to a measurement, not to an intention.
+
+    28 Aug 2026, a full sweep on a three-topic abstract: 133 credits — one
+    classification at 100, twenty-one pages of /sources, one grouped /works at
+    10, two recovery batches. The ceiling has to sit above that and stay there.
+    """
+    assert pipeline.cost_ceiling(discover=True) >= 133
+    # Without the sweep only the classification is left, and nothing else may
+    # creep into that path: it is the one an operator picks to spend less.
+    assert pipeline.cost_ceiling(discover=False) == config.COST_TEXT
 
 
 def test_a_short_abstract_is_refused_without_writing_a_run(client):

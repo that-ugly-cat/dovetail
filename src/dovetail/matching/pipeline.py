@@ -73,6 +73,59 @@ def classify(session: Session, client: OpenAlexClient, title: str, abstract: str
     return payload
 
 
+# --- what a run costs, before it is started -------------------------------
+
+# Every call in a run that spends OpenAlex credits, with the ceiling on how many
+# times it can happen. It lives **here**, next to the code that makes the calls,
+# because the first version of it lived in the web layer and was wrong on its
+# first live run: it counted the paginated sweep and neither of the other two
+# calls stage 2 makes, so a form promising "at most 125" watched a run spend 133.
+#
+# An estimate that is under is worse than no estimate, because it is trusted.
+# `test_the_estimate_names_every_call_that_spends` walks the source of
+# `generate_candidates` and fails if a call appears there that is not named here,
+# which is the drift that produced the error in the first place.
+def cost_terms(discover: bool = True) -> list[dict]:
+    from .. import config as _c
+
+    terms = [
+        {
+            "call": "classify_text",
+            "label": "Classifying the manuscript",
+            "detail": "/text/topics, once — the one call that cannot be skipped",
+            "credits": _c.COST_TEXT,
+        }
+    ]
+    if discover:
+        terms += [
+            {
+                "call": "sources_by_topics",
+                "label": "Sweeping for candidates",
+                "detail": f"/sources, up to {_c.MAX_CANDIDATE_PAGES} pages of 200",
+                "credits": _c.MAX_CANDIDATE_PAGES * _c.COST_SOURCES,
+            },
+            {
+                "call": "journals_publishing_on",
+                "label": "Journals that publish on the subject as a sideline",
+                "detail": "/works grouped by source, once — the topics filter cannot reach them",
+                "credits": _c.COST_WORKS,
+            },
+            {
+                "call": "sources_by_ids",
+                "label": "Fetching the records those groups named",
+                # Group results cap at 200, and the batch is 100, so this is two
+                # calls at the very most however broad the topic.
+                "detail": "/sources by id, at most two batches of 100",
+                "credits": 2 * _c.COST_SOURCES,
+            },
+        ]
+    return terms
+
+
+def cost_ceiling(discover: bool = True) -> int:
+    return sum(t["credits"] for t in cost_terms(discover))
+
+
 # --- stage 2 --------------------------------------------------------------
 
 

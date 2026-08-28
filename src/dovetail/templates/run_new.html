@@ -10,10 +10,10 @@ screen that spends the shared OpenAlex budget, which is why it needs an admin.</
   <h2>What it will cost, before you press it</h2>
   <div class="table-wrap"><table class="table">
     <tbody>
-    <tr><td>Classifying the manuscript <span class="muted small">— <code>/text/topics</code>, once</span></td>
-        <td class="n">{{ estimate.classify }} credits</td></tr>
-    <tr><td>Sweeping for candidates <span class="muted small">— up to {{ estimate.sweep_pages }} pages of 200, a ceiling and not a bill</span></td>
-        <td class="n">≤ {{ estimate.sweep }} credits</td></tr>
+    {% for t in estimate.terms %}
+    <tr><td>{{ t.label }} <span class="muted small">— {{ t.detail }}</span></td>
+        <td class="n">{{ t.credits }} credits</td></tr>
+    {% endfor %}
     <tr><td>Enriching the finalists from DOAJ</td><td class="n">free</td></tr>
     <tr><td><strong>At most</strong></td><td class="n"><strong>{{ estimate.total }}</strong></td></tr>
     <tr><td class="muted">Left today</td>
@@ -21,7 +21,10 @@ screen that spends the shared OpenAlex budget, which is why it needs an admin.</
     </tbody>
   </table></div>
   <p class="muted small" style="margin-bottom:0">Every figure comes from the rate-limit headers
-  OpenAlex returns, so this is arithmetic and not a guess. The budget resets at midnight UTC.</p>
+  OpenAlex returns, so this is arithmetic and not a guess — and it is a <strong>ceiling</strong>: the
+  sweep stops early when the pool runs out, and the last two lines only happen if the grouping found
+  journals the topic filter missed. A real run on 28 Aug 2026 spent 133 of these {{ estimate.total }}.
+  The budget resets at midnight UTC.</p>
 </div>
 
 <form method="post" action="/app/runs/new">
