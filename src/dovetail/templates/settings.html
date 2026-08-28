@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% block title %}Settings — Dovetail{% endblock %}
+{% block body %}
+<h1>Settings</h1>
+<p class="sub">Your own credentials, for the one thing Dovetail cannot pay for out of a shared
+budget.</p>
+
+{% if saved == '1' %}<div class="flash ok"><strong>Key stored.</strong> It is encrypted, and no
+screen will show it again — not to you and not to whoever runs the server.</div>
+{% elif saved == 'cleared' %}<div class="flash">Key removed. Genre judgements will be offered again
+once there is one.</div>{% endif %}
+
+<div class="card">
+  <h2>Anthropic API key</h2>
+  <p class="muted">Stage 5a asks a model whether a journal publishes work of the same
+  <em>kind</em> as your manuscript — form and method, not subject. That call costs money, and it is
+  charged to whoever's key runs it.</p>
+
+  {% if not crypto_ready %}
+  <div class="flash err" style="margin-bottom:0"><strong>This instance cannot store a key.</strong>
+  <code>FERNET_KEY</code> is not set, so there is nowhere to keep one encrypted — and keeping one any
+  other way is not on offer. Stage 5a is unavailable until an operator sets it.</div>
+  {% else %}
+  <form method="post" action="/app/settings/anthropic-key">
+    <label>Key
+      <input name="anthropic_key" type="password" autocomplete="off"
+        placeholder="{% if has_key %}stored — type a new one to replace it{% else %}sk-ant-…{% endif %}">
+    </label>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn" type="submit">{% if has_key %}Replace{% else %}Store{% endif %}</button>
+      {% if has_key %}<span class="badge ok">a key is stored</span>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<p class="note"><strong>Per person, not per machine.</strong> A judgement bills the account of
+whoever started it, and this server holds no model credential of its own — the same question left
+open for <code>venue_history</code>, settled the other way here because there is a place to put the
+key. Encrypted with Fernet, decrypted in memory when a judgement runs, and never written to a log.</p>
+<p class="note">Removing it is emptying the field and saving. Nothing else on this instance uses it,
+and everything through stage 4 — the sweep, the scores, the constraints, the criteria — works with
+no key at all.</p>
+<p class="note">The model is <code>{{ model }}</code>, and it is recorded on every verdict it
+writes. A judgement read back a year from now should say what produced it.</p>
+{% endblock %}

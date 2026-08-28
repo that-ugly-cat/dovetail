@@ -823,8 +823,9 @@ def new_run(
 
 
 @app.get("/app/runs/{run_id}", response_class=HTMLResponse)
-def run_detail(request: Request, run_id: int, user: User = Depends(current_user),
-               s: Session = Depends(get_db)):
+def run_detail(request: Request, run_id: int, genre: str = "",
+               judged: int = 0, failed: int = 0, detail: str = "",
+               user: User = Depends(current_user), s: Session = Depends(get_db)):
     run = s.get(MatchRun, run_id)
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such run")
@@ -857,16 +858,124 @@ def run_detail(request: Request, run_id: int, user: User = Depends(current_user)
                 "reachable": res.score_topic > 0,
             }
         )
+    from . import crypto
+    from .matching import genre as genre_mod
+
     return page(
         request, "run.html", user, s,
         nav="runs",
         run=run,
         buckets=buckets,
         total_rows=sum(len(v) for v in buckets.values()),
+        # Stage 5a is offered only where it can actually be paid for: a key
+        # stored by this user, on an instance able to store one at all.
+        genre_ready=crypto.available() and bool(user.anthropic_key_encrypted),
+        genre_estimate=(
+            genre_mod.cost_estimate(s, [r["result"] for r in buckets["shortlist"]])
+            if buckets["shortlist"] else None
+        ),
+        genre_flash={"state": genre, "judged": judged, "failed": failed, "detail": detail},
         # The manuscript's own profile: the input every score below is measured
         # against, and until now the one thing the page did not show.
         text_topics=(run.text_profile or {}).get("topics") or [],
     )
+
+
+@app.post("/app/runs/{run_id}/read-finalists")
+def read_finalists(run_id: int, user: User = Depends(require_admin),
+                   s: Session = Depends(get_db)):
+    """Stage 5a on this run's shortlist: does each journal publish work of this kind?
+
+    Not part of `run_match`, on purpose. It is a second spend, in a second
+    currency, against a key that belongs to a person rather than to the box — so
+    it is a separate button with its own estimate, pressed after looking at the
+    list. Folding it into the consultation would make every run cost money
+    somebody had not been asked about.
+    """
+    from anthropic import APIError
+
+    from . import crypto
+    from .matching import genre
+    from .sources.openalex import OpenAlexClient, OpenAlexError
+
+    run = s.get(MatchRun, run_id)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such run")
+    if not (crypto.available() and user.anthropic_key_encrypted):
+        return RedirectResponse(f"/app/runs/{run_id}?genre=nokey",
+                                status_code=status.HTTP_303_SEE_OTHER)
+
+    results = list(
+        s.scalars(
+            select(MatchResult)
+            .where(MatchResult.run_id == run_id, MatchResult.bucket == "shortlist")
+            .order_by(MatchResult.position)
+        )
+    )
+    if not results:
+        return RedirectResponse(f"/app/runs/{run_id}?genre=empty",
+                                status_code=status.HTTP_303_SEE_OTHER)
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=crypto.decrypt_api_key(user.anthropic_key_encrypted))
+    try:
+        verdicts, failures = genre.read_finalists(
+            s, client, OpenAlexClient(), run, results
+        )
+    except (APIError, OpenAlexError) as e:
+        # The whole pass died rather than one journal: a bad key, an exhausted
+        # OpenAlex budget. The code travels; the template picks the sentence.
+        return RedirectResponse(
+            f"/app/runs/{run_id}?genre=failed&detail={type(e).__name__}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return RedirectResponse(
+        f"/app/runs/{run_id}?genre=done&judged={len(verdicts)}&failed={len(failures)}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# --- the key that pays for stage 5 ----------------------------------------
+
+
+@app.get("/app/settings", response_class=HTMLResponse)
+def settings(request: Request, user: User = Depends(current_user),
+             s: Session = Depends(get_db)):
+    from . import crypto
+    from .matching import genre
+
+    return page(request, "settings.html", user, s, nav="settings",
+                crypto_ready=crypto.available(),
+                has_key=bool(user.anthropic_key_encrypted),
+                model=genre.MODEL,
+                saved=request.query_params.get("saved"))
+
+
+@app.post("/app/settings/anthropic-key")
+def save_anthropic_key(request: Request, anthropic_key: str = Form(""),
+                       user: User = Depends(current_user),
+                       s: Session = Depends(get_db)):
+    """Store, or clear, this user's own Anthropic key.
+
+    `current_user` and not `require_admin`: it is **their** key and their money,
+    and a reader storing one costs nobody anything — the routes that spend it
+    are admin-gated separately. Guarding the key itself by role would confuse
+    ownership with permission.
+    """
+    from . import crypto
+
+    if not crypto.available():
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "FERNET_KEY is not set on this instance, so a key cannot be stored "
+            "encrypted — and storing one any other way is not on offer.",
+        )
+    key = anthropic_key.strip()
+    user.anthropic_key_encrypted = crypto.encrypt_api_key(key) if key else None
+    s.flush()
+    return RedirectResponse(f"/app/settings?saved={'1' if key else 'cleared'}",
+                            status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/app/proposals", response_class=HTMLResponse)

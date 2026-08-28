@@ -113,6 +113,13 @@ class Venue(Base):
     topics: Mapped[list | None] = mapped_column(JSON)
     topics_coverage: Mapped[float | None] = mapped_column(Float)
 
+    # Titles of what this journal published most recently, for the genre
+    # judgement of stage 5. Cached on the record rather than fetched per run:
+    # it is **inventory**, it costs 10 credits a journal, and it changes on the
+    # timescale of an issue rather than of a consultation. Dated through
+    # `field_verification` like every other field, so `STALE_DAYS` refreshes it.
+    recent_titles: Mapped[list | None] = mapped_column(JSON)
+
     # DOAJ, so present only on fully open access journals.
     licenses: Mapped[list | None] = mapped_column(JSON)
     review_process: Mapped[list | None] = mapped_column(JSON)
@@ -285,6 +292,17 @@ class MatchResult(Base):
     excluded_by: Mapped[list | None] = mapped_column(JSON)
     flags: Mapped[list | None] = mapped_column(JSON)
 
+    # Stage 5a: does this journal publish things made **like this one**? Not
+    # "about this subject" — stages 3 and 4 answered that, and the two are
+    # different questions: an empirical study and a conceptual essay on the same
+    # topic score identically on scope and belong in different journals.
+    #
+    # It is stored beside the scores and **never merged into them**. The
+    # judgement is not reproducible, and ordering a list on it would make the
+    # list impossible to explain — which §11 promises it will be. It raises a
+    # flag and writes the sentence that motivates it; nothing moves.
+    genre_verdict: Mapped[dict | None] = mapped_column(JSON)
+
     run: Mapped[MatchRun] = relationship(back_populates="results")
     venue: Mapped[Venue] = relationship()
     criteria: Mapped[list[Criterion]] = relationship(
@@ -374,6 +392,10 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String(256))
     hashed_password: Mapped[str] = mapped_column(String(256))
     borant_sub: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    # Anthropic key for stage 5, Fernet-encrypted. Per user and not per box:
+    # a judgement bills the account of whoever started it, and this machine
+    # holds no model credential of its own.
+    anthropic_key_encrypted: Mapped[str | None] = mapped_column(Text)
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.READER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

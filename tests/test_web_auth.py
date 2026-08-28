@@ -355,6 +355,98 @@ def test_a_run_started_from_the_web_is_never_left_saying_running(client, monkeyp
         assert run.finished_at is not None
 
 
+# --- stage 5a, and the key that pays for it -------------------------------
+
+
+def test_only_an_admin_can_read_the_finalists(client):
+    sign_in(client, "reader@example.org", "pw-reader")
+    assert client.post("/app/runs/1/read-finalists").status_code == 403
+
+
+def test_without_a_key_the_pass_declines_instead_of_half_running(client):
+    """It spends against a person's own account. With nothing to spend from, the
+    honest answer is to say so before touching OpenAlex."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        run = MatchRun(title="T", abstract="a", status="done")
+        s.add(run)
+        s.flush()
+        run_id = run.id
+    r = client.post(f"/app/runs/{run_id}/read-finalists")
+    assert r.status_code == 303 and "genre=nokey" in r.headers["location"]
+
+
+def test_a_stored_key_is_never_rendered_back(client, monkeypatch):
+    """Not to its owner and not to whoever runs the server. A field that shows a
+    key is a field that leaks one into a screenshot."""
+    from cryptography.fernet import Fernet
+
+    from dovetail import crypto
+
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
+    sign_in(client, "admin@example.org", "pw-admin")
+
+    secret = "sk-ant-api03-NEVERRENDERTHIS-4321"
+    assert client.post(
+        "/app/settings/anthropic-key", data={"anthropic_key": secret}
+    ).status_code == 303
+    page = client.get("/app/settings").text
+    assert secret not in page
+    assert "NEVERRENDERTHIS" not in page
+    assert "a key is stored" in page
+
+    with db.session_scope() as s:
+        stored = s.query(User).filter(User.email == "admin@example.org").one()
+        assert stored.anthropic_key_encrypted and secret not in stored.anthropic_key_encrypted
+        assert crypto.decrypt_api_key(stored.anthropic_key_encrypted) == secret
+
+
+def test_a_key_can_be_removed_by_emptying_the_field(client, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    from dovetail import crypto
+
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
+    sign_in(client, "admin@example.org", "pw-admin")
+    client.post("/app/settings/anthropic-key", data={"anthropic_key": "sk-ant-x1234"})
+    client.post("/app/settings/anthropic-key", data={"anthropic_key": "  "})
+    with db.session_scope() as s:
+        assert s.query(User).filter(User.email == "admin@example.org").one().anthropic_key_encrypted is None
+
+
+def test_with_no_fernet_key_the_app_refuses_to_store_one(client, monkeypatch):
+    """Storing it unencrypted because the encryption was unavailable is worse
+    than a feature that says it is off."""
+    from dovetail import crypto
+
+    monkeypatch.delenv("FERNET_KEY", raising=False)
+    crypto._fernet.cache_clear()
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post("/app/settings/anthropic-key", data={"anthropic_key": "sk-ant-x"})
+    assert r.status_code == 503
+    assert "FERNET_KEY" in r.text
+    assert client.get("/app/settings").status_code == 200  # the page still explains itself
+
+
+def test_a_reader_may_store_their_own_key(client, monkeypatch):
+    """`current_user`, not `require_admin`: it is their key and their money, and
+    the routes that spend it are gated separately. Guarding the key by role would
+    confuse ownership with permission."""
+    from cryptography.fernet import Fernet
+
+    from dovetail import crypto
+
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
+    sign_in(client, "reader@example.org", "pw-reader")
+    assert client.get("/app/settings").status_code == 200
+    assert client.post(
+        "/app/settings/anthropic-key", data={"anthropic_key": "sk-ant-reader"}
+    ).status_code == 303
+
+
 # --- the three baskets ----------------------------------------------------
 
 

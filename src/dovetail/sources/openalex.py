@@ -183,6 +183,41 @@ class OpenAlexClient:
             if g.get("key") and g.get("key") != "unknown"
         ]
 
+    def recent_titles(
+        self, session: Session, openalex_id: str, per_page: int = 25
+    ) -> list[dict]:
+        """What this journal published most recently, newest first.
+
+        Stage 5a reads a journal's recent index to answer a question the topic
+        profile cannot: not *what is this journal about*, which the profile
+        already says, but *what shape are the things it prints*. A run of titles
+        carries that — «A randomised trial of…», «Towards a phenomenology of…» —
+        where a list of topic ids does not.
+
+        Titles and years only. The judgement does not need abstracts, and asking
+        for them would multiply the payload for nothing.
+        """
+        spend(session, config.COST_WORKS)
+        payload = self._call(
+            session,
+            "/works",
+            {
+                "filter": f"primary_location.source.id:{openalex_id}",
+                "sort": "publication_date:desc",
+                "per-page": per_page,
+                "select": "id,title,publication_year,type",
+            },
+        )
+        return [
+            {
+                "title": w.get("title") or "",
+                "year": w.get("publication_year"),
+                "type": w.get("type"),
+            }
+            for w in (payload.get("results") or [])
+            if w.get("title")
+        ]
+
     def sources_by_ids(self, session: Session, ids: list[str]) -> list[dict]:
         """Fetch full records for a batch of OpenAlex source ids.
 

@@ -114,6 +114,56 @@ never cut. Everything below was measured against what remained.</div>
   </div>
 </div>
 
+{% set g = genre_flash %}
+{% if g.state == 'done' %}
+<div class="flash ok"><strong>Finalists read.</strong> {{ g.judged }} judged{% if g.failed %},
+{{ g.failed }} could not be — a journal with no recent index cannot be judged on one.{% else %}.{% endif %}
+The verdicts sit beside the scores and moved nothing: a judgement that is not reproducible cannot
+order a list that has to be explainable.</div>
+{% elif g.state == 'nokey' %}
+<div class="flash">Reading the finalists needs your own Anthropic key, because that call is charged
+to a person and not to a shared budget. <a href="/app/settings">Store one in settings</a>.</div>
+{% elif g.state == 'empty' %}
+<div class="flash">There is no shortlist to read.</div>
+{% elif g.state == 'failed' %}
+<div class="flash err"><strong>The pass failed before finishing</strong> — <code>{{ g.detail }}</code>.
+That is the whole call rather than one journal: usually a rejected key or an exhausted OpenAlex
+budget. Nothing partial was left behind.</div>
+{% endif %}
+
+{% if buckets.shortlist and user.is_admin() %}
+<div class="card">
+  <div class="head">
+    <h2 style="margin:0">Stage 5a — does each one publish work of this <em>kind</em>?</h2>
+    {% if genre_ready %}
+    <form method="post" action="/app/runs/{{ run.id }}/read-finalists" style="margin:0">
+      <button class="btn btn-small" type="submit">Read the finalists</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="muted small" style="margin:8px 0 0">Form and method, not subject — stages 3 and 4 already
+  measured subject, and an empirical study and a conceptual essay on the same topic score the same
+  there and belong in different journals. It is the criterion the two desk rejects of 2026 were
+  missing.</p>
+  {% if genre_estimate %}
+  <p class="muted small" style="margin:8px 0 0">
+    {{ genre_estimate.venues }} journal{{ 's' if genre_estimate.venues != 1 }} ·
+    {{ genre_estimate.model_calls }} call{{ 's' if genre_estimate.model_calls != 1 }} to
+    <code>{{ genre_estimate.model }}</code>, roughly <strong>${{ '%.2f'|format(genre_estimate.usd_estimate) }}</strong>
+    on your key{% if genre_estimate.index_fetches %}, plus {{ genre_estimate.openalex_credits }}
+    OpenAlex credits to fetch {{ genre_estimate.index_fetches }} recent
+    ind{{ 'ex' if genre_estimate.index_fetches == 1 else 'exes' }} from the shared budget{% else %}.
+    Every recent index is already on record, so this costs no OpenAlex credits{% endif %}.
+    Two currencies, reported apart because they come out of different pockets.
+  </p>
+  {% endif %}
+  {% if not genre_ready %}
+  <p class="warn small" style="margin:8px 0 0">Needs your own Anthropic key —
+  <a href="/app/settings">settings</a>.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% macro result(row) %}
 <div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable %}unreachable{% endif %}">
   <div class="rhead">
@@ -128,6 +178,17 @@ never cut. Everything below was measured against what remained.</div>
       <span>field<b>{{ '%.4f'|format(row.result.score_field) }}</b></span>
     </span>
   </div>
+
+  {% set v = row.result.genre_verdict %}
+  {% if v %}
+  <div class="verdict {{ 'fits' if v.fits else 'misfits' }}">
+    <span class="badge {{ 'ok' if v.fits else 'warn' }}">{{ 'same kind' if v.fits else 'different kind' }}</span>
+    <span class="badge">confidence: {{ v.confidence }}</span>
+    <div style="margin-top:6px">{{ v.sentence }}</div>
+    <div class="muted small" style="margin-top:4px">this manuscript reads as <em>{{ v.manuscript_kind }}</em>;
+    the journal's recent index is <em>{{ v.journal_kind }}</em> · judged by {{ v.model }}, and it moved nothing</div>
+  </div>
+  {% endif %}
 
   {% if not row.result.score_topic and not row.result.score_subfield %}
   <div class="warn small" style="margin-top:6px">No profile: this zero is «I don't know», not «out of scope».</div>

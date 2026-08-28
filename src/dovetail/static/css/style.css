@@ -248,3 +248,15 @@ form.searchbar input.q { min-width: 260px; flex: 1; }
   .container { padding: 16px 12px 48px; }
   .res .scores { margin-left: 0; }
 }
+
+/* ── the genre verdict ──
+ * Beside the scores and visibly not one of them: it carries no number, because
+ * a judgement that cannot be reproduced must not look like a measurement that
+ * can. It orders nothing.
+ */
+.verdict {
+  margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--border); font-size: 13.5px;
+}
+.verdict.fits { border-left: 3px solid var(--ok); }
+.verdict.misfits { border-left: 3px solid var(--warn); }
