@@ -377,29 +377,40 @@ def test_the_container_installs_what_the_project_declares():
     calls it prices in different files, and an SDK with no parameter for a header
     it needs. Two halves that cannot see each other do not stay in step because
     somebody meant them to.
+
+    **And the first version of this test was broken the same way.** It split the
+    TOML on the first `]`, which is the one inside `"mcp[cli]"`, so it read five
+    dependencies out of eleven, never reached `anthropic`, and passed. A test
+    that cannot fail is worse than no test, so this one parses TOML with a TOML
+    parser and asserts up front that it found a plausible number of packages —
+    the guard that would have caught it.
     """
     import re
+    import tomllib
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
 
-    def names(text: str) -> set[str]:
-        found = set()
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            m = re.match(r"^\"?([A-Za-z0-9_.-]+)", line)
-            if m:
-                found.add(m.group(1).lower().replace("_", "-"))
-        return found
+    with open(root / "pyproject.toml", "rb") as fh:
+        declared = {
+            re.match(r"^([A-Za-z0-9_.-]+)", spec).group(1).lower().replace("_", "-")
+            for spec in tomllib.load(fh)["project"]["dependencies"]
+        }
 
-    pyproject = root / "pyproject.toml"
-    block = pyproject.read_text(encoding="utf-8").split("dependencies = [", 1)[1].split("]", 1)[0]
-    declared = names(block)
+    installed = set()
+    for line in (root / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            installed.add(
+                re.match(r"^([A-Za-z0-9_.-]+)", line).group(1).lower().replace("_", "-")
+            )
+
+    # The guard. A parse that silently returns almost nothing is how the first
+    # version of this test passed while the container was missing a package.
+    assert len(declared) >= 10, f"parsed only {len(declared)} dependencies: {sorted(declared)}"
+    assert "anthropic" in declared, "the parser is not reaching the end of the list"
+
     # uvicorn is the container's entry point and not imported by the package, so
     # it is legitimately in one list only. Everything else must be in both.
-    installed = names((root / "requirements.txt").read_text(encoding="utf-8")) - {"uvicorn"}
-
-    missing = declared - installed
+    missing = declared - installed - {"uvicorn"}
     assert not missing, f"declared in pyproject but never installed in the image: {sorted(missing)}"
