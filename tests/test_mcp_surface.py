@@ -41,12 +41,44 @@ def test_nothing_on_this_surface_approves_or_deletes():
     assert forbidden == []
 
 
-def test_the_only_writes_are_proposals():
-    writes = {n for n in tool_names() if n.startswith(("propose_", "match_"))}
-    others = tool_names() - writes
-    assert writes == {"propose_venue", "propose_update", "match_venues"}
-    # Everything else must be a read, by name and by intent.
-    assert all(n.startswith(("list_", "get_", "search_", "explain_", "budget_")) for n in others)
+def test_every_write_is_named_like_one():
+    """The taxonomy the surface is allowed to have.
+
+    Four writes, and none of them turns a suggestion into a fact: two file
+    proposals, one records a consultation, one records a genre verdict beside
+    the scores. Everything else reads. Keeping this as a name rule is what makes
+    it cheap enough to run on every commit — a tool that writes under a reading
+    name is the thing this catches.
+    """
+    writes = {n for n in tool_names() if n.startswith(("propose_", "match_", "judge_"))}
+    assert writes == {"propose_venue", "propose_update", "match_venues", "judge_finalists"}
+
+    reads = tool_names() - writes
+    assert all(
+        n.startswith(("list_", "get_", "search_", "explain_", "budget_", "estimate_"))
+        for n in reads
+    ), sorted(reads)
+
+
+def test_anything_that_spends_has_a_free_estimator_beside_it():
+    """The house rule for a tool that costs money: a cost seen afterwards is not
+    a decision, so the estimate has to exist and has to be free."""
+    names = tool_names()
+    assert "budget_status" in names, "match_venues spends OpenAlex credits"
+    assert "estimate_genre_judgement" in names, "judge_finalists spends the caller's own money"
+
+    est = next(t for t in asyncio.run(server.list_tools()) if t.name == "estimate_genre_judgement")
+    assert "free" in est.description.lower()
+
+
+def test_the_judgement_tool_says_it_orders_nothing():
+    """A model reading a verdict must not take it for a ranking signal. The
+    judgement is not reproducible, and the description is where a caller learns
+    that — nobody reads the spec."""
+    tool = next(t for t in asyncio.run(server.list_tools()) if t.name == "judge_finalists")
+    text = tool.description.lower()
+    assert "orders nothing" in text or "never as ranking" in text
+    assert "your own money" in text or "charged to" in text
 
 
 def test_every_tool_says_what_it_is_for():
@@ -137,7 +169,7 @@ def test_the_mcp_endpoint_is_closed_without_a_key(http):
 def test_a_reader_key_can_list_and_read(http):
     client, keys = http
     r = rpc(client, keys["reader"], "tools/list")
-    assert r.status_code == 200 and len(r.json()["result"]["tools"]) == 11
+    assert r.status_code == 200 and len(r.json()["result"]["tools"]) == 13
 
 
 def test_a_reader_key_cannot_write_to_the_queue(http):
@@ -227,3 +259,58 @@ def test_a_repository_says_so_to_a_model_too(tmp_path, monkeypatch):
     # A journal carries the type and no warning: the note is for the exceptions.
     assert found["A Journal"]["venue_type"] == "journal"
     assert "not_a_journal" not in found["A Journal"]
+
+
+def test_judging_without_a_stored_key_is_refused_with_a_sentence(tmp_path, monkeypatch):
+    """The call is charged to a person, so a caller with no credential of their
+    own gets told where to put one — not a stack trace, and not silence."""
+    from dovetail import mcp_server
+    from dovetail.models import MatchResult, MatchRun, Role, User, Venue
+
+    monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "k.db"))
+    db.create_all(tmp_path / "k.db")
+    with db.session_scope() as s:
+        u = User(email="a@b.c", hashed_password="x", role=Role.ADMIN)
+        run = MatchRun(title="t", abstract="x", status="done")
+        v = Venue(display_name="J", openalex_id="S1")
+        s.add_all([u, run, v])
+        s.flush()
+        s.add(MatchResult(run_id=run.id, venue_id=v.id, bucket="shortlist", position=1))
+        run_id, user_id = run.id, u.id
+
+    class Who:
+        id = user_id
+
+        def is_admin(self):
+            return True
+
+    token = mcp_server.caller.set(Who())
+    try:
+        out = mcp_server.judge_finalists(run_id)
+    finally:
+        mcp_server.caller.reset(token)
+
+    assert "denied" in out
+    assert "/app/settings" in out["denied"]
+
+
+def test_the_estimator_answers_without_a_key_and_without_calling_anything(tmp_path, monkeypatch):
+    """It has to work for someone deciding *whether* to store a key."""
+    from dovetail import mcp_server
+    from dovetail.models import MatchResult, MatchRun, Venue
+
+    monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "e.db"))
+    db.create_all(tmp_path / "e.db")
+    with db.session_scope() as s:
+        run = MatchRun(title="t", abstract="x", status="done")
+        v = Venue(display_name="J", openalex_id="S1")
+        s.add_all([run, v])
+        s.flush()
+        s.add(MatchResult(run_id=run.id, venue_id=v.id, bucket="shortlist", position=1))
+        run_id = run.id
+
+    out = mcp_server.estimate_genre_judgement(run_id)
+    # Two currencies, kept apart: they come out of different pockets.
+    assert out["model_calls"] == 1 and out["usd_estimate"] > 0
+    assert out["openalex_credits"] == 10
+    assert out["already_judged"] == 0

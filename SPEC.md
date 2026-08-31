@@ -537,6 +537,8 @@ Letture libere, **scritture solo come proposte**, approvazione in UI.
 | `list_sources()` | sorgenti con i loro hints | ✅ |
 | `list_proposals(status)` | la coda | ✅ |
 | `propose_venue` / `propose_update` | depositano in coda, non scrivono | ✅ |
+| `judge_finalists(run_id)` | **stadio 5a**: giudizio di genere sulle finaliste, sulla chiave Anthropic **di chi chiama** | ✅ |
+| `estimate_genre_judgement(run_id)` | cosa costerebbe, nelle due valute separate. **Gratis, nessuna chiamata** | ✅ |
 | `venue_history(venue_id)` | cosa è già successo lì, da PaperTrail | ❌ **non implementato**: richiede una chiave PaperTrail lato server, che è una decisione di deploy e non di codice |
 
 **E la superficie porta una chiave propria.** Dietro Caddy `/mcp` sta fra le rotte
@@ -545,6 +547,11 @@ MCP che spende il budget OpenAlex e scrive in coda non può stare lì scoperto: 
 `X-API-Key` per utente, hashato con SHA-256 e mostrato una volta sola. Il ruolo della chiave decide
 dentro i tool: un reader elenca tutto e legge, le chiamate che costano gli rispondono con una frase
 che spiega perché no.
+
+**Quattro scritture, e nessuna trasforma un suggerimento in un fatto:** due depositano proposte, una
+registra una consultazione, una registra un verdetto di genere accanto ai punteggi. Il test che lo
+protegge è una regola sui **nomi**, il che è ciò che lo rende abbastanza economico da girare a ogni
+commit — e ciò che intercetta è un tool che scrive sotto un nome da lettura.
 
 **Nessun tool approva.** È la garanzia che rende sicuro puntarci un agente, ed è protetta da un
 test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *delete* o *remove*.
@@ -569,11 +576,35 @@ macchine non si lamenta di essere indietro.** Nessuno apre la pagina e vede che 
 - **`match_venues` restituiva già i tre cestini separati**, ed è l'unico posto dove
   l'appiattimento non c'era mai stato: la persistenza li concatenava, questa superficie no.
 
-**Non c'è un tool che faccia girare lo stadio 5a**, ed è una decisione aperta e non una svista.
-Spenderebbe la credenziale Anthropic **del proprietario della chiave MCP**, che è il comportamento
-che la convenzione di casa descrive per [[autocode.md]] — quindi sarebbe coerente. Ma è la prima
-volta che una chiamata MCP spenderebbe qualcosa che non sia il budget OpenAlex condiviso, e vale una
-decisione esplicita.
+### `judge_finalists`, e la prima spesa non condivisa
+
+**Deciso il 28 ago 2026:** lo stadio 5a ha un tool, e spende la credenziale Anthropic **del
+proprietario della chiave MCP**. È la prima volta che una chiamata su questa superficie spende
+qualcosa che non sia il budget OpenAlex condiviso, ed è esattamente il comportamento che la
+convenzione di casa descrive per [[autocode.md]]: *la chiave MCP non porta la credenziale che spende;
+quella resta per-utente e cifrata, così una run lanciata da una chat paga sul budget di chi possiede
+la chiave*.
+
+Quattro proprietà lo tengono onesto.
+
+**La chiave porta un'identità, non una capacità.** Il tool legge `caller`, risale all'utente e usa
+*la sua* chiave. Chi non ne ha una stored riceve una frase che dice dove metterla, non un errore.
+
+**Serve comunque un admin**, perché recuperare l'indice recente di una rivista che non ce l'ha spende
+dal budget **condiviso**: dieci crediti a rivista. La spesa personale non è l'unica in gioco.
+
+**Accanto c'è lo stimatore, gratuito**, che riporta le due valute **separate** — chiamate al modello
+sulla chiave di una persona, crediti OpenAlex sul budget di tutti. Sommarle darebbe un numero che non
+significa niente, e c'è un test che pretende l'esistenza di uno stimatore accanto a ogni tool che
+spende.
+
+**E il tool dichiara nella propria descrizione che non ordina niente.** Un modello che legge un
+verdetto non deve prenderlo per un segnale di ranking: il giudizio non è riproducibile. Un test
+legge la descrizione e fallisce se quella frase sparisce, perché la descrizione è dove un chiamante
+lo impara — la spec non la legge nessuno.
+
+Su stdio non c'è un chiamante — è un processo locale avviato da chi possiede la macchina — e lì, e
+solo lì, viene onorata `ANTHROPIC_API_KEY` dall'ambiente.
 
 ---
 

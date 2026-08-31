@@ -35,6 +35,7 @@ from .models import (
     Proposal,
     ProposalStatus,
     Source,
+    User,
     Venue,
 )
 from .sources.doaj import DoajClient
@@ -397,6 +398,198 @@ def list_proposals(status: str = "pending", limit: int = 50) -> dict:
                 for p in rows
             ],
             "note": "approval happens outside this surface, by a person",
+        }
+
+
+# --- stage 5a: the one that spends the caller's own money -----------------
+
+
+def _callers_key(s):
+    """The caller's own Anthropic credential, or a sentence saying why not.
+
+    Returns `(client, None)` or `(None, error_dict)`.
+
+    **Bound to the person, not to the machine.** The MCP key carries an
+    identity, and this call spends against the credential of whoever owns that
+    identity — a judgement started from a chat bills its own account and nobody
+    else's. This box holds no Anthropic key of its own, which is the same rule
+    that keeps `venue_history` open and is settled the other way here because
+    there is a per-user place to put one.
+
+    Over stdio there is no caller — a local process started by whoever owns the
+    box — so `ANTHROPIC_API_KEY` from the environment is honoured there and
+    nowhere else.
+    """
+    import os
+
+    from . import crypto
+    from .matching import genre
+
+    who = caller.get()
+    if who is None:
+        raw = os.environ.get("ANTHROPIC_API_KEY")
+        if not raw:
+            return None, {
+                "denied": (
+                    "no Anthropic key: over stdio this reads ANTHROPIC_API_KEY, "
+                    "and it is not set"
+                )
+            }
+        return genre.build_client(raw, os.environ.get("ANTHROPIC_WORKSPACE_ID")), None
+
+    user = s.get(User, who.id)
+    if user is None or not user.anthropic_key_encrypted:
+        return None, {
+            "denied": (
+                "you have no Anthropic key stored. This call is charged to a "
+                "person rather than to a shared budget, so it needs your own: "
+                "store one at /app/settings."
+            )
+        }
+    if not crypto.available():
+        return None, {
+            "denied": (
+                "FERNET_KEY is not set on this instance, so stored keys cannot "
+                "be read. That is an operator's fix, not yours."
+            )
+        }
+    return (
+        genre.build_client(
+            crypto.decrypt_api_key(user.anthropic_key_encrypted),
+            user.anthropic_workspace_id,
+        ),
+        None,
+    )
+
+
+@server.tool()
+def estimate_genre_judgement(run_id: int) -> dict:
+    """What judging a run's finalists would cost. **Free, and makes no calls.**
+
+    Next to the thing that spends there has to be a thing that estimates, and it
+    has to cost nothing: a cost seen afterwards is not a decision.
+
+    Two currencies, reported apart because they come out of different pockets —
+    model calls against *your* key, OpenAlex credits against the shared daily
+    budget. Adding them would produce a number that means nothing.
+    """
+    from .matching import genre
+
+    db.init_engine()
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            return {"error": f"no consultation {run_id}"}
+        results = list(
+            s.scalars(
+                select(MatchResult).where(
+                    MatchResult.run_id == run_id, MatchResult.bucket == "shortlist"
+                )
+            )
+        )
+        if not results:
+            return {"error": f"consultation {run_id} has no shortlist to judge"}
+        est = genre.cost_estimate(s, results)
+        already = sum(1 for r in results if r.genre_verdict)
+        return {
+            **est,
+            "already_judged": already,
+            "note": (
+                "the model calls are charged to the key of whoever makes the "
+                "call; the OpenAlex credits come out of the shared daily budget. "
+                "Judging again replaces the previous verdicts rather than adding to them."
+            ),
+        }
+
+
+@server.tool()
+def judge_finalists(run_id: int) -> dict:
+    """Stage 5a: does each shortlisted journal publish work of this **kind**?
+
+    Form and method, not subject. Stages 3 and 4 already measured subject, and
+    an empirical study and a conceptual essay on the same topic score the same
+    there and belong in different journals.
+
+    **It orders nothing.** A positive verdict becomes a criterion of merit and a
+    negative one stays a flag; no position and no score moves. The judgement is
+    not reproducible — ask twice and the sentence differs — and a list ordered on
+    something unreproducible cannot be explained, which is what `explain_match`
+    promises. Read the verdicts as informing a reading, never as ranking one.
+
+    **It spends your own money.** The model calls are charged to the Anthropic
+    key stored by whoever owns the MCP key being used, not to any shared budget.
+    Call `estimate_genre_judgement` first: it is free.
+
+    Fetching a journal's recent index, where it is missing, does spend the
+    shared OpenAlex budget — which is why this needs an admin key.
+
+    A journal that cannot be judged costs that row its verdict and not the
+    others theirs: a hand-declared venue has no OpenAlex index to read, and a
+    model may decline. Both come back under `could_not_judge`.
+    """
+    from anthropic import APIError
+
+    from .matching import genre
+
+    denied = _needs_admin()
+    if denied:
+        return denied
+
+    db.init_engine()
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_id)
+        if run is None:
+            return {"error": f"no consultation {run_id}"}
+        results = list(
+            s.scalars(
+                select(MatchResult)
+                .where(MatchResult.run_id == run_id, MatchResult.bucket == "shortlist")
+                .order_by(MatchResult.position)
+            )
+        )
+        if not results:
+            return {"error": f"consultation {run_id} has no shortlist to judge"}
+
+        client, problem = _callers_key(s)
+        if problem:
+            return problem
+
+        try:
+            verdicts, failures = genre.read_finalists(
+                s, client, OpenAlexClient(), run, results
+            )
+        except APIError as e:
+            # Three different fixes, and they used to be one class name: a key
+            # that needs a workspace is a form to fill in, a rejected key is a
+            # credential to check, an empty balance is a top-up.
+            code, detail = genre.classify_api_error(e)
+            return {"error": code, "detail": detail, "spent": "nothing was left half-written"}
+        except OpenAlexError as e:
+            return {"error": "openalex", "detail": str(e)}
+
+        return {
+            "run_id": run_id,
+            "judged": len(verdicts),
+            "same_kind": sum(1 for v in verdicts if v.fits),
+            "different_kind": sum(1 for v in verdicts if not v.fits),
+            "model": genre.MODEL,
+            "verdicts": [
+                {
+                    "venue_id": v.venue_id,
+                    "fits": v.fits,
+                    "confidence": v.confidence,
+                    "manuscript_kind": v.manuscript_kind,
+                    "journal_kind": v.journal_kind,
+                    "sentence": v.sentence,
+                }
+                for v in verdicts
+            ],
+            "could_not_judge": failures,
+            "note": (
+                "nothing moved. A verdict sits beside the scores and never "
+                "inside them; `fits: false` is a flag and not a constraint, and "
+                "it removed nothing from the list."
+            ),
         }
 
 
