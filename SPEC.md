@@ -527,9 +527,9 @@ Letture libere, **scritture solo come proposte**, approvazione in UI.
 
 | tool | cosa fa | stato |
 |---|---|---|
-| `match_venues(title, abstract, word_count, funder, max_apc, discover)` | la lista con criteri e avvertenze | ✅ |
-| `explain_match(run_id, venue_id)` | punteggi ai tre livelli, criteri, vincoli, e lo **snapshot** del momento | ✅ |
-| `list_runs(limit)` | le consultazioni passate, con i vincoli di ciascuna | ✅ |
+| `match_venues(title, abstract, word_count, funder, max_apc, discover)` | la lista con criteri e avvertenze, **nei tre cestini separati** | ✅ |
+| `explain_match(run_id, venue_id)` | punteggi ai tre livelli, criteri, vincoli, lo **snapshot** del momento, il **cestino** e il **verdetto di genere** se lo stadio 5a è girato | ✅ |
+| `list_runs(limit)` | le consultazioni passate, con i vincoli e lo **`status`** di ciascuna | ✅ |
 | `get_venue(venue_id)` | record completo con `verified_at` **per campo** e la fonte di ogni timbro | ✅ |
 | `list_article_types(venue_id)` | tipi e limiti di parole | ✅ (tabella quasi sempre vuota) |
 | `search_venues(q, limit)` | ricerca lessicale su nome e ISSN | ✅ |
@@ -552,6 +552,28 @@ test che fallisce se qualcuno aggiunge un tool il cui nome contiene *approve*, *
 «l'approvazione vive nella UI» non è stata piegata per comodità.
 
 `record_outcome` **non esiste**: gli esiti stanno in PaperTrail, e duplicarli creerebbe due verità.
+
+### Cosa la superficie ha imparato il 28 ago 2026, e cosa ancora non sa
+
+Aggiornata in ritardo rispetto al resto, e vale la pena aver notato il ritardo: **una superficie per
+macchine non si lamenta di essere indietro.** Nessuno apre la pagina e vede che manca un campo.
+
+- **`list_runs` porta `status` ed `error_code`.** Senza, una corsa ancora viva e una il cui processo
+  è morto sono identiche a `results: 0` — esattamente la distinzione per cui la colonna esiste,
+  vista dal lato del modello invece che da quello della pagina.
+- **`explain_match` porta il verdetto di genere**, accanto ai punteggi e con la frase che dice che
+  non ordina niente. Un modello che legge un punteggio senza il verdetto ha metà di ciò che il
+  database sa.
+- **`_venue_brief` porta `venue_type`**, con una riga in chiaro quando non è una rivista. Un nome
+  come «PubMed» senza tipo accanto non dà a un modello niente su cui ragionare.
+- **`match_venues` restituiva già i tre cestini separati**, ed è l'unico posto dove
+  l'appiattimento non c'era mai stato: la persistenza li concatenava, questa superficie no.
+
+**Non c'è un tool che faccia girare lo stadio 5a**, ed è una decisione aperta e non una svista.
+Spenderebbe la credenziale Anthropic **del proprietario della chiave MCP**, che è il comportamento
+che la convenzione di casa descrive per [[autocode.md]] — quindi sarebbe coerente. Ma è la prima
+volta che una chiamata MCP spenderebbe qualcosa che non sia il budget OpenAlex condiviso, e vale una
+decisione esplicita.
 
 ---
 

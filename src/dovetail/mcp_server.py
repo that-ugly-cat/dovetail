@@ -82,16 +82,27 @@ def _needs_admin() -> dict | None:
 
 
 def _venue_brief(v: Venue) -> dict[str, Any]:
-    return {
+    brief = {
         "venue_id": v.id,
         "name": v.display_name,
         "issn_l": v.issn_l,
+        # Not every row is a journal. The sweep drags in repositories because
+        # Zenodo carries 12.2 million works and therefore touches every topic
+        # there is, and a model reading a name like "PubMed" with no type beside
+        # it has nothing to go on. They are never shortlisted; they are visible.
+        "venue_type": v.venue_type,
         "publisher": v.host_organization_name,
         "oa_model": getattr(v.oa_model, "value", v.oa_model),
         "apc_usd": v.apc_usd,
         "anvur": v.anvur_class,
         "predatory_risk": (v.predatory_risk or {}).get("level"),
     }
+    if v.venue_type and v.venue_type != "journal":
+        brief["not_a_journal"] = (
+            f"a {v.venue_type}: papers are deposited there, not submitted to it "
+            f"for review. Stage 4 excludes it."
+        )
+    return brief
 
 
 def _row_out(r) -> dict[str, Any]:
@@ -237,9 +248,15 @@ def list_runs(limit: int = 10) -> dict:
     """Past consultations, newest first, with the constraints each ran under.
 
     Use it to find a `run_id` for `explain_match`, and to see what was already
-    asked before spending credits asking it again. A run with `refused` set
-    produced no list at all — usually an abstract too short to classify — and
-    the reason is worth reading before retrying with the same text.
+    asked before spending credits asking it again.
+
+    **Read `status` before reading `results`.** A consultation started from the
+    web answers before it has finished, so a row can exist with nothing in it
+    yet: `running` means wait, `failed` means look at `error_code`, `refused`
+    means the matcher declined to guess — usually an abstract too short to
+    classify — and that reason is worth reading before retrying with the same
+    text. Without this field a run still going and a run whose process died look
+    identical, and they want opposite reactions.
     """
     db.init_engine()
     with db.session_scope() as s:
@@ -254,6 +271,9 @@ def list_runs(limit: int = 10) -> dict:
                         k: v for k, v in (r.constraints or {}).items() if not k.startswith("_")
                     },
                     "created_at": r.created_at.isoformat(),
+                    "status": r.status,
+                    "error_code": r.error_code,
+                    "error_detail": r.error_detail,
                     "refused": r.refused_reason,
                     "results": len(r.results),
                 }
@@ -309,6 +329,16 @@ def explain_match(run_id: int, venue_id: int) -> dict:
             },
             "merit": [c.label for c in crits if c.kind.value == "merit"],
             "logistics": [c.label for c in crits if c.kind.value == "logistics"],
+            # Stage 5a, when it has run. Beside the scores and never merged into
+            # them: the judgement is not reproducible, so it may inform a
+            # reading and must never order one. `fits: false` is not a
+            # constraint and did not remove anything.
+            "genre_verdict": res.genre_verdict,
+            "genre_note": (
+                "whether the journal publishes work of this KIND — form and "
+                "method, not subject. Not reproducible, so it orders nothing. "
+                "Absent means stage 5a has not been run on this consultation."
+            ),
             "evidence": {c.label: c.evidence for c in crits},
             "constraints": res.excluded_by,
             "flags": res.flags,

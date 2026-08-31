@@ -184,3 +184,46 @@ def test_every_cli_command_survives_python_dash_m():
     ).stdout
     for command in ("create-user", "api-key", "serve", "validate-against-published"):
         assert command in out, f"{command} is missing when run as a module"
+
+
+# --- what the surface must not go on hiding -------------------------------
+
+
+def test_a_run_still_going_is_distinguishable_over_mcp(tmp_path, monkeypatch):
+    """The same distinction the `status` column exists for, from the model's
+    side. A consultation started from the web answers before it has finished, so
+    a row can exist with nothing in it — and `results: 0` alone cannot tell a
+    sweep in progress from a process that died."""
+    from dovetail import db, mcp_server
+    from dovetail.models import MatchRun
+
+    monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "m.db"))
+    db.create_all(tmp_path / "m.db")
+    with db.session_scope() as s:
+        s.add(MatchRun(title="alive", abstract="x", status="running"))
+        s.add(MatchRun(title="dead", abstract="x", status="failed",
+                       error_code="budget", error_detail="ran out"))
+    out = {r["title"]: r for r in mcp_server.list_runs()["runs"]}
+    assert out["alive"]["status"] == "running" and out["alive"]["error_code"] is None
+    assert out["dead"]["status"] == "failed" and out["dead"]["error_code"] == "budget"
+
+
+def test_a_repository_says_so_to_a_model_too(tmp_path, monkeypatch):
+    """A name like «PubMed» with no type beside it gives a model nothing to go
+    on, and the sweep does drag repositories in — Zenodo touches every topic
+    there is."""
+    from dovetail import db, mcp_server
+    from dovetail.models import Venue
+
+    monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "m2.db"))
+    db.create_all(tmp_path / "m2.db")
+    with db.session_scope() as s:
+        s.add(Venue(display_name="A Repository", venue_type="repository"))
+        s.add(Venue(display_name="A Journal", venue_type="journal"))
+
+    found = {v["name"]: v for v in mcp_server.search_venues(query="A ")["venues"]}
+    assert found["A Repository"]["venue_type"] == "repository"
+    assert "deposited" in found["A Repository"]["not_a_journal"]
+    # A journal carries the type and no warning: the note is for the exceptions.
+    assert found["A Journal"]["venue_type"] == "journal"
+    assert "not_a_journal" not in found["A Journal"]
