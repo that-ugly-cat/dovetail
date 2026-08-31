@@ -981,6 +981,23 @@ oltre questo tool:
 > **Un pezzo costruito su una ragione può funzionare per un'altra, e finché non lo si esegue le due
 > cose sono indistinguibili.**
 
+### La non-riproducibilità si è fatta vedere, e ha dato ragione alla regola
+
+Girato una seconda volta sullo stesso manoscritto, in produzione, **Philosophical Psychology ha
+cambiato verdetto**: `fits=False` con confidenza *media* la prima volta, `fits=True` con confidenza
+**bassa** la seconda — e la frase spiega l'esitazione, «l'indice è dominato da analisi concettuale,
+*ma alcuni pezzi guidati dai dati*».
+
+Non è un difetto: è la proprietà dichiarata del giudizio, osservata. E **giustifica la regola più
+importante del modulo**. Se il verdetto ordinasse la lista, quella rivista si sarebbe spostata di
+posizione fra due corse per una ragione che nessun lettore può ispezionare — e §11 promette
+`explain_match`. Sta accanto ai punteggi, non dentro, esattamente per questo.
+
+Il campo `confidence` ha fatto il suo lavoro: il verdetto che ha oscillato è arrivato marcato
+**basso**, che è il segnale che un lettore usa per non fidarsi di quella riga in particolare. La
+seconda corsa ha dato 11 «stessa forma» e 1 «forma diversa» contro le 10 e 2 della prima, e l'unica
+riga cambiata è quella.
+
 Ed è anche il motivo per cui `judge-venues` resta: una venue che il matcher non propone mai è
 invisibile a ogni superficie che legge una shortlist, e un'affermazione che niente può raggiungere è
 un'affermazione che niente può testare.
