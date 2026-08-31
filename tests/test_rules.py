@@ -359,3 +359,47 @@ def test_the_title_is_never_the_part_that_is_cut():
     title = "A perfectly ordinary paper title"
     kept, _, _ = fit_text(title, "word " * 600)
     assert kept == title
+
+
+# --- the two dependency lists have to agree -------------------------------
+
+
+def test_the_container_installs_what_the_project_declares():
+    """`pyproject.toml` is what `uv` reads; `requirements.txt` is what the image
+    installs. Nothing makes them agree except this.
+
+    They did not on 28 Aug 2026: `anthropic` went into pyproject when stage 5a
+    was built and never into requirements, so the deployed container had no such
+    module and every stage 5a call failed — **silently**, because the web route
+    catches `APIError` and a missing module is not one.
+
+    It is the same shape as two other faults found the same day: a price and the
+    calls it prices in different files, and an SDK with no parameter for a header
+    it needs. Two halves that cannot see each other do not stay in step because
+    somebody meant them to.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+
+    def names(text: str) -> set[str]:
+        found = set()
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            m = re.match(r"^\"?([A-Za-z0-9_.-]+)", line)
+            if m:
+                found.add(m.group(1).lower().replace("_", "-"))
+        return found
+
+    pyproject = root / "pyproject.toml"
+    block = pyproject.read_text(encoding="utf-8").split("dependencies = [", 1)[1].split("]", 1)[0]
+    declared = names(block)
+    # uvicorn is the container's entry point and not imported by the package, so
+    # it is legitimately in one list only. Everything else must be in both.
+    installed = names((root / "requirements.txt").read_text(encoding="utf-8")) - {"uvicorn"}
+
+    missing = declared - installed
+    assert not missing, f"declared in pyproject but never installed in the image: {sorted(missing)}"
