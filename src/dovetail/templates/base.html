@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Dovetail{% endblock %}</title>
 <link rel="stylesheet" href="/static/css/style.css?v={{ ASSETS }}">
+<script>
+  // Runs before the first paint, so a user who chose light never sees a dark
+  // frame. Kept inline and tiny on purpose: an external file would load too
+  // late. The toggle itself is in theme.js.
+  (function () {
+    try {
+      if (window.localStorage.getItem("dovetail-theme") === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    } catch (e) {}
+  })();
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🪵</text></svg>">
 {% block head_extra %}{% endblock %}
 </head>
@@ -23,11 +35,13 @@
     <span class="badge {{ 'accent' if user.is_admin() }}">{{ user.role.value }}</span>
     {% if gateway %}<span class="badge">Borant ID</span>
     {% else %}<form class="inline" method="post" action="/logout"><button class="btn btn-link btn-small">Sign out</button></form>{% endif %}
+    <button type="button" class="theme-toggle" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><span class="theme-icon-dark" aria-hidden="true">&#9788;</span><span class="theme-icon-light" aria-hidden="true">&#9790;</span></button>
   </nav>
 </div>
 {% endif %}
 <main class="container {% block main_class %}{% endblock %}">
 {% block body %}{% endblock %}
 </main>
+<script src="/static/js/theme.js?v={{ ASSETS }}"></script>
 </body>
 </html>
