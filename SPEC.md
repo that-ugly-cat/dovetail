@@ -1069,6 +1069,8 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
   ancora un numero** perché aspetta un'ora di giudizio umano.
 - **Fase 4** — **stadio 5a fatto** (giudizio di genere, §12); **5b scritto il 20 nov 2026 e non
   ancora provato contro un modello vero** (§16h); restano l'anatomia e `venue_history`.
+- **Da fare, messo da parte da Spit il 20 nov 2026: esporre il 5b nel sito.** Oggi si avvia solo
+  da riga di comando e da MCP. Il disegno e ciò che lo vincola stanno in fondo a §16h.
 - **Fase 1c — il vicinato di citazione, fatto il 20 nov 2026** (§6b, §16g). Lo strato a embedding
   previsto dalla v0.3 **resta non costruito**: il vicinato copre lo stesso buco, la generazione, con
   un dato che c'è già e senza un modello da ospitare. Se la scheda in cieco dicesse che non basta,
@@ -1481,6 +1483,38 @@ host fuori da internet pubblica si rifiutano a ogni salto di un redirect.
 
 **Non verificato:** l'estrazione ha girato solo contro un client finto. Le dieci righe lette a mano
 l'8 settembre sono la verità a terra contro cui misurarla, una pagina per editore.
+
+### Da fare: esporlo nel sito (messo da parte il 20 nov 2026)
+
+**Il vincolo, misurato.** Il 20 novembre il server ha provato a scaricare le nove pagine di
+guidelines già note, senza chiamare modelli. Non ne ha ottenuta nessuna: cinque rispondono 403
+(due BMJ, Wiley, UTP, RBMO), una è un PDF, e le tre di Springer rispondono 200 con 209 caratteri di
+«A required part of this site couldn't load». La nota dell'8 settembre, «Springer non blocca», non
+vale più. Quindi il 5b è di fatto un estrattore su **testo incollato**, e un bottone «leggi da
+questo indirizzo» fallirebbe nove volte su nove.
+
+**Il disegno proposto.**
+
+- Sulla pagina della rivista, nel riquadro dei tipi di articolo, un bottone che chiede l'indirizzo
+  della pagina (resta come fonte) e il suo testo, incollato dopo averla aperta nel proprio browser.
+  Lo scaricamento resta come scorciatoia quando riesce.
+- Prima di depositare si vedono i tipi trovati, ciascuno con la frase di origine, e quelli scartati
+  con il motivo.
+- La coda resta. Un admin che legge approva nella stessa schermata; un membro deposita e aspetta.
+- Dalla consultazione, su ogni scheda senza limiti noti, un rimando a quella pagina. Il criterio sul
+  formato va ricalcolato quando la consultazione si riapre, altrimenti leggere le guidelines dopo
+  non cambia niente di ciò che si vede.
+
+**Da fare prima, comunque.**
+
+- Provarlo su un modello vero: due o tre delle riviste lette a mano l'8 settembre, testo incollato,
+  confronto con quelle righe. Pochi centesimi sulla chiave Anthropic di chi lo lancia.
+- Una soglia minima di testo: oggi le pagine vuote di Springer arriverebbero al modello, e la
+  chiamata si pagherebbe per sentirsi dire che non sono guidelines.
+
+**Scartato.** Un browser finto sul server per aggirare i blocchi: è ciò che gli editori stanno
+rifiutando, e il modulo dichiara di non fingersi un browser. La lettura a tappeto delle finaliste:
+senza indirizzi e senza scaricamento non c'è niente da automatizzare.
 
 ---
 
