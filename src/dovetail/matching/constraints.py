@@ -99,29 +99,21 @@ def evaluate(
             Outcome("venue_type", NEEDS_CHECK, "no type on record: check what this is")
         )
 
-    # **Whether the record is trustworthy** is the other fact, and `is_core` is
-    # OpenAlex's answer to it. Without this check the first live run put **FOX6
-    # News Milwaukee** tenth in the shortlist with three merit criteria: a TV
-    # news outlet typed `journal`, 2811 "works", h-index 1.
+    # There used to be a second exclusion here, on `is_core`: a journal outside
+    # the list of core sources was never proposed. It came in on 27 Aug 2026,
+    # after a TV news outlet typed `journal` came tenth in a shortlist, and it
+    # was described as OpenAlex's curated subset. It is not that. `is_core` is
+    # the CWTS Core sources list behind the Leiden Ranking, frozen on a snapshot
+    # of August 2024, and it left out three journals in four of those on record
+    # here — among them 111 with an h-index of 50 or more, journals in MEDLINE
+    # and in DOAJ, and most of what is not published in English.
     #
-    # Measured 28 Aug 2026, on the worry that it might be a mainstream-only
-    # filter: it is not. The twelve finalists of a real run carry 66 to 2,232
-    # works and are all core, while the non-core side is *ChemInform*, *Who's
-    # Who*, *Inpharma Weekly* — and a **duplicate** BMJ record with 389k works
-    # whose two canonical twins are both core. It de-duplicates and curates; it
-    # does not favour size.
-    #
-    # It excludes, but **here and not in the stage-2 query**, so it stays visible
-    # among the excluded instead of vanishing without trace.
-    if venue.is_core is False:
-        outcomes.append(
-            Outcome(
-                "is_core",
-                EXCLUDED,
-                "outside OpenAlex's curated subset: an abstracting service, a "
-                "magazine, or a duplicate of a record that is in it",
-            )
-        )
+    # Removed on 20 Nov 2026. A journal off that list is proposed like any other.
+    # What it costs is known and was measured on a real consultation before
+    # removing it: four of the first twelve places, and thirteen of the first
+    # twenty-five, go to journals off the list — national-language journals,
+    # titles that have ceased, small publishers. The reader now sees them and
+    # decides, which is where the judgement was moved to.
 
     # -- funder --------------------------------------------------------------
     funder = (constraints.get("funder") or "").lower()
@@ -185,27 +177,3 @@ def evaluate(
                 )
 
     return outcomes
-
-
-def predatory_risk(venue) -> dict:
-    """No single one of these signals convicts. Together they raise a flag that a
-    human has to close.
-
-    It exists because the merit/logistics grid of §9, on its own, **promotes** a
-    predatory journal: fast, OA, low APC, no embargo are four full logistics
-    criteria, and its topic profile is broad by construction.
-    """
-    flags: list[str] = []
-    model = getattr(venue.oa_model, "value", venue.oa_model)
-
-    if model == "oa_outside_doaj":
-        flags.append("OA but outside DOAJ")
-    if venue.host_organization_name is None:
-        flags.append("publisher not declared")
-    if venue.works_count and venue.h_index is not None:
-        if venue.works_count > 1000 and venue.h_index < 15:
-            flags.append(f"{venue.works_count} works but h-index {venue.h_index}")
-    if venue.indexed_in is not None and not venue.indexed_in:
-        flags.append("not indexed")
-
-    return {"flags": flags, "level": "high" if len(flags) >= 2 else ("low" if flags else "none")}

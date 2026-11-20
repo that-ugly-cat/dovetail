@@ -93,6 +93,8 @@ def _plain_flag(flag: str) -> str:
             "a very large general journal: only its 25 most frequent topics are on "
             "record, so a low subject score may be wrong"
         )
+    # The three below are no longer written: they were the risk signals, removed
+    # on 20 Nov 2026. Consultations recorded before then still carry them.
     return {
         "OA but outside DOAJ": "open access, but not listed in DOAJ",
         "publisher not declared": "no publisher on record",
@@ -150,6 +152,7 @@ def _plain_evidence(evidence: str | None) -> str:
 
 _CONSTRAINTS = {
     "venue_type": "kind of record",
+    # No longer applied (20 Nov 2026). Kept for consultations recorded before.
     "is_core": "curated journals only",
     "funder:snsf": "funder: SNSF",
     "max_apc": "highest fee",
@@ -514,7 +517,6 @@ def _inventory(s: Session) -> dict:
         "not_journals": total - journals,
         "profiled": profiled,
         "unprofiled": journals - profiled,
-        "core": _count(s, is_journal, Venue.is_core.is_(True)),
         "doaj": _count(s, is_journal, Venue.is_in_doaj.is_(True)),
         "apc_known": _count(s, is_journal, Venue.apc_usd.isnot(None)),
         "with_guidelines": s.scalar(
@@ -586,8 +588,6 @@ def venues(
     oa: str = "",
     doaj: str = "",
     profile: str = "",
-    core: str = "",
-    risk: str = "",
     kind: str = "journal",
     sort: str = "works",
     p: int = 1,
@@ -624,15 +624,6 @@ def venues(
         filters.append(HAS_PROFILE)
     elif profile == "no":
         filters.append(NO_PROFILE)
-    if core == "yes":
-        filters.append(Venue.is_core.is_(True))
-    elif core == "no":
-        # `type:journal` includes news bulletins, which is how FOX6 News
-        # Milwaukee once came tenth in a shortlist. This is the switch that
-        # shows what the `is_core` exclusion is actually removing.
-        filters.append(or_(Venue.is_core.is_(False), Venue.is_core.is_(None)))
-    if risk in {"high", "low"}:
-        filters.append(Venue.predatory_risk["level"].as_string() == risk)
 
     total = _count(s, *filters)
     pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
@@ -649,7 +640,7 @@ def venues(
         total=total, page_no=p, pages=pages, per_page=PER_PAGE,
         grand_total=_count(s),
         args={"q": q, "oa": oa, "doaj": doaj, "profile": profile,
-              "core": core, "risk": risk, "kind": kind, "sort": sort},
+              "kind": kind, "sort": sort},
         oa_models=[m.value for m in OAModel],
         kinds=venue_kinds(s),
         kind=kind,

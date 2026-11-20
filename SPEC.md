@@ -1,9 +1,10 @@
-# Dovetail — SPEC v0.6
+# Dovetail — SPEC v0.7
 
 *Trovare la rivista giusta per un paper, partendo da titolo, abstract e word count.*
 *Creato: 27 agosto 2026 — Giovanni Spitale + Ono*
 *v0.5, 28 ago 2026: stadio 5a, e la Fase 1b ridisegnata su misure che reggono.*
 *v0.6, 20 nov 2026: il vicinato di citazione (§6b), lo stadio 5b, e la coda che scrive i tipi di articolo.*
+*v0.7, 20 nov 2026: via l'esclusione «not curated», il rischio e ANVUR (§16i).*
 *Storia delle revisioni in §17.*
 
 > **Lingua:** il codice, la CLI e i test sono **in inglese**; questo documento resta in italiano,
@@ -177,7 +178,7 @@ Campi da API (rinfrescabili in blocco) e campi da guidelines (uno alla volta, vi
 | `license[]`, `review_process`, `publication_time_weeks`, `has_waiver` | DOAJ | solo full OA |
 | ~~`anvur_class`~~ | — | **tolto il 20 nov 2026.** La fascia ANVUR conta solo per chi è valutato in Italia, e in uno strumento che ora ha più utenti era una colonna vuota per quasi tutti: in produzione non la portava nessuna rivista. Chi ne ha bisogno la legge dagli elenchi ANVUR |
 | `indexed_in[]` | NLM / Scopus | |
-| `predatory_risk` | derivato + manuale | vedi §9 |
+| ~~`predatory_risk`~~ | — | **tolto il 20 nov 2026**, §16i |
 | `verified_at` **per campo** | — | vedi §10 |
 
 ### `venue_alias`
@@ -587,6 +588,10 @@ E: **ampiezza di pubblico non è tenuta dell'argomento.** Un desk reject motivat
 specialisti, non il nostro pubblico ampio» è informazione sul posizionamento, non sul paper.
 
 ### Il rischio predatorio, che la griglia da sola aggrava
+
+> **Tolto il 20 novembre 2026** (§16i). Il problema descritto qui sotto resta vero: la griglia, da
+> sola, promuove una rivista predatoria. Quello che non ha retto è il rimedio. Lo strumento oggi
+> non dice quanto una rivista è affidabile, e la guida lo scrive.
 
 Una rivista predatoria segna **quattro criteri logistici pieni** (veloce, OA, APC basso, nessun
 embargo) e almeno uno di merito, perché il suo profilo di topic è largo per costruzione. La griglia
@@ -1003,7 +1008,8 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
    ho dati" sono lo stesso numero. Serve una terza uscita esplicita, `insufficient profile`.
 5. **Abstract corto o generico.** Verificato: lo stesso paper in una frase produce topic disgiunti.
    Guard-rail in §6 stadio 1.
-6. **Riviste predatorie.** §9.
+6. **Riviste predatorie.** §9. Dal 20 nov 2026 lo strumento non le segnala più (§16i): il rischio
+   è aperto, e sta a chi legge la lista.
 7. **OpenAlex resta punto singolo di guasto per l'enumerazione, non più per il giudizio.**
    L'architettura a tre strati attenua molto questo rischio: il giorno che la tassonomia sbaglia un
    topic, il fit non dipende più da quella, perché lo scope lo dà l'embedding sul corpus e il genere
@@ -1325,6 +1331,7 @@ Tre reperti dalla prima esecuzione vera del matcher sul caso di riferimento.
 tre criteri di merito**: 2811 «lavori», h-index 1, nessun editore. Corretto con il flag `is_core`
 di OpenAlex, applicato come esclusione **allo stadio 4 e non nella query**, così resta visibile
 fra le escluse. Non prende tutto: *Journal of Student Research* è `is_core: true`.
+*(L'esclusione è stata tolta il 20 novembre 2026: §16i.)*
 
 **L'ordinamento per solo subfield era indifendibile.** *Journal of Cognitive Neuroscience* (topic
 0.017) usciva sopra *Philosophical Psychology* (topic 0.326), perché il subfield premia quanto una
@@ -1362,7 +1369,8 @@ una volta.
 
 - `add-venue` crea la rivista con i metadati che una persona può leggere dal sito. `is_core` resta
   **`None` e non `False`**: non essere nell'indice curato di OpenAlex non è un giudizio di qualità,
-  ed è la differenza fra «non lo so» e «no».
+  ed è la differenza fra «non lo so» e «no». *(«Indice curato di OpenAlex» era la descrizione
+  sbagliata: §16i.)*
 - `profile-venue` costruisce il profilo di scope dagli **articoli realmente pubblicati** dalla
   rivista, classificandoli uno per uno. È la stessa idea degli embedding di §5 — il profilo viene
   dal corpus, non da una tassonomia dichiarata — fatta con lo strumento che c'è già. Costa 100
@@ -1475,7 +1483,59 @@ l'8 settembre sono la verità a terra contro cui misurarla, una pagina per edito
 
 ---
 
+## 16i. Tre cose tolte: «not curated», il rischio, ANVUR (20 nov 2026)
+
+Tutte e tre per decisione di Spit, lo stesso giorno, guardando l'elenco delle riviste con gli occhi
+di chi non l'ha costruito.
+
+**«Not curated» non voleva dire quello che c'era scritto.** Il campo `is_core` di OpenAlex era
+descritto, nel codice e nell'interfaccia, come «il sottoinsieme curato di OpenAlex», che terrebbe
+fuori bollettini, servizi di abstract e duplicati (§16b). È invece l'elenco *Core sources* del CWTS
+di Leida, quello su cui è costruito il Leiden Ranking Open Edition: circa 36.000 fonti, calcolato
+su uno snapshot del 30 agosto 2024. Misura l'appartenenza alla letteratura internazionale, non
+l'affidabilità di un record.
+
+In produzione ne stavano fuori **15.218 riviste su 20.274**, e una rivista fuori dall'elenco non
+veniva mai proposta. Fra le escluse, 111 con h-index di almeno 50: *Health Affairs*, *Swiss Medical
+Weekly* (che è in DOAJ e in MEDLINE), *History and Theory*, *Philosophy East and West*. E quasi
+tutto ciò che non si pubblica in inglese.
+
+**L'esclusione è tolta, e il suo costo è misurato.** Prima di toglierla la stessa consultazione è
+stata ricalcolata con e senza, su tutto l'inventario: senza, **quattro dei primi dodici posti e
+tredici dei primi venticinque** vanno a riviste fuori dall'elenco. Non sono telegiornali: sono
+riviste nazionali in altre lingue, testate cessate (il vecchio nome di una rivista che ne ha preso
+uno nuovo), piccoli editori. Il caso di §16b, il telegiornale tipizzato `journal`, non ha più niente
+che lo fermi. La scelta è di mostrarle e lasciare il giudizio a chi legge.
+
+Il campo resta nella tabella, come fatto riportato dalla fonte, e non compare in nessuna pagina.
+Lo legge ancora solo la scheda in cieco, che estrae da lì i distrattori.
+
+**Il rischio non misurava il rischio.** `predatory_risk` (§9) sommava quattro segnali. Uno,
+«non indicizzata», non è mai stato alimentato: `indexed_in` è vuoto su ogni rivista. Uno,
+«editore non dichiarato», registrava un buco di OpenAlex: manca su 816 riviste *core* su 5.056,
+fra cui *NEJM AI* e le *JMIR*. Il livello si calcolava solo per le finaliste di una consultazione,
+quindi esisteva per 110 riviste su 20.567, e nell'elenco un trattino voleva dire sia «nessun
+segnale» sia «mai guardata». Dei tre «high» in produzione, due erano riviste serie. Le riviste di
+editori discussi uscivano «low».
+
+Tolti il campo, la colonna, i filtri e i segnali fra le note di un risultato. Le consultazioni
+registrate prima li portano ancora, e si leggono come prima.
+
+**Cosa c'è al loro posto: niente, e la guida lo dice.** OpenAlex espone per ogni fonte gli elenchi
+su cui compare (`listed_in`: MEDLINE, DOAJ, CWTS, registri nazionali). Sarebbe la base per dire
+«chi garantisce per questa rivista» invece di contare indizi. È stata proposta e non scelta: resta
+qui come strada nota, non come piano.
+
+**ANVUR.** Vedi §4: vale solo per chi è valutato in Italia, e nessuna rivista lo portava.
+
+---
+
 ## 17. Storia delle revisioni
+
+### v0.7 — tre cose tolte (20 nov 2026)
+
+§16i: l'esclusione delle riviste fuori dall'elenco CWTS, il rischio predatorio, la fascia ANVUR.
+Il budget condiviso era già caduto lo stesso giorno (§12).
 
 ### v0.6 — una seconda strada, e due cose che non funzionavano (20 nov 2026)
 

@@ -235,7 +235,6 @@ class Row:
     score: object
     outcomes: list
     criteria: list
-    predatory: dict
     # Set when the citation neighbourhood reached this venue. Beside the score
     # and never folded into it: see `neighbourhood.py`.
     neighbourhood: object | None = None
@@ -269,19 +268,14 @@ def evaluate_all(
         }
         outcomes = constraints_mod.evaluate(v, constraints, verified_at)
         crits = criteria_mod.build(v, score, outcomes, word_count)
-        rows.append(Row(v, score, outcomes, crits, constraints_mod.predatory_risk(v)))
+        rows.append(Row(v, score, outcomes, crits))
     return rows
 
 
 def _reevaluate(
     session: Session, rows: list[Row], constraints: dict, word_count
 ) -> None:
-    """Recompute constraints, criteria and predatory risk after enrichment.
-
-    Also the one place `Venue.predatory_risk` is written: it used to be computed
-    per run and dropped into the result's flags, leaving the column on the venue
-    permanently empty — a field that looked like state and was not.
-    """
+    """Recompute constraints and criteria after enrichment."""
     for r in rows:
         verified_at = {
             fv.field_name: fv.verified_at
@@ -293,8 +287,6 @@ def _reevaluate(
         r.criteria = criteria_mod.build(
             r.venue, r.score, r.outcomes, word_count, r.neighbourhood
         )
-        r.predatory = constraints_mod.predatory_risk(r.venue)
-        r.venue.predatory_risk = r.predatory
     session.flush()
 
 
@@ -564,7 +556,7 @@ def run_match_full(
                 {"constraint": o.constraint, "outcome": o.outcome, "reason": o.reason}
                 for o in r.outcomes
             ],
-            flags=list(r.score.notes) + r.predatory["flags"],
+            flags=list(r.score.notes),
             neighbourhood=r.neighbourhood.to_json() if r.neighbourhood else None,
         )
         session.add(result)

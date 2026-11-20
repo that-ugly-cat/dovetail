@@ -103,6 +103,10 @@ class Venue(Base):
     oa_flip_year: Mapped[int | None] = mapped_column(Integer)
     oa_model: Mapped[OAModel | None] = mapped_column(Enum(OAModel))
 
+    # On the CWTS Core sources list, as OpenAlex reports it. Kept as a fact
+    # from the source and shown nowhere: until 20 Nov 2026 a journal off the
+    # list was excluded from every consultation (see `constraints.evaluate`).
+    # The blind sheets still draw their decoys from it.
     is_core: Mapped[bool | None] = mapped_column(Boolean)
     works_count: Mapped[int | None] = mapped_column(Integer)
     h_index: Mapped[int | None] = mapped_column(Integer)
@@ -130,7 +134,6 @@ class Venue(Base):
     # Italian habilitation ranking, as `sector:band` (e.g. "11/C3:A"), comma
     # separated for more than one. A band with no sector means nothing.
     indexed_in: Mapped[list | None] = mapped_column(JSON)
-    predatory_risk: Mapped[dict | None] = mapped_column(JSON)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

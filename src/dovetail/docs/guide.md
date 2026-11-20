@@ -121,7 +121,7 @@ An empirical study and a conceptual essay on the same subject belong in differen
 
 **Journals** lists every journal a consultation has looked up, plus the ones added by hand. It grows with use and is not a census. Journals are shared by everyone on the instance.
 
-A journal's page shows its access model and fee, what it publishes, its article types and word limits where someone has read the guidelines, the signs of risk if any, and your own consultations it appeared in.
+A journal's page shows its access model and fee, what it publishes, its article types and word limits where someone has read the guidelines, and your own consultations it appeared in. Dovetail says what a journal publishes and what it costs; it does not judge how good or how trustworthy a journal is, so check a journal you do not know before you submit to it.
 
 Two things an admin can do:
 

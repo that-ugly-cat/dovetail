@@ -243,7 +243,7 @@ def _print(rows) -> None:
         )
         for o in r.outcomes:
             typer.echo(f"    [{o.outcome}] {o.constraint}: {o.reason}")
-        for f in list(r.score.notes) + r.predatory["flags"]:
+        for f in r.score.notes:
             typer.echo(f"    ! {f}")
         typer.echo("")
 

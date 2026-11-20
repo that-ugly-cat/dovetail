@@ -33,23 +33,13 @@ with use and is not a census: a journal missing here has not come up yet.</p>
       <option value="yes" {% if args.doaj == 'yes' %}selected{% endif %}>in DOAJ</option>
       <option value="no" {% if args.doaj == 'no' %}selected{% endif %}>not in DOAJ</option>
     </select>
-    <select name="core">
-      <option value="">curated: any</option>
-      <option value="yes" {% if args.core == 'yes' %}selected{% endif %}>curated only</option>
-      <option value="no" {% if args.core == 'no' %}selected{% endif %}>not curated</option>
-    </select>
-    <select name="risk">
-      <option value="">risk: any</option>
-      <option value="high" {% if args.risk == 'high' %}selected{% endif %}>high</option>
-      <option value="low" {% if args.risk == 'low' %}selected{% endif %}>low</option>
-    </select>
     <select name="sort">
       <option value="works" {% if args.sort == 'works' %}selected{% endif %}>by size</option>
       <option value="hindex" {% if args.sort == 'hindex' %}selected{% endif %}>by h-index</option>
       <option value="name" {% if args.sort == 'name' %}selected{% endif %}>by name</option>
     </select>
     <button class="btn btn-small" type="submit">Filter</button>
-    {% if args.q or args.oa or args.doaj or args.profile or args.core or args.risk %}
+    {% if args.q or args.oa or args.doaj or args.profile %}
       <a class="btn btn-link btn-small" href="/app/venues">Clear</a>
     {% endif %}
   </form>
@@ -77,14 +67,13 @@ with use and is not a census: a journal missing here has not come up yet.</p>
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>Journal</th><th>Kind</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
-    <th class="n">Works</th><th class="n">h</th><th>Subjects</th><th>Risk</th>
+    <th class="n">Works</th><th class="n">h</th><th>Subjects</th>
   </tr></thead>
   <tbody>
   {% for v in venues %}
   <tr>
     <td>
       <a class="name" href="/app/venues/{{ v.id }}">{{ v.display_name }}</a>
-      {% if not v.is_core %}<span class="badge warn" title="Outside OpenAlex's curated set of journals, which also holds news bulletins and duplicates. Never proposed.">not curated</span>{% endif %}
       <div class="muted small">{{ v.host_organization_name or 'publisher not declared' }}</div>
     </td>
     <td>{% if v.venue_type == 'journal' %}<span class="muted small">journal</span>
@@ -97,13 +86,9 @@ with use and is not a census: a journal missing here has not come up yet.</p>
     <td class="n muted">{{ v.h_index if v.h_index is not none else '—' }}</td>
     <td>{% if v.topics %}<span class="muted small">{{ v.topics|length }} topics</span>
         {% else %}<span class="badge warn">unknown</span>{% endif %}</td>
-    <td>{% set lvl = (v.predatory_risk or {}).get('level') %}
-        {% if lvl == 'high' %}<span class="badge danger">high</span>
-        {% elif lvl == 'low' %}<span class="badge warn">low</span>
-        {% else %}<span class="muted">—</span>{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="10" class="empty">Nothing matches those filters.</td></tr>
+  <tr><td colspan="8" class="empty">Nothing matches those filters.</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
@@ -122,8 +107,6 @@ with use and is not a census: a journal missing here has not come up yet.</p>
   journals in ten, so a consultation never excludes a journal for it: it marks it for checking.</p>
   <p><strong>Subjects unknown</strong> means nothing is on record about what the journal publishes.
   It cannot be compared with a manuscript, which is different from being a poor match.</p>
-  <p><strong>Risk</strong> flags signs often found in predatory journals. None of them is proof on
-  its own.</p>
   <p><strong>Repositories and book series</strong> are kept so that you can see what a consultation
   brought back, and are never proposed: a repository is where a paper is deposited, not where it is
   submitted.</p>

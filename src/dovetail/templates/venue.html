@@ -13,12 +13,12 @@ articles.
 <div style="margin-top:10px"><a class="btn btn-small" href="/app/venues/{{ venue.id }}/profile">Describe it now</a></div></div>
 {% endif %}
 
+{% if venue.is_in_doaj or venue.indexed_in %}
 <div class="btnrow" style="margin-bottom:16px">
-  {% if venue.is_core %}<span class="badge ok" title="In OpenAlex's curated set of journals">curated</span>
-  {% else %}<span class="badge warn" title="Outside OpenAlex's curated set of journals. Never proposed in a consultation.">not curated</span>{% endif %}
   {% if venue.is_in_doaj %}<span class="badge ok">in DOAJ</span>{% endif %}
   {% for ix in venue.indexed_in or [] %}<span class="badge">{{ ix }}</span>{% endfor %}
 </div>
+{% endif %}
 
 <div class="grid">
   <div class="stat">
@@ -43,15 +43,6 @@ articles.
   </div>
 </div>
 
-{% if venue.predatory_risk and venue.predatory_risk.get('flags') %}
-<div class="card">
-  <h2 class="{{ 'err' if venue.predatory_risk.level == 'high' else 'warn' }}">
-    Risk flags — {{ venue.predatory_risk.level }}</h2>
-  <ul class="crit">{% for f in venue.predatory_risk.flags %}<li>{{ f }}</li>{% endfor %}</ul>
-  <p class="muted small" style="margin-bottom:0">None of these is proof on its own. Together they are
-  a reason to look closer before submitting.</p>
-</div>
-{% endif %}
 
 <h2>What it publishes</h2>
 <div class="card">

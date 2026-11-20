@@ -98,7 +98,6 @@ def _venue_brief(v: Venue) -> dict[str, Any]:
         "publisher": v.host_organization_name,
         "oa_model": getattr(v.oa_model, "value", v.oa_model),
         "apc_usd": v.apc_usd,
-        "predatory_risk": (v.predatory_risk or {}).get("level"),
     }
     if v.venue_type and v.venue_type != "journal":
         brief["not_a_journal"] = (
@@ -128,7 +127,7 @@ def _row_out(r) -> dict[str, Any]:
             {"constraint": o.constraint, "outcome": o.outcome, "reason": o.reason}
             for o in r.outcomes
         ],
-        "flags": list(r.score.notes) + r.predatory["flags"],
+        "flags": list(r.score.notes),
         # Present when the reference list leads here. On a shortlisted row it
         # means two independent roads reach this journal.
         "cited_by_your_literature": (
@@ -245,7 +244,6 @@ def get_venue(venue_id: int) -> dict:
             "homepage": v.homepage_url,
             "works_count": v.works_count,
             "h_index": v.h_index,
-            "is_core": v.is_core,
             "in_doaj": v.is_in_doaj,
             "licenses": v.licenses,
             "review_process": v.review_process,
@@ -259,7 +257,6 @@ def get_venue(venue_id: int) -> dict:
                 for t in (v.topics or [])[:10]
             ],
             "topics_note": "truncated to 25 by OpenAlex; on a broad journal that is a fraction",
-            "predatory_risk": v.predatory_risk,
             "verified_at": {
                 fv.field_name: {
                     "when": fv.verified_at.isoformat(),

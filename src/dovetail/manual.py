@@ -65,9 +65,8 @@ def add_venue(
     venue.oa_model = derive_oa_model(
         {"is_in_doaj": venue.is_in_doaj, "is_oa": venue.is_oa, "apc_usd": venue.apc_usd}
     )
-    # `is_core` stays None and not False: being outside OpenAlex's curated index
-    # is not a quality judgement, and that is the difference between "I don't
-    # know" and "no".
+    # `is_core` stays None and not False: nobody looked this journal up on the
+    # CWTS list, and that is the difference between "I don't know" and "no".
     session.flush()
     stamp(session, venue, list(fields) + ["oa_model"], "manual", note_url)
     return venue

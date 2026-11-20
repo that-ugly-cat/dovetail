@@ -124,12 +124,14 @@ def test_a_long_abstract_passes():
 # --- venue quality --------------------------------------------------------
 
 
-def test_a_news_outlet_is_excluded():
-    """OpenAlex's `type:journal` includes TV news and aggregators. In the first
-    live run FOX6 News Milwaukee came tenth in the shortlist with three merit
-    criteria: 2811 "works", h-index 1, no publisher."""
-    outcomes = constraints_mod.evaluate(FakeVenue(is_core=False), {})
-    assert any(o.excludes() and o.constraint == "is_core" for o in outcomes)
+def test_a_journal_off_the_core_list_is_proposed_like_any_other():
+    """`is_core` is the CWTS list behind the Leiden Ranking. Until 20 Nov 2026 a
+    journal off it was excluded from every consultation, which removed three
+    journals in four, journals in MEDLINE and DOAJ among them. Being on the
+    list, off it, or unknown to it now decides nothing."""
+    for value in (True, False, None):
+        outcomes = constraints_mod.evaluate(FakeVenue(is_core=value), {})
+        assert not outcomes
 
 
 def test_a_repository_is_excluded_for_what_it_is_and_not_for_its_curation():
@@ -146,8 +148,6 @@ def test_a_repository_is_excluded_for_what_it_is_and_not_for_its_curation():
     kinds = {o.constraint: o for o in outcomes}
     assert kinds["venue_type"].outcome == constraints_mod.EXCLUDED
     assert "deposited" in kinds["venue_type"].reason
-    # And it says so on its own, without needing is_core to agree.
-    assert "curated" not in kinds["venue_type"].reason
 
 
 def test_a_book_series_is_marked_and_not_excluded():
@@ -172,23 +172,6 @@ def test_a_journal_raises_nothing_about_its_type():
     ]
 
 
-def test_unknown_is_core_does_not_exclude():
-    """None is not False: a journal we know nothing about must not be discarded."""
-    assert not any(o.excludes() for o in constraints_mod.evaluate(FakeVenue(is_core=None), {}))
-
-
-def test_oa_outside_doaj_with_no_publisher_raises_a_flag():
-    risk = constraints_mod.predatory_risk(
-        FakeVenue(oa_model="oa_outside_doaj", host_organization_name=None)
-    )
-    assert risk["level"] == "high"
-    assert len(risk["flags"]) >= 2
-
-
-def test_an_ordinary_journal_raises_no_flag():
-    assert constraints_mod.predatory_risk(FakeVenue(oa_model="full_oa"))["level"] == "none"
-
-
 # --- ordering -------------------------------------------------------------
 
 
@@ -209,7 +192,6 @@ def _row(venue, score, outcomes=()):
         score=score,
         outcomes=list(outcomes),
         criteria=[],
-        predatory={"flags": [], "level": "none"},
     )
 
 
@@ -229,7 +211,7 @@ def test_a_venue_with_no_profile_does_not_vanish():
 
 def test_an_excluded_venue_is_not_called_unclassifiable():
     """Whoever a constraint excludes has a declared reason: that is another list."""
-    venue = FakeVenue(id=98, is_core=False)
+    venue = FakeVenue(id=98, venue_type="repository")
     row = _row(
         venue,
         Score(0.0, 0.0, 0.0, False, False, ("insufficient profile",)),
