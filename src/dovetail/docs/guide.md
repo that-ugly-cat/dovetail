@@ -55,6 +55,8 @@ You do **not** need it to run a consultation. It pays for two optional things: c
 - **Title and abstract.** The abstract needs at least 60 words; below that it cannot be classified reliably and Dovetail declines rather than guess. OpenAlex reads at most 2,000 characters including the title, about 300 words; anything beyond is left out, and the consultation tells you so.
 - **Reference list** (optional, strongly recommended). Paste the bibliography in any format. Only the DOIs in it are read, up to 150, and at least 5 are needed. References without a DOI — books, mostly — are not seen.
 - **Constraints** (optional). A word count, checked against each journal's limits where they are on record. A funder: `snsf` excludes hybrid journals, which the SNSF does not pay for. The highest fee you can pay.
+- **Journals that publish in** a language. English is chosen when the form opens; pick another, or «any language». A journal is kept when at least a fifth of its articles are in that language, so a bilingual journal stays. Dovetail reads the language from the journal's own articles the first time it meets it, and remembers it. A journal whose language could not be found is marked for you to check, never removed.
+- **Only journals on the Leiden core list.** Unticked when the form opens. The «?» beside it says what the list is. In short: ticked, you get a shorter list with fewer surprises, and lose nearly every journal not published in English, many national journals and a few well-known ones. Being on the list is not a mark of quality.
 - **Search OpenAlex for new journals.** Leave it ticked unless you want a quick, almost free look at the journals Dovetail already knows.
 - **Look up the candidates in DOAJ.** Free. It adds licence, fees and declared time to publication.
 
@@ -157,6 +159,7 @@ This separation is between users of the application. Whoever runs the server can
 | Classifying the title and abstract | 100 |
 | Searching for journals by subject | up to about 40 |
 | A reference list | 1 per DOI, plus up to about 20 |
+| Looking up the language of journals not met before | 1 per journal, up to 60; close to nothing once the journals around your subject are known |
 | Checking the kind of paper | 10 per journal whose recent titles are not on record yet |
 | Describing a journal from its articles | 100 per article |
 

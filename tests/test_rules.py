@@ -30,6 +30,7 @@ class FakeVenue:
     h_index: int | None = 40
     host_organization_name: str | None = "A publisher"
     is_core: bool | None = True
+    languages: list | None = None
     venue_type: str | None = "journal"
     publication_time_weeks: int | None = None
     article_types: list | None = None
@@ -132,6 +133,65 @@ def test_a_journal_off_the_core_list_is_proposed_like_any_other():
     for value in (True, False, None):
         outcomes = constraints_mod.evaluate(FakeVenue(is_core=value), {})
         assert not outcomes
+
+
+def test_the_core_list_excludes_only_when_asked_and_never_on_a_missing_answer():
+    """It came back as a choice. Asked for, a journal off the list goes; one the
+    list was never asked about is marked, like every other missing fact."""
+    asked = {"core_only": True}
+    off = constraints_mod.evaluate(FakeVenue(is_core=False), asked)
+    assert [o.constraint for o in off if o.excludes()] == ["is_core"]
+    unknown = constraints_mod.evaluate(FakeVenue(is_core=None), asked)
+    assert [o.outcome for o in unknown] == [constraints_mod.NEEDS_CHECK]
+    assert not constraints_mod.evaluate(FakeVenue(is_core=True), asked)
+
+
+# --- language -------------------------------------------------------------
+
+GERMAN = [{"code": "de", "share": 1.0}]
+BILINGUAL = [{"code": "it", "share": 0.68}, {"code": "en", "share": 0.3}]
+A_GUEST_PAPER = [{"code": "nl", "share": 0.72}, {"code": "en", "share": 0.15}]
+
+
+def test_a_journal_in_another_language_is_excluded_and_says_which():
+    out = constraints_mod.evaluate(FakeVenue(languages=GERMAN), {"language": "en"})
+    assert [o.constraint for o in out if o.excludes()] == ["language"]
+    assert "German 100%" in out[0].reason and "English" in out[0].reason
+
+
+def test_a_bilingual_journal_stays_and_the_odd_guest_paper_does_not_make_one():
+    """A fifth of the articles. 30% English is a journal you can write for in
+    English; 15% is a Dutch journal that once took an English paper."""
+    assert not constraints_mod.evaluate(FakeVenue(languages=BILINGUAL), {"language": "en"})
+    assert not constraints_mod.evaluate(FakeVenue(languages=BILINGUAL), {"language": "it"})
+    out = constraints_mod.evaluate(FakeVenue(languages=A_GUEST_PAPER), {"language": "en"})
+    assert any(o.excludes() for o in out)
+
+
+def test_a_language_nobody_looked_up_marks_and_does_not_exclude():
+    for unknown in (None, []):
+        out = constraints_mod.evaluate(FakeVenue(languages=unknown), {"language": "en"})
+        assert [o.outcome for o in out] == [constraints_mod.NEEDS_CHECK]
+        assert out[0].constraint == "language"
+
+
+def test_with_no_language_asked_for_the_language_decides_nothing():
+    assert not constraints_mod.evaluate(FakeVenue(languages=GERMAN), {})
+
+
+def test_languages_are_shares_of_the_articles_that_have_one():
+    from dovetail.sources.openalex import summarise_languages
+
+    groups = [
+        {"key": "https://openalex.org/languages/it", "count": 68},
+        {"key": "en", "count": 30},
+        {"key": "es", "count": 2},      # under 5%: detection noise
+        {"key": None, "count": 900},    # never tagged: not part of the total
+        {"key": "unknown", "count": 50},
+    ]
+    assert summarise_languages(groups) == BILINGUAL
+    assert summarise_languages([{"key": None, "count": 10}]) == []
+    assert summarise_languages([]) == []
 
 
 def test_a_repository_is_excluded_for_what_it_is_and_not_for_its_curation():

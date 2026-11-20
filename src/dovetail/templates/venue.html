@@ -13,8 +13,10 @@ articles.
 <div style="margin-top:10px"><a class="btn btn-small" href="/app/venues/{{ venue.id }}/profile">Describe it now</a></div></div>
 {% endif %}
 
-{% if venue.is_in_doaj or venue.indexed_in %}
+{% if venue.is_in_doaj or venue.indexed_in or venue.languages %}
 <div class="btnrow" style="margin-bottom:16px">
+  {% if venue.languages %}<span class="badge"
+    title="Read from the journal's own articles">{{ venue.languages|languages_label(true) }}</span>{% endif %}
   {% if venue.is_in_doaj %}<span class="badge ok">in DOAJ</span>{% endif %}
   {% for ix in venue.indexed_in or [] %}<span class="badge">{{ ix }}</span>{% endfor %}
 </div>

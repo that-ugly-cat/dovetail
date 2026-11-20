@@ -23,6 +23,7 @@ from dovetail import config, db
 from dovetail.matching import neighbourhood as nb
 from dovetail.matching import pipeline
 from dovetail.models import Criterion, MatchResult, MatchRun, Venue
+from dovetail.sources.openalex import OpenAlexError
 
 OA = "https://openalex.org/"
 TODAY = date(2026, 11, 20)
@@ -145,6 +146,16 @@ class FakeOpenAlex:
     def sources_by_ids(self, session, ids):
         self.calls.append("sources_by_ids")
         return [SOURCES[i] for i in ids if i in SOURCES]
+
+    # S_CLIN publishes in German; everything else in English.
+    languages = {"S_CLIN": [{"code": "de", "share": 1.0}]}
+    fail_languages = None
+
+    def languages_of(self, session, source_id):
+        self.calls.append("languages_of")
+        if self.fail_languages is not None:
+            raise self.fail_languages
+        return self.languages.get(source_id, [{"code": "en", "share": 1.0}])
 
 
 DOIS = [f"10.1000/{w.lower()}" for w in MEDICINE + HUMANITIES]
@@ -349,6 +360,63 @@ def test_the_references_are_read_even_when_the_topic_sweep_is_off(session):
     assert "sources_by_topics" not in client.calls
     assert client.calls.count("sources_citing") == 12
     assert out.neighbourhood
+
+
+# --- language, decided before the cut --------------------------------------
+
+
+def test_a_language_is_looked_up_before_the_cut_and_decides_who_is_listed(session):
+    """S_CLIN is the best match by subject and publishes in German. Asked for
+    English, it must not be in the list at all — which only works if its
+    language is known before the list is cut, not written beside it after."""
+    client = FakeOpenAlex()
+    out = pipeline.run_match_full(
+        session, client, "A paper", "word " * 100, references=DOIS,
+        constraints={"language": "en"})
+    listed = [r.venue.display_name
+              for r in out.shortlist + out.neighbourhood + out.conversations]
+    assert "S_CLIN" not in listed and "S_ETH" in listed
+    clin = session.query(Venue).filter_by(display_name="S_CLIN").one()
+    assert clin.languages == [{"code": "de", "share": 1.0}]
+    assert out.run.constraints["_languages"]["looked_up"] == client.calls.count("languages_of")
+    # Remembered: the same consultation again asks about no journal twice.
+    again = FakeOpenAlex()
+    pipeline.run_match_full(
+        session, again, "A paper", "word " * 100, references=DOIS,
+        constraints={"language": "en"})
+    assert "languages_of" not in again.calls
+
+
+def test_with_no_language_asked_for_nothing_is_looked_up(session):
+    client = FakeOpenAlex()
+    out = pipeline.run_match_full(session, client, "A paper", "word " * 100, references=DOIS)
+    assert "languages_of" not in client.calls
+    assert "_languages" not in (out.run.constraints or {})
+    assert "S_CLIN" in [r.venue.display_name for r in out.shortlist]
+
+
+@pytest.mark.parametrize("failure, reason", [
+    (db.BudgetExhausted("out of credits"), "budget"),
+    (OpenAlexError("503"), "openalex"),
+])
+def test_a_lookup_that_fails_does_not_cost_the_consultation(session, failure, reason):
+    """By then the classification is paid for. The list comes out, and the
+    journals whose language is unknown are marked instead of removed."""
+    client = FakeOpenAlex()
+    client.fail_languages = failure
+    out = pipeline.run_match_full(
+        session, client, "A paper", "word " * 100, constraints={"language": "en"})
+    assert out.run.constraints["_languages"] == {"looked_up": 0, "stopped": reason}
+    row = next(r for r in out.shortlist if r.venue.display_name == "S_CLIN")
+    assert [o.outcome for o in row.outcomes if o.constraint == "language"] == ["needs_check"]
+
+
+def test_the_lookups_are_priced_only_when_a_language_is_asked_for():
+    plain = pipeline.cost_ceiling(discover=False)
+    assert plain == config.COST_TEXT
+    asked = pipeline.cost_ceiling(discover=False, language=True)
+    assert asked - plain == config.LANGUAGE_LOOKUP_MAX
+    assert "languages_of" in {t["call"] for t in pipeline.cost_terms(language=True)}
 
 
 # --- what it costs --------------------------------------------------------

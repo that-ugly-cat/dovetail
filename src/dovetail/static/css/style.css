@@ -226,6 +226,10 @@ a.chip:hover { border-color: var(--accent); color: var(--text); }
 label { display: block; margin: 10px 0; font-size: 13px; color: var(--muted); }
 label.check { display: flex; align-items: center; gap: 8px; }
 label.check input { width: auto; margin: 0; }
+/* A tick box with a "?" beside it. The button sits outside the label, so that
+   asking what the box means does not tick it. */
+.check-help { display: flex; align-items: center; gap: 8px; }
+.check-help label.check { margin: 0; }
 input, select, textarea {
   width: 100%; margin-top: 4px; padding: 7px 10px; font: inherit; font-size: 14px;
   background: var(--bg); color: var(--text);

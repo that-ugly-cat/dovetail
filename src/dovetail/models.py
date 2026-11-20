@@ -103,11 +103,16 @@ class Venue(Base):
     oa_flip_year: Mapped[int | None] = mapped_column(Integer)
     oa_model: Mapped[OAModel | None] = mapped_column(Enum(OAModel))
 
-    # On the CWTS Core sources list, as OpenAlex reports it. Kept as a fact
-    # from the source and shown nowhere: until 20 Nov 2026 a journal off the
-    # list was excluded from every consultation (see `constraints.evaluate`).
-    # The blind sheets still draw their decoys from it.
+    # On the CWTS Core sources list, as OpenAlex reports it. Until 20 Nov 2026 a
+    # journal off the list was excluded from every consultation; now it is only
+    # when the person asks for it (`core_only`, see `constraints.evaluate`).
+    # The blind sheets draw their decoys from it.
     is_core: Mapped[bool | None] = mapped_column(Boolean)
+    # The languages its articles are written in, largest first, as
+    # `[{"code": "it", "share": 0.68}, {"code": "en", "share": 0.3}]`. Read from
+    # the journal's works, since OpenAlex has no language on a source. `None`
+    # is "never looked up"; an empty list is "looked up, nothing on record".
+    languages: Mapped[list | None] = mapped_column(JSON)
     works_count: Mapped[int | None] = mapped_column(Integer)
     h_index: Mapped[int | None] = mapped_column(Integer)
     two_yr_mean_citedness: Mapped[float | None] = mapped_column(Float)

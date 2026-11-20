@@ -291,6 +291,32 @@ def test_a_run_spends_the_key_of_whoever_started_it(client, monkeypatch):
         assert s.query(MatchRun).one().status == "done"
 
 
+def test_the_form_offers_a_language_and_the_core_list_and_records_the_choice(client, monkeypatch):
+    """English is chosen when the form opens; the core list is not. What the
+    person picks is what the consultation is run with."""
+    _accepting(monkeypatch)
+    client.post("/app/settings/openalex-key", data={"openalex_key": PERSONAL})
+    form = client.get("/app/runs/new").text
+    assert '<option value="en" selected>English</option>' in form
+    assert 'name="core_only"' in form and 'name="core_only" checked' not in form
+    assert 'id="core-help"' in form and "The Leiden core list" in form
+
+    seen = []
+
+    def fake_run_match(s, oa, title, abstract, word_count, constraints, **kw):
+        seen.append(constraints)
+
+    monkeypatch.setattr("dovetail.matching.pipeline.run_match", fake_run_match)
+    base = {"title": "T", "abstract": "word " * 100, "discover": "on"}
+    client.post("/app/runs/new", data={**base, "language": "de", "core_only": "on"})
+    client.post("/app/runs/new", data={**base, "language": ""})
+    client.post("/app/runs/new", data={**base, "language": "klingon"})
+    assert seen == [{"language": "de", "core_only": True}, {}, {}]
+
+    page = client.get("/app/runs/1").text
+    assert "journals in German" in page and "Leiden core list only" in page
+
+
 def test_over_mcp_the_callers_own_key_is_the_one_used_and_there_is_no_other(client, monkeypatch):
     from dovetail import mcp_server
 

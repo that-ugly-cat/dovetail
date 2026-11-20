@@ -311,6 +311,21 @@ class OpenAlexClient:
             ],
         }
 
+    def languages_of(self, session: Session, source_id: str) -> list[dict]:
+        """The languages a journal's articles are written in, as shares.
+
+        A source carries no language in OpenAlex; its works do. Grouping them
+        costs one credit whatever the size of the journal, and the answer is
+        kept on the journal, so each one is asked about once.
+        """
+        self._charge(session, config.COST_WORKS_FILTER)
+        payload = self._call(
+            session,
+            "/works",
+            {"filter": f"primary_location.source.id:{source_id}", "group_by": "language"},
+        )
+        return summarise_languages(payload.get("group_by") or [])
+
     def sources_by_ids(self, session: Session, ids: list[str]) -> list[dict]:
         """Fetch full records for a batch of OpenAlex source ids.
 
@@ -483,6 +498,31 @@ def verify_key(api_key: str, client: httpx.Client | None = None) -> int:
 
 
 # --- derivations ----------------------------------------------------------
+
+
+def summarise_languages(groups: list[dict]) -> list[dict]:
+    """Group counts by language into shares, largest first.
+
+    Works with no language on record are left out of the total: a journal whose
+    older half was never tagged is still written in what the tagged half says.
+    Shares under `LANGUAGE_KEEP_SHARE` are detection noise and are dropped.
+    """
+    counts: dict[str, int] = {}
+    for g in groups:
+        code = str(g.get("key") or "").rstrip("/").rsplit("/", 1)[-1].lower()
+        if not code or code in {"unknown", "null", "none"}:
+            continue
+        counts[code] = counts.get(code, 0) + int(g.get("count") or 0)
+    total = sum(counts.values())
+    if not total:
+        return []
+    out = [
+        {"code": code, "share": round(n / total, 2)}
+        for code, n in counts.items()
+        if n / total >= config.LANGUAGE_KEEP_SHARE
+    ]
+    out.sort(key=lambda x: x["share"], reverse=True)
+    return out[:4]
 
 
 def short_id(url_or_id: str) -> str:

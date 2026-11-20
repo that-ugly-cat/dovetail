@@ -98,6 +98,8 @@ def _venue_brief(v: Venue) -> dict[str, Any]:
         "publisher": v.host_organization_name,
         "oa_model": getattr(v.oa_model, "value", v.oa_model),
         "apc_usd": v.apc_usd,
+        # Shares of its articles by language, largest first. None: not looked up.
+        "languages": v.languages,
     }
     if v.venue_type and v.venue_type != "journal":
         brief["not_a_journal"] = (
@@ -749,6 +751,8 @@ def match_venues(
     max_apc: int | None = None,
     discover: bool = True,
     references: str = "",
+    language: str | None = None,
+    core_only: bool = False,
 ) -> dict:
     """Candidate journals for a manuscript. **Slow and expensive: read this.**
 
@@ -772,6 +776,14 @@ def match_venues(
     flags far more than it excludes — deliberately: discarding a journal for
     lack of data would throw away the corpus rather than the expensive ones.
 
+    `language` (a two-letter code, e.g. `"en"`) keeps the journals with at least
+    a fifth of their articles in that language. **Pass it**: without it the list
+    holds journals the author cannot write for. The language is read from each
+    journal's articles the first time it is met, up to 60 credits a run, and
+    remembered. `core_only=True` keeps only journals on the CWTS Leiden core
+    list: a shorter list, which also drops most non-English journals and some
+    well-known ones. It is not a quality mark.
+
     What comes back is a **list, not a ranking**, and three lists at that:
     the shortlist; venues a constraint removed, shown when fewer than three
     survive; and venues that cannot be profiled at all, where a zero means "no
@@ -783,7 +795,12 @@ def match_venues(
         if denied:
             return denied
         who = _caller_user(s)
-        constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
+        constraints = {
+            k: v for k, v in {
+                "funder": funder, "max_apc": max_apc,
+                "language": (language or "").strip().lower(), "core_only": core_only,
+            }.items() if v
+        }
         try:
             openalex = _callers_openalex(s)
             if discover and not openalex.keyed:

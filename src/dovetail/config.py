@@ -147,6 +147,42 @@ TOPIC_WEIGHT = 2.0
 SCORING_CONFIG_VERSION = "topics-cosine-v2-weight2"
 
 
+# --- Languages ------------------------------------------------------------
+#
+# OpenAlex has no language on a journal. It has one on every work, so a
+# journal's languages are read from its articles: one grouped /works call, one
+# credit, kept on the journal afterwards. Measured 20 Nov 2026 on nine journals:
+# a German journal comes back 100% German, a bilingual Italian one 68% Italian
+# and 30% English, an English one 98% English.
+
+# A journal "publishes in" a language when at least this share of its articles
+# is in it. A fifth keeps the bilingual journals and drops the ones whose only
+# English is the odd guest paper (15% on one Dutch journal measured).
+LANGUAGE_MIN_SHARE = 0.20
+
+# Shares below this are noise from language detection and are not stored.
+LANGUAGE_KEEP_SHARE = 0.05
+
+# The most a single consultation spends looking languages up. Journals already
+# looked up cost nothing, so this is reached on the first consultations only.
+LANGUAGE_LOOKUP_MAX = 60
+
+LANGUAGE_NAMES = {
+    "en": "English", "de": "German", "fr": "French", "es": "Spanish",
+    "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "ru": "Russian",
+    "zh": "Chinese", "ja": "Japanese", "ko": "Korean", "pl": "Polish",
+    "cs": "Czech", "tr": "Turkish", "sv": "Swedish", "da": "Danish",
+    "no": "Norwegian", "fi": "Finnish", "hu": "Hungarian", "ro": "Romanian",
+    "el": "Greek", "uk": "Ukrainian", "hr": "Croatian", "sk": "Slovak",
+    "sl": "Slovenian", "id": "Indonesian", "ar": "Arabic", "fa": "Persian",
+    "he": "Hebrew", "ca": "Catalan",
+}
+
+
+def language_name(code: str) -> str:
+    return LANGUAGE_NAMES.get(code, code)
+
+
 # --- Storage --------------------------------------------------------------
 
 

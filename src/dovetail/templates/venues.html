@@ -33,13 +33,20 @@ with use and is not a census: a journal missing here has not come up yet.</p>
       <option value="yes" {% if args.doaj == 'yes' %}selected{% endif %}>in DOAJ</option>
       <option value="no" {% if args.doaj == 'no' %}selected{% endif %}>not in DOAJ</option>
     </select>
+    <select name="language">
+      <option value="">language: any</option>
+      {% for code in languages_present %}
+      <option value="{{ code }}" {% if args.language == code %}selected{% endif %}>{{ code|language_name }}</option>
+      {% endfor %}
+      <option value="none" {% if args.language == 'none' %}selected{% endif %}>language not looked up</option>
+    </select>
     <select name="sort">
       <option value="works" {% if args.sort == 'works' %}selected{% endif %}>by size</option>
       <option value="hindex" {% if args.sort == 'hindex' %}selected{% endif %}>by h-index</option>
       <option value="name" {% if args.sort == 'name' %}selected{% endif %}>by name</option>
     </select>
     <button class="btn btn-small" type="submit">Filter</button>
-    {% if args.q or args.oa or args.doaj or args.profile %}
+    {% if args.q or args.oa or args.doaj or args.profile or args.language %}
       <a class="btn btn-link btn-small" href="/app/venues">Clear</a>
     {% endif %}
   </form>
@@ -67,7 +74,7 @@ with use and is not a census: a journal missing here has not come up yet.</p>
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>Journal</th><th>Kind</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
-    <th class="n">Works</th><th class="n">h</th><th>Subjects</th>
+    <th class="n">Works</th><th class="n">h</th><th>Subjects</th><th>Language</th>
   </tr></thead>
   <tbody>
   {% for v in venues %}
@@ -86,9 +93,12 @@ with use and is not a census: a journal missing here has not come up yet.</p>
     <td class="n muted">{{ v.h_index if v.h_index is not none else '—' }}</td>
     <td>{% if v.topics %}<span class="muted small">{{ v.topics|length }} topics</span>
         {% else %}<span class="badge warn">unknown</span>{% endif %}</td>
+    <td>{% if v.languages %}<span class="small">{{ v.languages|languages_label }}</span>
+        {% elif v.languages is none %}<span class="muted small">not looked up</span>
+        {% else %}<span class="muted">—</span>{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="8" class="empty">Nothing matches those filters.</td></tr>
+  <tr><td colspan="9" class="empty">Nothing matches those filters.</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
@@ -107,6 +117,9 @@ with use and is not a census: a journal missing here has not come up yet.</p>
   journals in ten, so a consultation never excludes a journal for it: it marks it for checking.</p>
   <p><strong>Subjects unknown</strong> means nothing is on record about what the journal publishes.
   It cannot be compared with a manuscript, which is different from being a poor match.</p>
+  <p><strong>Language</strong> is read from a journal's own articles, the first time a
+  consultation that asks for a language meets it. «Not looked up» means no consultation has got to
+  it yet, which says nothing about the journal.</p>
   <p><strong>Repositories and book series</strong> are kept so that you can see what a consultation
   brought back, and are never proposed: a repository is where a paper is deposited, not where it is
   submitted.</p>

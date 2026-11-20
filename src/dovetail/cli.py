@@ -132,6 +132,14 @@ def match(
         help="The reference list, in any format: only its DOIs are read. Adds the "
         "citation neighbourhood, at one credit per DOI.",
     ),
+    language: str = typer.Option(
+        None,
+        help='Keep journals with at least a fifth of their articles in this language, '
+        'e.g. "en". Looks languages up, one credit per journal not met before.',
+    ),
+    core_only: bool = typer.Option(
+        False, "--core-only", help="Only journals on the CWTS Leiden core list."
+    ),
 ):
     """Stages 1 to 4. Produce and record a shortlist."""
     from .matching.neighbourhood import extract_dois
@@ -142,7 +150,12 @@ def match(
     references = (
         extract_dois(references_file.read_text(encoding="utf-8")) if references_file else []
     )
-    constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
+    constraints = {
+        k: v for k, v in {
+            "funder": funder, "max_apc": max_apc,
+            "language": (language or "").strip().lower(), "core_only": core_only,
+        }.items() if v
+    }
     client = OpenAlexClient()
     precomputed = json.loads(profile.read_text(encoding="utf-8")) if profile else None
 
@@ -246,6 +259,49 @@ def _print(rows) -> None:
         for f in r.score.notes:
             typer.echo(f"    ! {f}")
         typer.echo("")
+
+
+@app.command("languages")
+def languages_cmd(
+    limit: int = typer.Option(200, help="How many journals at most. One credit each."),
+):
+    """Look up the language of journals that have none on record, largest first.
+
+    A consultation looks up only the journals near the top of its own list, so
+    most of the table stays «not looked up» and the language filter on the
+    journal list covers little. This fills it in, on the operator's key.
+    """
+    from sqlalchemy import select
+
+    from .models import Venue
+    from .provenance import stamp
+    from .sources.openalex import OpenAlexError
+
+    db.init_engine()
+    client = OpenAlexClient()
+    done = 0
+    with db.session_scope() as s:
+        todo = list(
+            s.scalars(
+                select(Venue)
+                .where(
+                    Venue.languages.is_(None),
+                    Venue.openalex_id.isnot(None),
+                    Venue.venue_type == "journal",
+                )
+                .order_by(Venue.works_count.desc().nullslast())
+                .limit(limit)
+            )
+        )
+        for v in todo:
+            try:
+                v.languages = client.languages_of(s, v.openalex_id)
+            except (db.BudgetExhausted, OpenAlexError) as e:
+                typer.echo(f"stopped: {e}")
+                break
+            stamp(s, v, ["languages"], "openalex")
+            done += 1
+    typer.echo(f"{done} journals looked up, {done} credits.")
 
 
 @app.command("add-venue")

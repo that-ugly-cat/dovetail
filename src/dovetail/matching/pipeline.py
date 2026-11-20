@@ -88,7 +88,9 @@ def classify(session: Session, client: OpenAlexClient, title: str, abstract: str
 # `test_the_estimate_names_every_call_that_spends` walks the source of
 # `generate_candidates` and fails if a call appears there that is not named here,
 # which is the drift that produced the error in the first place.
-def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
+def cost_terms(
+    discover: bool = True, references: int = 0, language: bool = False
+) -> list[dict]:
     from .. import config as _c
 
     terms = [
@@ -122,6 +124,20 @@ def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
                 "credits": 2 * _c.COST_SOURCES,
             },
         ]
+    if language:
+        # Only when a language is asked for. Without one nothing is looked up,
+        # and the run that re-reads the table stays at the classification alone.
+        terms.append(
+            {
+                "call": "languages_of",
+                "label": "Looking up the language of journals not met before",
+                "detail": (
+                    "/works grouped by language, once per journal and then "
+                    "remembered: the first consultations pay it, later ones barely"
+                ),
+                "credits": _c.LANGUAGE_LOOKUP_MAX * _c.COST_WORKS_FILTER,
+            }
+        )
     references = min(references, _c.MAX_REFERENCES)
     if references:
         # The second channel. Priced on the number of DOIs in the reference
@@ -153,8 +169,8 @@ def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
     return terms
 
 
-def cost_ceiling(discover: bool = True, references: int = 0) -> int:
-    return sum(t["credits"] for t in cost_terms(discover, references))
+def cost_ceiling(discover: bool = True, references: int = 0, language: bool = False) -> int:
+    return sum(t["credits"] for t in cost_terms(discover, references, language))
 
 
 # --- stage 2 --------------------------------------------------------------
@@ -288,6 +304,102 @@ def _reevaluate(
             r.venue, r.score, r.outcomes, word_count, r.neighbourhood
         )
     session.flush()
+
+
+def _front(rows: list[Row], found=None) -> list[Row]:
+    """The rows a cut could still pick: twice the length of each list, in each
+    list's own order, counting only rows nothing has excluded yet."""
+    eligible = [
+        r for r in rows
+        if not r.excluded and INSUFFICIENT_PROFILE not in r.score.notes and r.score.subfield > 0
+    ]
+    eligible.sort(key=lambda r: r.score.sort_key(), reverse=True)
+    front = eligible[: 2 * config.MAX_SHORTLIST]
+
+    if found is not None:
+        by_id = {r.venue.openalex_id: r for r in rows if r.venue.openalex_id}
+
+        def first(evidence, n: int) -> list[Row]:
+            out: list[Row] = []
+            for ev in evidence:
+                if len(out) >= n:
+                    break
+                r = by_id.get(ev.openalex_id)
+                if r is not None and not r.excluded:
+                    out.append(r)
+            return out
+
+        front += first(found.overall, 2 * config.MAX_SHORTLIST)
+        for evidence in found.by_field.values():
+            front += first(evidence, 2 * config.MAX_CONVERSATION_PER_FIELD)
+
+    seen: set[int] = set()
+    out = []
+    for r in front:
+        if id(r) not in seen:
+            seen.add(id(r))
+            out.append(r)
+    return out
+
+
+def lookup_languages(
+    session: Session,
+    client: OpenAlexClient,
+    rows: list[Row],
+    constraints: dict,
+    word_count,
+    found=None,
+) -> dict:
+    """Find out what language the journals near the top publish in, **before**
+    the cut, so that a language constraint decides who is in the list and not
+    only what is written beside a name.
+
+    It goes round: looking a journal up may exclude it, which brings the next
+    one into reach, which may not have been looked up either. It stops when
+    everything in reach is known, or at `LANGUAGE_LOOKUP_MAX` credits. What is
+    still unknown then is marked for checking, never removed.
+
+    A lookup that fails does not fail the consultation: by this point the
+    classification is paid for, and a list with a few languages missing is
+    worth more than no list.
+    """
+    from ..db import BudgetExhausted
+    from ..sources.openalex import OpenAlexError
+
+    looked, stopped = 0, None
+    while stopped is None:
+        missing = [
+            r for r in _front(rows, found)
+            if r.venue.languages is None and r.venue.openalex_id
+        ]
+        if not missing:
+            break
+        for r in missing:
+            if looked >= config.LANGUAGE_LOOKUP_MAX:
+                stopped = "ceiling"
+                break
+            try:
+                r.venue.languages = client.languages_of(session, r.venue.openalex_id)
+            except BudgetExhausted:
+                stopped = "budget"
+                break
+            except OpenAlexError:
+                stopped = "openalex"
+                break
+            looked += 1
+            stamp(session, r.venue, ["languages"], "openalex")
+            verified_at = {
+                fv.field_name: fv.verified_at
+                for fv in session.scalars(
+                    select(FieldVerification).where(FieldVerification.venue_id == r.venue.id)
+                )
+            }
+            r.outcomes = constraints_mod.evaluate(r.venue, constraints, verified_at)
+            r.criteria = criteria_mod.build(
+                r.venue, r.score, r.outcomes, word_count, r.neighbourhood
+            )
+    session.flush()
+    return {"looked_up": looked, "stopped": stopped}
 
 
 def cut(rows: list[Row]) -> tuple[list[Row], list[Row], list[Row]]:
@@ -487,6 +599,9 @@ def run_match_full(
             candidates.append(v)
 
     rows = evaluate_all(session, topics, candidates, constraints, word_count)
+    languages = None
+    if constraints.get("language"):
+        languages = lookup_languages(session, client, rows, constraints, word_count, found)
     shortlist, excluded_shown, unclassifiable = cut(rows)
 
     near: list[Row] = []
@@ -514,6 +629,8 @@ def run_match_full(
         run.constraints = {**constraints, "_doaj": enriched}
     if sweep is not None:
         run.constraints = {**(run.constraints or constraints), "_sweep": sweep}
+    if languages is not None:
+        run.constraints = {**(run.constraints or constraints), "_languages": languages}
     if found is not None:
         run.constraints = {
             **(run.constraints or constraints),

@@ -59,7 +59,9 @@ uv run dovetail seed            # resolve PaperTrail's venues, file alias propos
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
 uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
-uv run pytest                   # 223 tests
+uv run dovetail match --title "..." --abstract-file abstract.txt --language en --core-only
+uv run dovetail languages --limit 500   # look up the language of journals that have none
+uv run pytest                   # 231 tests
 ```
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
@@ -112,6 +114,25 @@ priced the paginated sweep and neither of the other two calls stage 2 makes. **A
 under is worse than none, because it is the one people believe** — so the terms now live beside the
 calls that generate them, and a test reads the source of `generate_candidates` and fails if it calls
 anything the estimate does not price.
+
+### Language, and the Leiden core list
+
+Two choices on every consultation, both off by default from the command line and over MCP. On the
+web form English is chosen when it opens and the core list is not.
+
+**`language`** keeps the journals with at least a fifth of their articles in that language.
+OpenAlex has no language on a journal, so it is read from the journal's works: one grouped
+`/works` call, one credit, kept on the journal (`venue.languages`). It is looked up **before the
+list is cut**, for the journals near the top of each list, so the constraint decides who is listed
+and not only what is written beside a name. Up to 60 credits a consultation, and close to nothing
+once the journals around a subject are known. A lookup that fails does not fail the consultation.
+`dovetail languages` fills in the rest of the table on the operator's key, which is what makes the
+language filter on the journal list cover more than what consultations happened to reach.
+
+**`core_only`** keeps the journals on the CWTS Core sources list (OpenAlex's `is_core`), the list
+behind the Leiden Ranking. Until 20 Nov 2026 this was applied to every consultation, under the
+name «curated», and removed three journals in four. It is now a choice, explained by the «?»
+beside the tick box. It is not a quality mark.
 
 ### Five baskets, not one list
 

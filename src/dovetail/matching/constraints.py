@@ -112,8 +112,28 @@ def evaluate(
     # What it costs is known and was measured on a real consultation before
     # removing it: four of the first twelve places, and thirteen of the first
     # twenty-five, go to journals off the list — national-language journals,
-    # titles that have ceased, small publishers. The reader now sees them and
-    # decides, which is where the judgement was moved to.
+    # titles that have ceased, small publishers.
+    #
+    # So it came back the same day as a choice, off unless asked for. A journal
+    # the list was never asked about is marked and not removed, like every
+    # other missing fact.
+    if constraints.get("core_only"):
+        if venue.is_core is False:
+            outcomes.append(
+                Outcome(
+                    "is_core",
+                    EXCLUDED,
+                    "not on the Leiden core list, and you asked for those journals only",
+                )
+            )
+        elif venue.is_core is None:
+            outcomes.append(
+                Outcome(
+                    "is_core",
+                    NEEDS_CHECK,
+                    "not known whether it is on the Leiden core list",
+                )
+            )
 
     # -- funder --------------------------------------------------------------
     funder = (constraints.get("funder") or "").lower()
@@ -174,6 +194,41 @@ def evaluate(
             if missing:
                 outcomes.append(
                     Outcome("must_be_indexed_in", EXCLUDED, f"not indexed in {', '.join(missing)}")
+                )
+
+    # -- language -------------------------------------------------------------
+    # Read from the journal's articles (`Venue.languages`). A journal is kept
+    # when at least a fifth of them are in the language asked for, which keeps
+    # the bilingual ones. Not looked up yet is not "no": it is marked.
+    want = str(constraints.get("language") or "").lower()
+    if want:
+        langs = getattr(venue, "languages", None)
+        if langs is None:
+            outcomes.append(
+                Outcome(
+                    "language",
+                    NEEDS_CHECK,
+                    "the language of its articles has not been looked up",
+                )
+            )
+        elif not langs:
+            outcomes.append(
+                Outcome("language", NEEDS_CHECK, "no language is on record for its articles")
+            )
+        else:
+            share = next((x.get("share", 0.0) for x in langs if x.get("code") == want), 0.0)
+            if share < config.LANGUAGE_MIN_SHARE:
+                found = ", ".join(
+                    f"{config.language_name(x['code'])} {round(x['share'] * 100)}%"
+                    for x in langs[:3]
+                )
+                outcomes.append(
+                    Outcome(
+                        "language",
+                        EXCLUDED,
+                        f"its articles are in {found}: under a fifth are in "
+                        f"{config.language_name(want)}",
+                    )
                 )
 
     return outcomes

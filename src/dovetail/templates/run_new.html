@@ -41,9 +41,33 @@ what comes of it are visible to you alone.</p>
       <label>Highest fee you can pay, in USD
         <input name="max_apc" inputmode="numeric" value="{{ form.max_apc or '' }}"></label>
     </div>
-    <p class="muted small" style="margin:0">The word count is checked against each journal's limits,
-    where they are on record. A funder excludes the journals it does not pay for. A journal whose fee
-    or access is unknown is never removed: it is marked for you to check.</p>
+    <p class="muted small" style="margin:0 0 14px">The word count is checked against each journal's
+    limits, where they are on record. A funder excludes the journals it does not pay for. A journal
+    whose fee or access is unknown is never removed: it is marked for you to check.</p>
+
+    {% set lang = form.language if form.language is defined else 'en' %}
+    <div class="row">
+      <label>Journals that publish in
+        <select name="language">
+          <option value="" {% if not lang %}selected{% endif %}>any language</option>
+          {% for code, name in languages.items() %}
+          <option value="{{ code }}" {% if lang == code %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <p class="muted small" style="margin:0 0 14px">A journal is kept when at least a fifth of its
+    articles are in that language, so bilingual journals stay. The language is read from the
+    journal's own articles the first time a consultation meets it, which is the last line of the
+    cost below; a journal whose language could not be found is marked, not removed.</p>
+
+    <div class="check-help">
+      <label class="check"><input type="checkbox" name="core_only" {% if form.core_only %}checked{% endif %}>
+        Only journals on the Leiden core list</label>
+      <button type="button" class="help" aria-label="What the Leiden core list is"
+        aria-haspopup="dialog"
+        onclick="document.getElementById('core-help').showModal()">?</button>
+    </div>
   </div>
 
   <div class="card">
@@ -78,6 +102,44 @@ what comes of it are visible to you alone.</p>
     stop it.</p>
   </div>
 </form>
+
+<dialog id="core-help" class="modal" aria-labelledby="core-help-title">
+  <div class="modal-body">
+    <h2 id="core-help-title">The Leiden core list</h2>
+    <p>A list of journals kept by CWTS, the centre at Leiden University that publishes the Leiden
+    Ranking. It is the set of journals that ranking counts, and OpenAlex says of each journal
+    whether it is on it. Of the {{ '{:,}'.format(core_counts.all) }} journals Dovetail knows,
+    {{ '{:,}'.format(core_counts.on) }} are.</p>
+
+    <h3>Left unticked</h3>
+    <p>Every journal is considered. The list you get is wider: beside the journals everybody knows
+    it shows national and society journals, small publishers, and now and then a title that has
+    stopped publishing or a record that is not really a journal. Choosing a language removes most
+    of the journals you could not submit to anyway.</p>
+
+    <h3>Ticked</h3>
+    <p>Only journals on the list are proposed. The result is shorter and has fewer surprises. It
+    also leaves out journals you may want: nearly everything not published in English, many
+    national journals, and some well-known titles — <em>Health Affairs</em> and <em>Swiss Medical
+    Weekly</em> are not on it.</p>
+
+    <p class="muted small">Being on the list means the ranking counts the journal. It is not a mark
+    of quality, and being off it is not a warning. The list was computed from data of August 2024,
+    so a journal founded since is not on it. Source:
+    <a href="https://zenodo.org/records/13879982" target="_blank" rel="noopener noreferrer">CWTS,
+    «Core sources and core publications in OpenAlex»</a>, read on 20 Nov 2026.</p>
+    <form method="dialog" class="btnrow" style="justify-content:flex-end">
+      <button class="btn" type="submit" autofocus>Close</button>
+    </form>
+  </div>
+</dialog>
+
+<script>
+// A click on the backdrop closes the dialog; a click inside it does not.
+document.getElementById('core-help').addEventListener('click', function (e) {
+  if (e.target === this) this.close();
+});
+</script>
 
 <script>
 // How many DOIs are in the box, and what they add to the ceiling. The server

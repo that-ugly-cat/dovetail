@@ -4,7 +4,7 @@
 *Creato: 27 agosto 2026 — Giovanni Spitale + Ono*
 *v0.5, 28 ago 2026: stadio 5a, e la Fase 1b ridisegnata su misure che reggono.*
 *v0.6, 20 nov 2026: il vicinato di citazione (§6b), lo stadio 5b, e la coda che scrive i tipi di articolo.*
-*v0.7, 20 nov 2026: via l'esclusione «not curated», il rischio e ANVUR (§16i).*
+*v0.7, 20 nov 2026: via l'esclusione «not curated», il rischio e ANVUR; l'elenco di Leida e la lingua come scelte (§16i).*
 *Storia delle revisioni in §17.*
 
 > **Lingua:** il codice, la CLI e i test sono **in inglese**; questo documento resta in italiano,
@@ -554,7 +554,8 @@ saputo segmentare» è accettabile; indovinare no.
   OpenAlex `apc_usd 2290`, DOAJ `apc.max USD 2390`. Regola: **DOAJ vince quando presente**, perché
   è autodichiarato dall'editore e aggiornato al delisting; OpenAlex è il fallback; la shortlist
   mostra entrambi quando divergono di più del 10%.
-- `language`, `must_be_indexed_in`. (`anvur_class` c'era fino al 20 nov 2026.)
+- `language` (dal 20 nov 2026, §16i), `core_only` (idem), `must_be_indexed_in`. (`anvur_class`
+  c'era fino al 20 nov 2026.)
 - **`exclude_venues`** — popolata da PaperTrail **attraverso `venue_alias`** (§4), mai per fuzzy
   match al volo.
 - **`accepts_unsolicited`** — la corsia dell'opinion non sollecitata alle generaliste risulta chiusa,
@@ -1528,14 +1529,58 @@ qui come strada nota, non come piano.
 
 **ANVUR.** Vedi §4: vale solo per chi è valutato in Italia, e nessuna rivista lo portava.
 
+### La sera stessa: l'elenco di Leida torna come scelta, e arriva la lingua
+
+Visto il costo misurato qui sopra, Spit ha chiesto due cose al posto dell'esclusione fissa.
+
+**Una casella, «Only journals on the Leiden core list»**, spenta di default, con un «?» che apre
+una finestra: cos'è l'elenco, cosa si ottiene spuntandola e cosa si perde. È il vincolo
+`core_only`. Chi non sta sull'elenco esce solo se la casella è spuntata; una rivista di cui non si
+sa (dichiarata a mano, `is_core` nullo) viene marcata e non tolta, come ogni altro dato mancante.
+
+**La lingua.** OpenAlex non ha una lingua sulla rivista. Ce l'ha su ogni lavoro, quindi si ricava
+raggruppando i lavori di una rivista per lingua: una chiamata `/works`, un credito, qualunque sia
+la dimensione della rivista. Misurato su nove riviste il 20 novembre:
+
+| rivista | cosa torna |
+|---|---|
+| una rivista tedesca di settore | tedesco 100% |
+| una francese | francese 96%, inglese 4% |
+| *Medicina e Morale* | italiano 68%, inglese 30% |
+| una olandese | olandese 72%, inglese 15% |
+| *Swiss Medical Weekly* | inglese 68%, tedesco 26%, francese 6% |
+| *Bioethics* | inglese 98% |
+
+Tre regole, ciascuna con la sua ragione:
+
+- **La soglia è un quinto degli articoli** (`LANGUAGE_MIN_SHARE`). Tiene le riviste bilingui (il 30%
+  di *Medicina e Morale*) e lascia fuori quelle in cui l'inglese è l'articolo ospite (il 15%
+  dell'olandese). Non è validata oltre questi nove casi.
+- **La lingua si cerca prima del taglio, non dopo.** Se si cercasse solo per le dodici finaliste, il
+  vincolo scriverebbe «tedesco» accanto a un nome senza toglierlo dalla lista. Si cerca per le
+  riviste in testa a ciascuna lista, e a giri: cercarne una può escluderla, e allora entra in
+  portata la successiva. Si ferma quando tutto ciò che è in portata è noto, o a 60 crediti.
+- **Una ricerca che fallisce non fa fallire la consultazione.** A quel punto la classificazione è
+  già pagata. La lista esce, e le riviste di cui non si è saputa la lingua sono marcate.
+
+Il campo è `venue.languages`, con `NULL` che vuol dire «mai cercata». Sul modulo web l'inglese è
+già scelto, perché l'abstract che il classificatore legge è in inglese; da riga di comando e da MCP
+non c'è default. L'elenco delle riviste ha una colonna e un filtro per lingua, che copre solo le
+riviste già cercate e lo dice («language not looked up»); `dovetail languages` riempie il resto
+con la chiave dell'operatore, un credito a rivista.
+
+**Non provato:** l'effetto sulla lista di una consultazione vera. I test usano un client finto, e
+la misura sulle nove riviste dice che il dato c'è, non che la soglia sia quella giusta.
+
 ---
 
 ## 17. Storia delle revisioni
 
-### v0.7 — tre cose tolte (20 nov 2026)
+### v0.7 — tre cose tolte, due scelte aggiunte (20 nov 2026)
 
-§16i: l'esclusione delle riviste fuori dall'elenco CWTS, il rischio predatorio, la fascia ANVUR.
-Il budget condiviso era già caduto lo stesso giorno (§12).
+§16i: via l'esclusione fissa delle riviste fuori dall'elenco CWTS, il rischio predatorio e la
+fascia ANVUR. L'elenco di Leida torna come scelta di chi consulta, e arriva il vincolo di lingua,
+ricavata dagli articoli di ogni rivista. Il budget condiviso era già caduto lo stesso giorno (§12).
 
 ### v0.6 — una seconda strada, e due cose che non funzionavano (20 nov 2026)
 

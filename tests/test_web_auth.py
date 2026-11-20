@@ -277,7 +277,8 @@ def test_the_cost_is_shown_before_the_button_and_not_after(client):
     r = client.get("/app/runs/new")
     assert r.status_code == 200
     assert str(config.COST_TEXT) in r.text
-    assert str(pipeline.cost_ceiling(discover=True)) in r.text
+    # The form opens with English chosen, so the language lookups are in it.
+    assert str(pipeline.cost_ceiling(discover=True, language=True)) in r.text
 
 
 def test_the_estimate_names_every_call_that_spends():

@@ -152,8 +152,8 @@ def _plain_evidence(evidence: str | None) -> str:
 
 _CONSTRAINTS = {
     "venue_type": "kind of record",
-    # No longer applied (20 Nov 2026). Kept for consultations recorded before.
-    "is_core": "curated journals only",
+    "is_core": "Leiden core list",
+    "language": "language",
     "funder:snsf": "funder: SNSF",
     "max_apc": "highest fee",
     "must_be_indexed_in": "indexing",
@@ -163,6 +163,19 @@ _CONSTRAINTS = {
 
 def _plain_constraint(name: str) -> str:
     return _CONSTRAINTS.get(name, name.replace("_", " "))
+
+
+def _languages_label(langs, shares: bool = False) -> str:
+    """A journal's languages in words: the ones it publishes in (a fifth of its
+    articles or more), or its largest when none reaches that."""
+    if not langs:
+        return ""
+    main = [x for x in langs if x.get("share", 0) >= config.LANGUAGE_MIN_SHARE] or langs[:1]
+    if shares:
+        return ", ".join(
+            f"{config.language_name(x['code'])} {round(x['share'] * 100)}%" for x in main
+        )
+    return ", ".join(config.language_name(x["code"]) for x in main)
 
 
 def _role_label(role) -> str:
@@ -180,6 +193,8 @@ templates.env.filters.update(
     plain_label=_plain_label,
     plain_evidence=_plain_evidence,
     plain_constraint=_plain_constraint,
+    languages_label=_languages_label,
+    language_name=config.language_name,
 )
 
 # The MCP transport is built before the app so its session manager exists: it is
@@ -588,6 +603,7 @@ def venues(
     oa: str = "",
     doaj: str = "",
     profile: str = "",
+    language: str = "",
     kind: str = "journal",
     sort: str = "works",
     p: int = 1,
@@ -624,6 +640,15 @@ def venues(
         filters.append(HAS_PROFILE)
     elif profile == "no":
         filters.append(NO_PROFILE)
+    # By the journal's largest language. "none" is the journals nobody has
+    # looked up yet, which is most of them until consultations have reached
+    # them: said in the filter so that an empty result is not read as "no
+    # German journals".
+    main_language = Venue.languages[(0, "code")].as_string()
+    if language == "none":
+        filters.append(Venue.languages.is_(None))
+    elif language:
+        filters.append(main_language == language)
 
     total = _count(s, *filters)
     pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
@@ -640,7 +665,13 @@ def venues(
         total=total, page_no=p, pages=pages, per_page=PER_PAGE,
         grand_total=_count(s),
         args={"q": q, "oa": oa, "doaj": doaj, "profile": profile,
-              "kind": kind, "sort": sort},
+              "language": language, "kind": kind, "sort": sort},
+        languages_present=sorted(
+            (c for c in s.scalars(
+                select(main_language).where(Venue.languages.isnot(None)).distinct()
+            ) if c),
+            key=config.language_name,
+        ),
         oa_models=[m.value for m in OAModel],
         kinds=venue_kinds(s),
         kind=kind,
@@ -899,7 +930,7 @@ def _budget_view(s: Session, user: User) -> dict:
 
 
 def estimate_run(s: Session, discover: bool, references: int = 0,
-                 user: User | None = None) -> dict:
+                 user: User | None = None, language: bool = True) -> dict:
     """What a consultation will cost, before it is started. Free, and no calls.
 
     The house rule for a tool that spends: next to the thing that spends there
@@ -914,7 +945,7 @@ def estimate_run(s: Session, discover: bool, references: int = 0,
     """
     from .matching.pipeline import cost_ceiling, cost_terms
 
-    terms = cost_terms(discover, references)
+    terms = cost_terms(discover, references, language)
     total = sum(t["credits"] for t in terms)
     view = _budget_view(s, user) if user is not None else None
     remaining = view["remaining"] if view else db.credits_remaining(s)
@@ -934,10 +965,10 @@ def estimate_run(s: Session, discover: bool, references: int = 0,
         # What the reference list adds to this estimate, and the part of that
         # which does not depend on how long the list is. The form recomputes the
         # total as the list is pasted, from these two and the per-DOI rate.
-        "references_cost": total - cost_ceiling(discover, 0),
+        "references_cost": total - cost_ceiling(discover, 0, language),
         "references_fixed": cost_ceiling(discover, 1) - cost_ceiling(discover, 0) - 2,
         "max_references": config.MAX_REFERENCES,
-        "total_with_max_references": cost_ceiling(discover, config.MAX_REFERENCES),
+        "total_with_max_references": cost_ceiling(discover, config.MAX_REFERENCES, language),
         "remaining": remaining,
         "budget": view["total"] if view else config.daily_budget(),
         # A ceiling and not a bill: the sweep stops when the pool runs out, and
@@ -960,7 +991,21 @@ def new_run_form(request: Request, user: User = Depends(require_consultant),
     return page(request, "run_new.html", user, s, nav="runs",
                 estimate=estimate_run(s, discover=True, user=user),
                 min_words=config.MIN_ABSTRACT_WORDS,
-                min_references=config.MIN_REFERENCES, form={}, error=None)
+                min_references=config.MIN_REFERENCES, form={}, error=None,
+                **_run_form_choices(s))
+
+
+def _run_form_choices(s: Session) -> dict:
+    """What the form offers to choose from: the languages, and how many of the
+    journals on record are on the Leiden core list, for the «?» beside it."""
+    is_journal = Venue.venue_type == "journal"
+    return {
+        "languages": config.LANGUAGE_NAMES,
+        "core_counts": {
+            "all": _count(s, is_journal),
+            "on": _count(s, is_journal, Venue.is_core.is_(True)),
+        },
+    }
 
 
 def _execute_run(run_id: int, discover: bool, use_doaj: bool,
@@ -1041,6 +1086,8 @@ def new_run(
     discover: str = Form(""),
     doaj: str = Form(""),
     references: str = Form(""),
+    language: str = Form(""),
+    core_only: str = Form(""),
     user: User = Depends(require_consultant),
     s: Session = Depends(get_db),
 ):
@@ -1049,15 +1096,21 @@ def new_run(
 
     discover_on, doaj_on = discover == "on", doaj == "on"
     dois = extract_dois(references)[: config.MAX_REFERENCES]
+    language = language.strip().lower()
+    if language not in config.LANGUAGE_NAMES:
+        language = ""
+    core_on = core_only == "on"
     form = {"title": title, "abstract": abstract, "word_count": word_count,
             "funder": funder, "max_apc": max_apc, "references": references,
-            "discover": discover_on, "doaj": doaj_on}
+            "discover": discover_on, "doaj": doaj_on,
+            "language": language, "core_only": core_on}
 
     def refuse(msg: str):
         return page(request, "run_new.html", user, s, nav="runs",
-                    estimate=estimate_run(s, discover_on, len(dois), user),
+                    estimate=estimate_run(s, discover_on, len(dois), user, bool(language)),
                     min_words=config.MIN_ABSTRACT_WORDS,
-                    min_references=config.MIN_REFERENCES, form=form, error=msg)
+                    min_references=config.MIN_REFERENCES, form=form, error=msg,
+                    **_run_form_choices(s))
 
     # Both checks are free and both are done *before* anything is written. The
     # short-abstract guard rail costs nothing to evaluate, so failing it should
@@ -1068,7 +1121,7 @@ def new_run(
         guard_rail(abstract)
     except Refusal as e:
         return refuse(str(e))
-    est = estimate_run(s, discover_on, len(dois), user)
+    est = estimate_run(s, discover_on, len(dois), user, bool(language))
     if not est["affordable"]:
         return refuse(
             f"Not enough budget: classifying the abstract costs {est['classify']} "
@@ -1099,6 +1152,10 @@ def new_run(
         constraints["funder"] = funder.strip()
     if max_apc.strip().isdigit():
         constraints["max_apc"] = int(max_apc)
+    if language:
+        constraints["language"] = language
+    if core_on:
+        constraints["core_only"] = True
 
     run = MatchRun(
         title=title.strip(),
