@@ -745,6 +745,7 @@ def parse_articles(raw: str) -> list[dict]:
 @app.get("/app/venues/{venue_id}/profile", response_class=HTMLResponse)
 def profile_venue_form(request: Request, venue_id: int, user: User = Depends(require_admin),
                        s: Session = Depends(get_db)):
+    _needs_own_key(user)
     venue = s.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such venue")
@@ -773,6 +774,8 @@ def profile_venue(
     """
     from .matching.pipeline import Refusal, guard_rail
     from .sources.openalex import OpenAlexError, RemoteBudgetExhausted, client_for
+
+    _needs_own_key(user)
     from . import manual
 
     venue = s.get(Venue, venue_id)
@@ -874,23 +877,35 @@ def runs(request: Request, user: User = Depends(current_user), s: Session = Depe
                 deleted=request.query_params.get("deleted"))
 
 
+def _needs_own_key(user: User) -> None:
+    """For what takes an admin *and* spends credits — describing a journal from
+    its articles. The role decides who may change a shared record; the key
+    decides who pays, and it is the person doing it."""
+    if not ownership.may_consult(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ownership.WHY_NOT)
+
+
 def _budget_view(s: Session, user: User) -> dict:
-    """Today's OpenAlex budget as this person sees it: their own key's if they
-    stored one, the instance's otherwise. The two are different tills, and a
-    page that showed the shared one to somebody spending their own would be
-    showing them a number that does not apply to them."""
+    """Today's OpenAlex budget as this person has it: their own key's, or none.
+
+    There is no shared till any more. Somebody with no key of their own has no
+    budget here, and the pages say so instead of printing a number that would
+    be somebody else's.
+    """
     from .sources.openalex import ledger_for
 
     ledger = ledger_for(user)
+    if ledger is None:
+        return {"total": 0, "spent": 0, "remaining": 0, "classifications": 0,
+                "own_key": False, "keyed": False, "ledger": None}
     remaining = db.credits_remaining(s, ledger)
-    own = ledger != db.SHARED_LEDGER
     return {
         "total": db.budget_of(ledger),
         "spent": db.credits_spent(s, ledger),
         "remaining": remaining,
         "classifications": remaining // config.COST_TEXT,
-        "own_key": own,
-        "keyed": own or bool(config.openalex_api_key()),
+        "own_key": True,
+        "keyed": True,
         "ledger": ledger,
     }
 
@@ -1066,13 +1081,6 @@ def new_run(
     except Refusal as e:
         return refuse(str(e))
     est = estimate_run(s, discover_on, len(dois), user)
-    if discover_on and not est["keyed"]:
-        return refuse(
-            "Searching for new journals needs an OpenAlex key, and there is none: "
-            "the consultation would spend 100 credits classifying your abstract "
-            "and then be refused. Add your own key in Settings — it is free — or "
-            "untick «Search OpenAlex for new journals»."
-        )
     if not est["affordable"]:
         return refuse(
             f"Not enough budget: classifying the abstract costs {est['classify']} "
@@ -1312,9 +1320,8 @@ def settings(request: Request, user: User = Depends(current_user),
                 has_openalex_key=bool(user.openalex_key_encrypted),
                 openalex=request.query_params.get("openalex"),
                 budget=_budget_view(s, user),
-                shared_budget=db.budget_of(db.SHARED_LEDGER),
                 own_budget=config.BUDGET_WITH_KEY,
-                instance_keyed=bool(config.openalex_api_key()))
+                )
 
 
 @app.post("/app/settings/openalex-key")
@@ -1329,8 +1336,8 @@ def save_openalex_key(openalex_key: str = Form(""),
 
     **The key is tried against OpenAlex before it is kept.** A key that was
     issued and never activated looks exactly like one that works, and finding
-    out at the first consultation means finding out after the classification
-    was charged to the shared budget instead. Saving an empty field removes it.
+    out at the first consultation means finding out by a run that fails.
+    Saving an empty field removes it.
 
     The outcome travels as a code and the page picks the sentence. The key
     itself goes nowhere but the encrypted column: not into the redirect, not

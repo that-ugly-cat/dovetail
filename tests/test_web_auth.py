@@ -21,6 +21,17 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("JWT_SECRET", "test-secret-not-a-default")
     monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "web.db"))
     monkeypatch.delenv("AUTH_MODE", raising=False)
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    # The admin has an OpenAlex key of their own and the reader has none. There
+    # is no shared budget: whoever starts something that spends pays for it with
+    # their own key, whatever their role. So the reader's 403s below are about
+    # the missing key, and the admin's 200s are not about being an admin.
+    from cryptography.fernet import Fernet
+
+    from dovetail import crypto
+
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
     db.create_all(tmp_path / "web.db")
     with db.session_scope() as s:
         s.add_all(
@@ -36,10 +47,16 @@ def client(tmp_path, monkeypatch):
                     name="Admin",
                     hashed_password=auth.hash_password("pw-admin"),
                     role=Role.ADMIN,
+                    openalex_key_encrypted=crypto.encrypt_api_key("admin-openalex-key"),
                 ),
             ]
         )
     return TestClient(app, follow_redirects=False)
+
+
+def _ledger_of_admin(s) -> str:
+    """The ledger the admin of the fixture spends from: their own."""
+    return db.user_ledger(s.query(User).filter(User.email == "admin@example.org").one().id)
 
 
 @pytest.fixture()
@@ -320,7 +337,7 @@ def test_a_run_with_no_budget_is_refused_before_it_starts(client, monkeypatch):
     """Refusing before spending, with the number, beats a 429 read afterwards."""
     sign_in(client, "admin@example.org", "pw-admin")
     with db.session_scope() as s:
-        db.spend(s, config.daily_budget())
+        db.spend(s, config.BUDGET_WITH_KEY, _ledger_of_admin(s))
     r = client.post("/app/runs/new", data={"title": "T", "abstract": "word " * 100})
     assert r.status_code == 200 and "Not enough budget" in r.text
     with db.session_scope() as s:
@@ -395,7 +412,7 @@ def test_the_reference_list_is_priced_before_the_run_starts(client):
     cannot afford its own reference list is refused with the figure."""
     sign_in(client, "admin@example.org", "pw-admin")
     with db.session_scope() as s:
-        db.spend(s, config.daily_budget() - config.COST_TEXT - 5)
+        db.spend(s, config.BUDGET_WITH_KEY - config.COST_TEXT - 5, _ledger_of_admin(s))
     refs = " ".join(f"10.1000/ref{i}" for i in range(40))
     r = client.post(
         "/app/runs/new",
@@ -658,7 +675,7 @@ def test_profiling_more_articles_than_the_budget_covers_is_refused_with_the_numb
     r = client.post("/app/venues/new", data={"display_name": "Costly Journal"})
     venue_id = int(r.headers["location"].split("/")[3].split("?")[0])
     with db.session_scope() as s:
-        db.spend(s, config.daily_budget() - config.COST_TEXT)  # enough for exactly one
+        db.spend(s, config.BUDGET_WITH_KEY - config.COST_TEXT, _ledger_of_admin(s))  # enough for exactly one
 
     two = ("A title\n" + "word " * 100) + "\n---\n" + ("Another\n" + "word " * 100)
     r = client.post(f"/app/venues/{venue_id}/profile", data={"articles": two})

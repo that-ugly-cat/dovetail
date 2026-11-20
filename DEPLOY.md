@@ -195,10 +195,11 @@ Losing `FERNET_KEY` means every stored key becomes unreadable and has to be
 entered again. Nothing else breaks: stages 1 to 4 never touch it.
 
 **The same `FERNET_KEY` protects people's own OpenAlex keys**, stored on the same
-page. A person who has one spends their own daily budget and not the instance's;
-a stored OpenAlex key that can no longer be decrypted falls back to
-`OPENALEX_API_KEY` without an error, so after a rotation the symptom is the
-shared budget draining again, not a failure.
+page, and those are what every consultation is paid with: there is no budget
+shared between users. So losing or rotating `FERNET_KEY` stops everybody from
+starting consultations until they store their key again. The app says so in
+those words; nothing falls back to `OPENALEX_API_KEY`, which is used only by
+the command line on the box.
 
 **Not every Anthropic key is the same kind of thing.** A key scoped to «all
 workspaces» is *identity-linked* and refuses every call — including one that

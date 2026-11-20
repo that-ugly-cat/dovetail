@@ -20,13 +20,12 @@ A consultation takes one to two minutes. It is visible only to you.
 
 The front page is public and shows nothing about anyone's work. Everything else is behind the sign-in: Borant ID where the instance uses it, a password where it runs on its own. There is no sign-up form. Ask whoever runs the instance for access.
 
-There are two roles.
+There are two roles. The role decides who may change what everybody shares. It does not decide who may start a consultation: that takes your own OpenAlex key, for members and admins alike.
 
 | | member | admin |
 |---|---|---|
 | Browse the journals and the review queue | yes | yes |
 | Start consultations, with your own OpenAlex key | yes | yes |
-| Start consultations on the instance's shared budget | no | yes |
 | Add a journal by hand, or describe one from its articles | no | yes |
 | Approve or reject proposals in the review queue | no | yes |
 | Manage users | no | yes |
@@ -37,7 +36,7 @@ Open **Settings**. There are two keys, both optional, both stored encrypted and 
 
 ### OpenAlex key — needed to start consultations
 
-A consultation is paid for in OpenAlex credits. With your own key it spends your own daily budget of 10,000 credits, and you can start consultations whatever your role. It is free:
+A consultation is paid for in OpenAlex credits, and **each person pays for their own with their own key**. There is no budget shared between users: without a key you can browse the journals and read your consultations, and you cannot start one. A key is free and comes with 10,000 credits a day, enough for dozens of consultations:
 
 1. Make an account at [openalex.org/signup](https://openalex.org/signup) and confirm your email address.
 2. Copy the key from **Settings → API key** on openalex.org.
@@ -113,7 +112,7 @@ The **smaller groups** matter when most of your references are about the paper's
 
 An empirical study and a conceptual essay on the same subject belong in different journals, and no score sees the difference. On a finished consultation, **Check N journals** has a model read each candidate's most recent titles and say whether it publishes work of the same kind as yours.
 
-- It needs your Anthropic key, and your own OpenAlex key or an admin role.
+- It needs your Anthropic key as well as your OpenAlex key.
 - The cost is shown beside the button: about a cent a journal.
 - It takes a few minutes. Keep the page open.
 - Each journal gets a line: *publishes this kind of paper* or *a different kind*, with a sentence saying why. **It never changes the order of the lists.** You can then sort by it.
@@ -127,7 +126,7 @@ A journal's page shows its access model and fee, what it publishes, its article 
 Two things an admin can do:
 
 - **Add a journal by hand**, for one that OpenAlex does not list. Leave «unknown» wherever you have not checked: answering «no» without looking would exclude it for no reason.
-- **Describe a journal from its articles.** A journal with no known subjects cannot be compared with a manuscript. Paste five to ten of its articles, from different years, and Dovetail takes its subjects from them. It costs 100 credits an article.
+- **Describe a journal from its articles.** A journal with no known subjects cannot be compared with a manuscript. Paste five to ten of its articles, from different years, and Dovetail takes its subjects from them. It costs 100 credits an article, from the admin's own key.
 
 ## 8. Article types, word limits and the review queue
 
@@ -143,7 +142,7 @@ Once a journal has its article types, a consultation with a word count tells you
 |---|---|
 | Your consultations: title, abstract, references, lists, verdicts | Journals and everything known about them |
 | Your OpenAlex and Anthropic keys | The review queue |
-| Your OpenAlex budget, if you have your own key | The instance's OpenAlex budget |
+| Your OpenAlex budget | |
 
 Nobody else can open your consultations. That includes admins, who see how many each person has run and what they spent, and nothing of what they are about. A consultation that is not yours answers «not found», exactly like one that does not exist.
 
@@ -161,7 +160,7 @@ This separation is between users of the application. Whoever runs the server can
 | Checking the kind of paper | 10 per journal whose recent titles are not on record yet |
 | Describing a journal from its articles | 100 per article |
 
-A free OpenAlex key gives 10,000 credits a day. The budget resets at midnight UTC. The model steps are billed in dollars to your Anthropic account: about a cent per journal checked, a fraction of a cent per page of guidelines.
+All of these come out of your own key: a free OpenAlex key gives 10,000 credits a day, and nobody else's use touches yours. The budget resets at midnight UTC. The model steps are billed in dollars to your Anthropic account: about a cent per journal checked, a fraction of a cent per page of guidelines.
 
 ## 11. Using it from an AI assistant
 
@@ -176,7 +175,7 @@ Ask whoever runs the instance for an MCP key.
 - **«No list was produced».** The abstract was too short or too generic to classify. Give it more of the paper's actual argument.
 - **The list by subject is all about the wrong field.** Look at how the abstract was classified. Then add the reference list, and read the lists by reference.
 - **Few DOIs were found.** A bibliography of books has none. The lists by reference need at least five.
-- **«Searching for new journals needs an OpenAlex key».** Add yours in Settings.
-- **«Not enough budget».** Wait for midnight UTC, or untick the search for new journals.
+- **There is no «New consultation» button.** You have no OpenAlex key stored. Add one in Settings.
+- **«Not enough budget».** Your key's credits for today are used up. Wait for midnight UTC, or untick the search for new journals.
 - **Your Anthropic key needs a workspace id.** It is a key that works across several workspaces. Add the id in Settings, or use a key that belongs to one workspace.
 - **A journal you expected is missing.** Search for it under Journals. If it is not there, no consultation has come across it yet; an admin can add it by hand.

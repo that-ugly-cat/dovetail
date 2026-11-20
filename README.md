@@ -64,8 +64,8 @@ uv run pytest                   # 223 tests
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
 without `OPENALEX_API_KEY` in `.env`, run `match` with `--no-discover`. The reference list works
-either way. In the web app and over MCP a sweep with no key anywhere is refused before it spends
-anything, with the place to get one.
+either way. That concerns the command line only: in the web app nobody starts a consultation
+without a key of their own.
 
 ### Whose consultations
 
@@ -74,17 +74,21 @@ it** — not by other members and not by admins, who get a count and a credit to
 nothing else. It holds the title and the bibliography of a manuscript that is not published. Its
 owner can delete it; the journals it found stay.
 
-Anyone with their own OpenAlex key can start one. An Anthropic key is only needed for the check on
-the kind of paper. A consultation started from the command line has no owner and is seen by admins.
+Starting one takes your own OpenAlex key, whatever your role. An Anthropic key is only needed for
+the check on the kind of paper. A consultation started from the command line has no owner and is
+seen by admins.
 The rules are in `src/dovetail/ownership.py`.
 
 ### Whose OpenAlex budget
 
-Each person can store **their own OpenAlex key** at `/app/settings` (the «?» there says how to get
-one: it is free). Their consultations then spend that key's daily budget of 10,000 credits, on a
-ledger of their own, and not the budget everybody on the instance shares. The key is tried against
-OpenAlex before it is kept, stored encrypted, and never shown again. `OPENALEX_API_KEY` in `.env`
-stays what everyone without a key of their own falls back to.
+Your own. **There is no budget shared between users.** Each person stores their own OpenAlex key at
+`/app/settings` (the «?» there says how to get one: it is free), and everything they start is
+charged to it, on a ledger of their own, 10,000 credits a day. Without a key a person can browse
+the journals and read their consultations, and cannot start anything that spends, admin or not.
+The key is tried against OpenAlex before it is kept, stored encrypted, and never shown again.
+
+`OPENALEX_API_KEY` in `.env` is the operator's: it is used by the command line and by MCP over
+stdio, and no signed-in user's work is ever charged to it.
 
 A text profile can be reused with `--profile file.json`, which skips stage 1 and its hundred
 credits; `import-source` loads an already downloaded `/sources` response, so you can work without
@@ -183,9 +187,9 @@ criterion of merit, a negative one stays a flag, and nothing moves — a judgeme
 reproducible cannot order a list that has to be explainable.
 
 It needs your own Anthropic key, stored encrypted per user at `/app/settings`, because that call is
-charged to a person rather than to a shared budget. Set `FERNET_KEY` on the server to enable it;
-without one the feature is off and everything through stage 4 works unchanged. The same key pays
-for stage 5b, and the same `FERNET_KEY` is what lets a personal OpenAlex key be stored.
+charged to the person who makes it. The same key pays for stage 5b. `FERNET_KEY` on the server is
+what lets a person's keys be stored at all — the OpenAlex key included, without which nobody can
+start a consultation from the web.
 
 ```bash
 uv run dovetail judge-venues --run-id 3 --issn 1472-6939 --as-user you@example.org

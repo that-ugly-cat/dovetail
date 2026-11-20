@@ -17,10 +17,11 @@ manuscripts, so an admin gets counts and credits per person and nothing more.
 command line has nobody's name on it; admins see those, because somebody has
 to be able to.
 
-**Anyone with their own OpenAlex key may start one.** The rule used to be «an
-admin», and the reason was the budget: a consultation spent what everybody
-shared. Somebody spending their own key costs nobody anything. Without a key of
-one's own the budget is still the shared one, and that still takes an admin.
+**Whoever has their own OpenAlex key may start one, and nobody else.** The rule
+used to be «an admin», and the reason was the budget: a consultation spent what
+everybody shared. That budget is gone. Each person pays for their own work with
+their own key, admins included, so no role is needed to start a consultation
+and no role is enough to start one without a key.
 
 Everything that reads a consultation goes through `visible_to`, and nothing
 relies on a page not linking to it: a consultation that is not yours answers
@@ -73,13 +74,15 @@ def has_own_openalex_key(user: User | None) -> bool:
 
 
 def may_consult(user: User | None) -> bool:
-    """Whether this person may start something that spends OpenAlex credits on
-    a manuscript of their own: a consultation, or the check on its journals."""
-    return user is None or user.is_admin() or has_own_openalex_key(user)
+    """Whether this person may start something that spends OpenAlex credits: a
+    consultation, the check on its journals, describing a journal from its
+    articles. A key of their own, whatever their role. The command line has the
+    operator's."""
+    return user is None or has_own_openalex_key(user)
 
 
 WHY_NOT = (
-    "Starting a consultation needs your own OpenAlex key, which is free: "
-    "Settings says how to get one. Without it a consultation would spend the "
-    "budget everybody here shares, and that takes an admin."
+    "This needs your own OpenAlex key, which is free: Settings says how to get "
+    "one. Everything that spends OpenAlex credits here is paid for by the "
+    "person who starts it."
 )

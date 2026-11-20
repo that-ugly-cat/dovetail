@@ -1,9 +1,9 @@
 {% extends "base.html" %}{% block title %}Settings — Dovetail{% endblock %}
 {% block body %}
 <h1>Settings</h1>
-<p class="sub">Your own credentials. Both are optional, both are encrypted, and each one moves a
-cost from the instance to you: an OpenAlex key for the consultations, an Anthropic key for the two
-things a model does here.</p>
+<p class="sub">Your own credentials, stored encrypted. Everything that costs something here is paid
+for by the person who starts it: an OpenAlex key for consultations, and an Anthropic key for the two
+optional steps that use a model.</p>
 
 {% if not crypto_ready %}
 <div class="flash err"><strong>This instance cannot store a key.</strong> <code>FERNET_KEY</code>
@@ -15,8 +15,8 @@ offer. Both fields below are unavailable until an operator sets it.</div>
 
 {% if openalex == 'stored' %}<div class="flash ok"><strong>OpenAlex key stored.</strong> OpenAlex
 accepted it just now. It is encrypted, and no screen will show it again.</div>
-{% elif openalex == 'cleared' %}<div class="flash">OpenAlex key removed. Your consultations spend
-the instance's shared budget again.</div>
+{% elif openalex == 'cleared' %}<div class="flash">OpenAlex key removed. You can read your
+consultations and browse the journals; starting a consultation needs a key again.</div>
 {% elif openalex == 'invalid' %}<div class="flash err"><strong>OpenAlex does not know that
 key</strong>, so it was not stored{% if has_openalex_key %} and the one you had is still in
 place{% endif %}. Copy it again from <em>Settings → API key</em> on openalex.org: a missing
@@ -37,19 +37,17 @@ can tell: try again in a moment.</div>
     <button type="button" class="help" aria-label="How to get an OpenAlex key"
       aria-haspopup="dialog"
       onclick="document.getElementById('openalex-help').showModal()">?</button></h2>
-  <p class="muted">A consultation is paid for in OpenAlex credits. With a key of your own it spends
-  <strong>your</strong> daily budget of {{ '{:,}'.format(own_budget) }} credits; without one it
-  spends the budget everybody here shares
-  ({{ '{:,}'.format(shared_budget) }} credits{% if not instance_keyed %}, and since this instance has
-  no key of its own, Dovetail cannot search for new journals at all{% endif %}).</p>
+  <p class="muted">A consultation is paid for in OpenAlex credits, and each person pays for their
+  own with their own key. It is free: an OpenAlex account comes with
+  {{ '{:,}'.format(own_budget) }} credits a day, enough for dozens of consultations.</p>
 
   {% if not can_consult %}
-  <p class="warn small" style="margin:0 0 12px"><strong>You need a key of your own to start
-  consultations.</strong> Store one below and the «New consultation» button appears.</p>
+  <p class="warn small" style="margin:0 0 12px"><strong>You need a key to start consultations.</strong>
+  Store one below and the «New consultation» button appears.</p>
+  {% else %}
+  <p class="small" style="margin:0 0 12px">Today: {{ '{:,}'.format(budget.remaining) }} of
+  {{ '{:,}'.format(budget.total) }} credits left on your key.</p>
   {% endif %}
-  <p class="small" style="margin:0 0 12px">Today you are spending from
-  {% if budget.own_key %}<strong>your own key</strong>{% else %}<strong>the shared budget</strong>{% endif %}:
-  {{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits left.</p>
 
   {% if crypto_ready %}
   <form method="post" action="/app/settings/openalex-key">
@@ -155,10 +153,10 @@ will be offered again once there is one.</div>{% endif %}
   {% endif %}
 </div>
 
-<p class="note"><strong>Per person, not per machine.</strong> A model call bills the account of
-whoever started it, and this server holds no model credential of its own. The same goes for an
-OpenAlex key stored here: it pays for your consultations and nobody else's. Both are encrypted with
-Fernet, decrypted in memory when they are used, and never written to a log.</p>
+<p class="note"><strong>Per person, not per machine.</strong> Nothing here is paid for out of a
+budget people share: a consultation is charged to the OpenAlex key of whoever started it, and a
+model call to their Anthropic key. Both keys are encrypted with Fernet, decrypted in memory when
+they are used, and never written to a log.</p>
 <p class="note">To remove a key, empty its field and save. A consultation itself needs no Anthropic
 key: only the two steps above do.</p>
 <p class="note">The model is recorded on every verdict and every proposal it writes. Something read

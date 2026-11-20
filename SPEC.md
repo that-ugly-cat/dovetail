@@ -731,6 +731,11 @@ la prova.
 
 ### Due livelli, e la divisione è per quanto costano
 
+> **Superato il 20 nov 2026**, e lasciato perché dice da dove viene la regola. La divisione fra i
+> ruoli non è più per quanto una cosa costa: il costo lo paga chi la avvia, con la propria chiave.
+> Un *admin* è chi può cambiare ciò che è di tutti — riviste, coda, utenti. Vedi «Riviste di tutti,
+> consultazioni di chi le avvia» e «Le chiavi sono per persona», più sotto.
+
 **Reader** guarda: riviste, consultazioni, coda, il ragionamento dietro una lista. Niente di ciò che
 fa spende crediti OpenAlex o cambia un fatto.
 
@@ -755,9 +760,9 @@ Tre decisioni di Spit:
 - **Non la vede nessun altro, admin compresi.** Amministrare l'istanza non richiede di leggere i
   manoscritti altrui: un admin vede quante consultazioni ha fatto ciascuno e quanti crediti ha speso
   sulla propria chiave, non di cosa parlano.
-- **Può avviarne una chiunque abbia la propria chiave OpenAlex**, oltre agli admin. La regola «serve
-  un admin» esisteva perché si spendeva un budget comune. Per avviare basta la chiave OpenAlex; la
-  chiave Anthropic serve solo al controllo sul tipo di articolo.
+- **Può avviarne una chi ha la propria chiave OpenAlex, e nessun altro**, admin compresi. La regola
+  «serve un admin» esisteva perché si spendeva un budget comune, che non c'è più (sotto). Per
+  avviare basta la chiave OpenAlex; la chiave Anthropic serve solo al controllo sul tipo di articolo.
 - **La condivisione con un coautore si fa dopo.**
 
 Una consultazione **senza proprietario** — avviata da riga di comando — è dell'istanza, e la vedono
@@ -773,8 +778,7 @@ Il ruolo in database e sul gate si chiama ancora `reader`, perché Borant ID reg
 dell'app con quel nome. Nell'interfaccia è mostrato come *member*.
 
 **Cosa non risolve.** Chi ha accesso al server legge il database: i titoli stanno in chiaro in
-SQLite e nei backup. Il budget OpenAlex condiviso non dice chi lo consuma. Le proposte in coda non
-hanno un autore.
+SQLite e nei backup. Le proposte in coda non hanno un autore.
 
 **Le consultazioni esistenti.** Dove l'istanza ha un solo account, la migrazione gliele assegna.
 Dove ne ha di più le lascia senza proprietario, invece di indovinare.
@@ -783,20 +787,27 @@ Dove ne ha di più le lascia senza proprietario, invece di indovinare.
 
 Le impostazioni tengono due credenziali, cifrate con Fernet e mai mostrate dopo il salvataggio.
 
-**La chiave OpenAlex.** L'istanza ne aveva una per tutti, quindi la consultazione di una persona
-spendeva il budget della successiva. Chi salva la propria spende da un **registro suo**
-(`budget_ledger.provider = openalex:u<id>`), che vale sempre 10.000 crediti al giorno perché una
-chiave personale è per definizione una chiave. Ogni pagina che stampa un budget stampa quello di chi
-la legge. La chiave d'istanza resta il ripiego per chi non ne ha una.
+**La chiave OpenAlex, e il budget condiviso che non c'è più.** L'istanza aveva una chiave per
+tutti, quindi la consultazione di una persona spendeva il budget della successiva. Nel primo passo
+chi salvava la propria spendeva da un registro suo e la chiave d'istanza restava il ripiego. Lo
+stesso giorno Spit ha tolto il ripiego: **ognuno paga ciò che avvia con la propria chiave**, admin
+compresi, e senza chiave non si avvia niente che spenda. Ogni persona ha il suo registro
+(`budget_ledger.provider = openalex:u<id>`), che vale 10.000 crediti al giorno.
+
+Il ruolo decide chi può cambiare ciò che è di tutti; la chiave decide chi paga. Descrivere una
+rivista dai suoi articoli vuole entrambe le cose: un admin, e la sua chiave.
+
+`OPENALEX_API_KEY` nell'ambiente resta la chiave dell'operatore, per la riga di comando e per MCP
+su stdio. Il lavoro di un utente che ha fatto l'accesso non le viene mai addebitato.
 
 Tre regole:
 
 - **La chiave si prova prima di tenerla**, con una chiamata a `/sources` pagata dalla chiave stessa.
   Una chiave emessa e mai attivata è identica a una che funziona, e solo OpenAlex lo sa (401 chiave
   ignota, 403 mai attivata). Una chiave respinta non si salva e **non costa quella che c'era già**.
-- **Uno sweep senza alcuna chiave si rifiuta prima di spendere.** Il cursore di paginazione senza
-  chiave risponde 401: la corsa pagherebbe i cento crediti della classificazione e si fermerebbe
-  alla prima pagina. È successo il 20 novembre, in locale.
+- **Una chiave che non si riesce più a leggere non è una chiave.** Se `FERNET_KEY` cambia, il
+  client non ripiega su quella d'istanza: dice che la chiave va salvata di nuovo. Ripiegare in
+  silenzio vorrebbe dire far pagare a qualcun altro, che è ciò che la regola esclude.
 - **Il task in background riceve l'id di chi ha avviato la corsa, non la chiave.** Gira dopo che la
   richiesta è finita, e una credenziale decifrata non deve stare in una coda.
 
@@ -891,7 +902,8 @@ dall'altra parte perché qui un posto dove mettere la chiave c'è. A differenza 
 `FERNET_KEY` mancante è una funzione spenta e non un processo morto.
 
 Il costo sta prima del bottone in **due valute riportate separate**, perché escono da tasche diverse:
-chiamate al modello sulla chiave di una persona, crediti OpenAlex sul budget condiviso. Sommarle
+chiamate al modello sulla chiave Anthropic di chi lo avvia, crediti OpenAlex sulla sua chiave
+OpenAlex (fino al 20 nov 2026, su un budget condiviso). Sommarle
 darebbe un numero che non significa niente. Misurato: dodici riviste, ~0,14 $, più 120 crediti per
 recuperare gli indici recenti — e l'indice si **cachea sulla venue** ed è datato come ogni altro
 campo, perché è inventario che cambia sul tempo di un fascicolo, non di una consultazione.

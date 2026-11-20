@@ -78,8 +78,8 @@ def _needs_admin() -> dict | None:
     if not who.is_admin():
         return {
             "denied": (
-                "this call either spends the shared OpenAlex budget or writes "
-                "into the approval queue, and the key you used belongs to a reader"
+                "this call writes into the approval queue, which everybody "
+                "shares, and the key you used does not belong to an admin"
             )
         }
     return None
@@ -149,23 +149,31 @@ def budget_status() -> dict:
     """
     db.init_engine()
     with db.session_scope() as s:
-        ledger = ledger_for(_caller_user(s))
+        who = _caller_user(s)
+        ledger = ledger_for(who)
+        if ledger is None:
+            return {
+                "daily_budget": 0,
+                "remaining": 0,
+                "has_api_key": False,
+                "note": (
+                    "you have no OpenAlex key of your own, so there is nothing "
+                    "to spend: everything here is paid for by the person who "
+                    "starts it. Store a free key in the web app, under Settings"
+                ),
+            }
         spent, remaining = db.credits_spent(s, ledger), db.credits_remaining(s, ledger)
-    own = ledger != db.SHARED_LEDGER
     return {
         "daily_budget": db.budget_of(ledger),
         "spent": spent,
         "remaining": remaining,
         "classifications_left": remaining // config.COST_TEXT,
-        # Whose till. A caller who stored their own OpenAlex key in the web
-        # app's Settings spends that key's budget; everybody else shares one.
-        "spending_from": "your own OpenAlex key" if own else "the instance's shared budget",
-        "has_api_key": own or bool(config.openalex_api_key()),
-        "note": (
-            "resets at midnight UTC. Without any key the sweep cannot run: "
-            "OpenAlex refuses cursor paging. A free key is stored per person in "
-            "the web app, under Settings"
+        "spending_from": (
+            "your own OpenAlex key" if who is not None
+            else "the key in the server's environment (command line)"
         ),
+        "has_api_key": who is not None or bool(config.openalex_api_key()),
+        "note": "resets at midnight UTC",
     }
 
 
@@ -578,9 +586,9 @@ def _callers_key(s):
     if user is None or not user.anthropic_key_encrypted:
         return None, {
             "denied": (
-                "you have no Anthropic key stored. This call is charged to a "
-                "person rather than to a shared budget, so it needs your own: "
-                "store one at /app/settings."
+                "you have no Anthropic key stored. This call is charged to the "
+                "person who makes it, so it needs your own: store one at "
+                "/app/settings."
             )
         }
     if not crypto.available():
@@ -607,8 +615,8 @@ def estimate_genre_judgement(run_id: int) -> dict:
     has to cost nothing: a cost seen afterwards is not a decision.
 
     Two currencies, reported apart because they come out of different pockets —
-    model calls against *your* key, OpenAlex credits against the shared daily
-    budget. Adding them would produce a number that means nothing.
+    model calls against your Anthropic key, OpenAlex credits against your
+    OpenAlex key. Adding them would produce a number that means nothing.
     """
     from .matching import genre
 
@@ -634,7 +642,7 @@ def estimate_genre_judgement(run_id: int) -> dict:
             "already_judged": already,
             "note": (
                 "the model calls are charged to the key of whoever makes the "
-                "call; the OpenAlex credits come out of the shared daily budget. "
+                "call, and so are the OpenAlex credits, to their own OpenAlex key. "
                 "Judging again replaces the previous verdicts rather than adding to them."
             ),
         }
@@ -655,11 +663,11 @@ def judge_finalists(run_id: int) -> dict:
     promises. Read the verdicts as informing a reading, never as ranking one.
 
     **It spends your own money.** The model calls are charged to the Anthropic
-    key stored by whoever owns the MCP key being used, not to any shared budget.
+    key stored by whoever owns the MCP key being used.
     Call `estimate_genre_judgement` first: it is free.
 
-    Fetching a journal's recent index, where it is missing, does spend the
-    shared OpenAlex budget — which is why this needs an admin key.
+    Fetching a journal's recent index, where it is missing, spends OpenAlex
+    credits from the same person's OpenAlex key — which is why it needs one.
 
     A journal that cannot be judged costs that row its verdict and not the
     others theirs: a hand-declared venue has no OpenAlex index to read, and a

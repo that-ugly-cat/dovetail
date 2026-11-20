@@ -244,22 +244,22 @@ def current_user(
 
 
 def require_admin(user: User = Depends(current_user)) -> User:
-    """The door. Everything that spends credits or turns a proposal into a fact
-    goes through here, and nothing relies on a template hiding a button.
+    """The door to what everybody shares: the journals, the queue, the users.
+    Nothing relies on a template hiding a button. What a thing *costs* is a
+    separate door, `require_consultant`.
     """
     if not user.is_admin():
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "This needs an admin: it either spends the shared OpenAlex budget or "
-            "makes a proposal true.",
+            "This needs an admin: it changes something everybody here shares.",
         )
     return user
 
 
 
 def require_consultant(user: User = Depends(current_user)) -> User:
-    """Whoever may start a consultation: an admin, or anyone spending their own
-    OpenAlex key. See `ownership.may_consult` for why the second half exists."""
+    """Whoever may spend OpenAlex credits: anyone with their own key, and
+    nobody without one. See `ownership.may_consult`."""
     from . import ownership
 
     if not ownership.may_consult(user):

@@ -56,8 +56,9 @@ class OpenAlexClient:
         ledger: str = SHARED_LEDGER,
     ):
         """`api_key` and `ledger` go together: a personal key spends from a
-        ledger of its own (`db.user_ledger`). Left out, the client uses the
-        instance's key, if it has one, and the shared ledger."""
+        ledger of its own (`db.user_ledger`). Left out, the client uses the key
+        in the environment and the instance's ledger — which is the command
+        line's, and which no signed-in user is ever given (`client_for`)."""
         self._client = client or httpx.Client(timeout=30.0)
         self._api_key = (api_key or "").strip() or None
         self.ledger = ledger
@@ -395,35 +396,54 @@ class OpenAlexClient:
 # --- whose key ------------------------------------------------------------
 
 
-def client_for(user) -> OpenAlexClient:
-    """The client a person's work should run on: their own key if they stored
-    one, the instance's otherwise.
+class NoOwnKey(OpenAlexError):
+    """A signed-in person with no OpenAlex key of their own that can be used."""
 
-    A stored key that cannot be read back — `FERNET_KEY` rotated, or unset —
-    falls through to the instance's. That is the one quiet fallback here, and it
-    is quiet because the alternative is every page that shows a budget failing
-    for one person; the settings page is where a key that no longer works gets
-    noticed and replaced.
+
+def client_for(user) -> OpenAlexClient:
+    """The client a person's work runs on: **their own key, and no other**.
+
+    There used to be a second answer: with no key of their own a person's work
+    ran on the instance's, and was charged to a budget everybody shared. That
+    went on 20 Nov 2026. Whoever starts something pays for it with their own
+    key, so there is nothing left to share and nobody's work can be stopped by
+    somebody else's.
+
+    `None` is a caller with no identity — the command line, or MCP over stdio —
+    and gets the key in the environment. That one is the operator's, used by
+    whoever is on the box, and no signed-in user ever reaches it.
+
+    A stored key that cannot be read back, because `FERNET_KEY` was rotated, is
+    not a key. It raises like a missing one, and the message says to store it
+    again: falling back quietly would spend somebody else's budget, which is
+    the thing this function exists to rule out.
     """
     from .. import crypto
 
+    if user is None:
+        return OpenAlexClient()
     encrypted = getattr(user, "openalex_key_encrypted", None)
-    if encrypted and crypto.available():
-        try:
-            return OpenAlexClient(
-                api_key=crypto.decrypt_api_key(encrypted), ledger=user_ledger(user.id)
-            )
-        except Exception:  # noqa: BLE001 - an unreadable key is treated as no key
-            pass
-    return OpenAlexClient()
+    if not encrypted or not crypto.available():
+        raise NoOwnKey("no OpenAlex key of your own is stored: add one in Settings")
+    try:
+        key = crypto.decrypt_api_key(encrypted)
+    except Exception as e:  # noqa: BLE001 - whatever the reason, it is unusable
+        raise NoOwnKey(
+            "your stored OpenAlex key can no longer be read: store it again in Settings"
+        ) from e
+    return OpenAlexClient(api_key=key, ledger=user_ledger(user.id))
 
 
-def ledger_for(user) -> str:
+def ledger_for(user) -> str | None:
+    """The ledger a person spends from, or None if they cannot spend at all.
+    The command line's is the instance's own."""
     from .. import crypto
 
+    if user is None:
+        return SHARED_LEDGER
     if getattr(user, "openalex_key_encrypted", None) and crypto.available():
         return user_ledger(user.id)
-    return SHARED_LEDGER
+    return None
 
 
 def verify_key(api_key: str, client: httpx.Client | None = None) -> int:

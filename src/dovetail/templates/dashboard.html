@@ -8,14 +8,8 @@
 
 {% if not can_consult %}
 <div class="flash"><strong>To start a consultation, add your own OpenAlex key.</strong> It is free,
-and <a href="/app/settings">Settings</a> says how to get one. Your consultations then spend your own
-daily budget, and only you can see them.</div>
-{% endif %}
-
-{% if can_consult and not budget.keyed %}
-<div class="flash"><strong>No OpenAlex key is in use.</strong> Without one the daily budget is a
-tenth of what a free account gets, and Dovetail cannot search for new journals at all.
-<a href="/app/settings">Add your own in Settings</a>: it is free, and the page says how to get one.</div>
+and <a href="/app/settings">Settings</a> says how to get one. Everyone here pays for their own
+consultations with their own key, and only you can see yours.</div>
 {% endif %}
 
 <div class="section-head"><h2>Your recent consultations</h2>
@@ -49,17 +43,19 @@ tenth of what a free account gets, and Dovetail cannot search for new journals a
 
 <div class="section-head"><h2>Today</h2></div>
 <div class="grid">
+  {% if can_consult %}
   <div class="stat">
     <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
     <div class="lbl">consultations left today</div>
     <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} OpenAlex
-      credits{% if budget.own_key %}, on your own key{% else %}, shared by everyone here{% endif %}</div>
+      credits, on your own key</div>
   </div>
   <div class="stat">
     <div class="n">{{ '{:,}'.format(budget.spent) }}</div>
     <div class="lbl">credits spent today</div>
     <div class="foot">resets at midnight UTC</div>
   </div>
+  {% endif %}
   <div class="stat">
     <div class="n {% if pending %}warn{% endif %}">{{ pending }}</div>
     <div class="lbl">{{ 'proposal' if pending == 1 else 'proposals' }} to review</div>

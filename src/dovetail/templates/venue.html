@@ -83,8 +83,8 @@ articles.
   {% if user.is_admin() %}
   <p style="margin-bottom:0"><a class="btn btn-small" href="/app/venues/{{ venue.id }}/profile">Describe it from its articles</a></p>
   {% else %}
-  <p class="muted small" style="margin-bottom:0">Describing it needs an admin, because it spends
-  OpenAlex credits: 100 per article.</p>
+  <p class="muted small" style="margin-bottom:0">Describing it changes a record everybody shares, so
+  it takes an admin. It costs 100 OpenAlex credits an article, from that admin's own key.</p>
   {% endif %}
   {% endif %}
 </div>

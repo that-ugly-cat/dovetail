@@ -15,9 +15,16 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from dovetail import auth, config, crypto, db
-from dovetail.models import MatchRun, Role, User
+from dovetail.models import MatchRun, Role, User, Venue
 from dovetail.sources import openalex
-from dovetail.sources.openalex import KeyRejected, OpenAlexClient, client_for, verify_key
+from dovetail.sources.openalex import (
+    KeyRejected,
+    NoOwnKey,
+    OpenAlexClient,
+    client_for,
+    ledger_for,
+    verify_key,
+)
 from dovetail.web import app
 
 PERSONAL = "oa-personal-key-9f3a"
@@ -103,26 +110,37 @@ def test_a_429_on_one_key_empties_that_till_and_not_the_other(client):
         assert db.credits_remaining(s, db.SHARED_LEDGER) == config.BUDGET_ANONYMOUS
 
 
-def test_the_client_for_a_person_is_theirs_only_if_they_stored_a_key(client):
+def test_a_person_is_given_their_own_key_or_no_client_at_all(client):
+    """There is no key to fall back on. A signed-in person with none of their
+    own gets no client, so nothing they start can be charged to anybody else."""
     with db.session_scope() as s:
         me = _admin(s)
-        assert client_for(me).ledger == db.SHARED_LEDGER and not client_for(me).keyed
-        assert client_for(None).ledger == db.SHARED_LEDGER
+        with pytest.raises(NoOwnKey, match="add one in Settings"):
+            client_for(me)
+        assert ledger_for(me) is None
         me.openalex_key_encrypted = crypto.encrypt_api_key(PERSONAL)
         mine = client_for(me)
         assert mine.ledger == db.user_ledger(me.id) and mine.keyed
         assert mine._headers() == {"Authorization": f"Bearer {PERSONAL}"}
+        # The command line has no identity and uses the operator's key. No
+        # signed-in user is ever handed this one.
+        assert client_for(None).ledger == db.SHARED_LEDGER == ledger_for(None)
 
 
-def test_a_stored_key_that_can_no_longer_be_read_falls_back_to_the_instance(client, monkeypatch):
-    """`FERNET_KEY` rotated under a stored key. Every page that prints a budget
-    builds this client, so it must not be the thing that breaks them."""
+def test_a_stored_key_that_can_no_longer_be_read_is_not_a_key(client, monkeypatch):
+    """`FERNET_KEY` rotated under a stored key. It used to fall back to the
+    instance's key without a word, which is exactly a person's work being paid
+    for by somebody else. It now says the key has to be stored again — and the
+    pages that only print a budget still open, because they never build it."""
     with db.session_scope() as s:
-        me = _admin(s)
-        me.openalex_key_encrypted = crypto.encrypt_api_key(PERSONAL)
-        monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
-        crypto._fernet.cache_clear()
-        assert client_for(me).ledger == db.SHARED_LEDGER
+        _admin(s).openalex_key_encrypted = crypto.encrypt_api_key(PERSONAL)
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
+    with db.session_scope() as s:
+        with pytest.raises(NoOwnKey, match="can no longer be read"):
+            client_for(_admin(s))
+    assert client.get("/app").status_code == 200
+    assert client.get("/app/settings").status_code == 200
 
 
 # --- asking OpenAlex ------------------------------------------------------
@@ -161,7 +179,7 @@ def test_a_key_is_stored_encrypted_and_never_shown_back(client, monkeypatch):
         assert crypto.decrypt_api_key(stored) == PERSONAL
     page = client.get("/app/settings?openalex=stored").text
     assert PERSONAL not in page and "a key is stored" in page
-    assert "your own key" in page
+    assert "credits left on your key" in page
 
 
 def test_a_rejected_key_is_not_stored_and_does_not_cost_the_one_already_there(client, monkeypatch):
@@ -214,33 +232,43 @@ def test_with_no_way_to_encrypt_nothing_is_stored(client, monkeypatch):
 # --- where it is spent ----------------------------------------------------
 
 
-def test_every_page_that_prints_a_budget_prints_the_readers_own(client, monkeypatch):
+def test_with_no_key_there_is_no_budget_to_show_and_with_one_it_is_yours(client, monkeypatch):
+    """No shared till. Without a key the pages say what is missing and print no
+    number, because any number there would be somebody else's."""
     _accepting(monkeypatch)
-    with db.session_scope() as s:
-        db.spend(s, 950, db.SHARED_LEDGER)
-    assert "50 of 1,000" in client.get("/app/runs/new").text
+    home = client.get("/app").text
+    assert "add your own OpenAlex key" in home
+    assert 'href="/app/runs/new"' not in home
+    assert "consultations left today" not in home
+    assert "You need a key to start consultations" in client.get("/app/settings").text
+
     client.post("/app/settings/openalex-key", data={"openalex_key": PERSONAL})
     form = client.get("/app/runs/new").text
     assert "10,000 of 10,000" in form and "on your own key" in form
-    assert "on your own key" in client.get("/app").text
-    # The other admin stored nothing and still sees the shared till.
+    home = client.get("/app").text
+    assert "on your own key" in home and 'href="/app/runs/new"' in home
+    # The other admin stored nothing, and one person's key opens nothing for another.
     other = TestClient(app, follow_redirects=False)
     other.post("/login", data={"email": "other@example.org", "password": "pw-other"})
-    assert "50 of 1,000" in other.get("/app/runs/new").text
+    assert other.get("/app/runs/new").status_code == 403
 
 
-def test_a_sweep_with_no_key_anywhere_is_refused_before_it_spends(client):
-    """Found on 20 Nov 2026 by a run that paid a hundred credits to classify and
-    then met a 401 on the first page: OpenAlex refuses cursor paging without a
-    key. The refusal now comes first, and says where to get one."""
+def test_being_an_admin_is_not_a_way_to_spend_without_a_key(client):
+    """The role decides who may change what everybody shares. It does not pay
+    for anything: an admin with no key starts no consultation, and cannot
+    describe a journal from its articles either, because that spends credits."""
     r = client.post("/app/runs/new",
                     data={"title": "T", "abstract": "word " * 100, "discover": "on"})
-    assert r.status_code == 200 and "Searching for new journals needs an OpenAlex key" in r.text
+    assert r.status_code == 403 and "your own OpenAlex key" in r.json()["detail"]
     with db.session_scope() as s:
         assert s.query(MatchRun).count() == 0
-    # Without the sweep the same run is accepted: nothing in it pages.
-    monkey = client.post("/app/runs/new", data={"title": "T", "abstract": "word " * 100})
-    assert monkey.status_code == 303
+        v = Venue(display_name="A Journal")
+        s.add(v)
+        s.flush()
+        venue_id = v.id
+    assert client.get(f"/app/venues/{venue_id}/profile").status_code == 403
+    # What only changes a shared record, and costs nothing, is still the admin's.
+    assert client.get("/app/venues/new").status_code == 200
 
 
 def test_a_run_spends_the_key_of_whoever_started_it(client, monkeypatch):
@@ -263,26 +291,40 @@ def test_a_run_spends_the_key_of_whoever_started_it(client, monkeypatch):
         assert s.query(MatchRun).one().status == "done"
 
 
-def test_over_mcp_the_callers_own_key_is_the_one_used(client, monkeypatch):
+def test_over_mcp_the_callers_own_key_is_the_one_used_and_there_is_no_other(client, monkeypatch):
     from dovetail import mcp_server
 
-    with db.session_scope() as s:
-        me = _admin(s)
-        me.openalex_key_encrypted = crypto.encrypt_api_key(PERSONAL)
-        s.flush()
-        s.expunge(me)
-    token = mcp_server.caller.set(me)
-    try:
-        status = mcp_server.budget_status()
+    def as_admin(fn, *a, **kw):
         with db.session_scope() as s:
-            oa = mcp_server._callers_openalex(s)
-    finally:
-        mcp_server.caller.reset(token)
+            me = _admin(s)
+            s.expunge(me)
+        token = mcp_server.caller.set(me)
+        try:
+            return fn(*a, **kw)
+        finally:
+            mcp_server.caller.reset(token)
+
+    # No key: nothing to spend, and nothing is started on anybody else's.
+    status = as_admin(mcp_server.budget_status)
+    assert status["has_api_key"] is False and status["daily_budget"] == 0
+    assert as_admin(mcp_server.match_venues, "T", "word " * 100)["error"] == (
+        "needs_your_own_openalex_key")
+
+    with db.session_scope() as s:
+        _admin(s).openalex_key_encrypted = crypto.encrypt_api_key(PERSONAL)
+    status = as_admin(mcp_server.budget_status)
     assert status["spending_from"] == "your own OpenAlex key"
     assert status["daily_budget"] == config.BUDGET_WITH_KEY
-    assert oa._api_key == PERSONAL
 
-    # Over stdio there is no caller, no key, and a sweep is refused by name.
-    assert mcp_server.budget_status()["spending_from"] == "the instance's shared budget"
-    out = mcp_server.match_venues("T", "word " * 100)
-    assert out["error"] == "no_openalex_key"
+    def key_in_use():
+        with db.session_scope() as s:
+            return mcp_server._callers_openalex(s)._api_key
+
+    assert as_admin(key_in_use) == PERSONAL
+
+    # Over stdio there is no caller: the key in the environment, which here is
+    # absent, so a search that needs one is refused by name.
+    assert "command line" in mcp_server.budget_status()["spending_from"]
+    assert mcp_server.match_venues("T", "word " * 100)["error"] == "no_openalex_key"
+
+

@@ -270,10 +270,19 @@ def test_judging_without_a_stored_key_is_refused_with_a_sentence(tmp_path, monke
     from dovetail import mcp_server
     from dovetail.models import MatchResult, MatchRun, Role, User, Venue
 
+    from cryptography.fernet import Fernet
+
+    from dovetail import crypto
+
     monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "k.db"))
+    monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
+    crypto._fernet.cache_clear()
     db.create_all(tmp_path / "k.db")
     with db.session_scope() as s:
-        u = User(email="a@b.c", hashed_password="x", role=Role.ADMIN)
+        # An OpenAlex key and no Anthropic one: the first door is open, so the
+        # refusal below is the second door's and not the first's.
+        u = User(email="a@b.c", hashed_password="x", role=Role.ADMIN,
+                 openalex_key_encrypted=crypto.encrypt_api_key("an-openalex-key"))
         run = MatchRun(title="t", abstract="x", status="done")
         v = Venue(display_name="J", openalex_id="S1")
         s.add_all([u, run, v])

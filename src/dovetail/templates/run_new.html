@@ -7,11 +7,6 @@ what comes of it are visible to you alone.</p>
 
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
-{% if not estimate.keyed %}
-<div class="flash"><strong>No OpenAlex key is in use, so Dovetail cannot search for new
-journals.</strong> <a href="/app/settings">Add your own key in Settings</a> — it is free — or untick
-that option below to compare your manuscript with the journals already known here.</div>
-{% endif %}
 
 <form method="post" action="/app/runs/new">
   <div class="card">
@@ -65,15 +60,13 @@ that option below to compare your manuscript with the journals already known her
       <tr><td>{{ t.label }}</td><td class="n">{{ t.credits }}</td></tr>
       {% endfor %}
       <tr><td><strong>At most</strong></td><td class="n"><strong id="cost-total" data-base="{{ estimate.total - estimate.references_cost }}">{{ estimate.total }}</strong> credits</td></tr>
-      <tr><td class="muted">Left today{% if estimate.own_key %} on your own key{% endif %}</td>
+      <tr><td class="muted">Left today on your own key</td>
           <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
       </tbody>
     </table></div>
-    <p class="muted small" style="margin:8px 0 0">OpenAlex credits, from
-    {% if estimate.own_key %}<strong>your own key</strong>{% else %}<strong>the budget everybody here
-    shares</strong> — <a href="/app/settings">add a key of your own</a> to use yours instead{% endif %}.
-    This is a ceiling: a consultation usually spends less. A reference list adds one credit per DOI,
-    up to {{ estimate.max_references }} DOIs. The budget resets at midnight UTC.</p>
+    <p class="muted small" style="margin:8px 0 0">OpenAlex credits, from <strong>your own
+    key</strong>. This is a ceiling: a consultation usually spends less. A reference list adds one
+    credit per DOI, up to {{ estimate.max_references }} DOIs. The budget resets at midnight UTC.</p>
 
     <div class="btnrow" style="margin-top:14px">
       <button class="btn" type="submit" data-busy-label="Starting…"

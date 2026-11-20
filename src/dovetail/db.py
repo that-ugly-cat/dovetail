@@ -103,11 +103,10 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-# The ledger the instance's own credential spends from. A person who has stored
-# their own OpenAlex key spends from a ledger of their own, named after them:
-# OpenAlex counts each key's budget separately, so one counter for everybody
-# would refuse a run that the key paying for it can perfectly well afford — or
-# let the shared key be charged for it in the books and not in fact.
+# The ledger of the key in the environment. It is spent only from the command
+# line and from MCP over stdio, by whoever is on the box. The name is from when
+# every user's work was charged to it; since 20 Nov 2026 a signed-in person
+# spends their own key, from a ledger named after them, and never this one.
 SHARED_LEDGER = "openalex"
 
 
@@ -155,8 +154,8 @@ def spend(s: Session, credits: int, provider: str = "openalex") -> None:
             f"need {credits} credits, {remaining} left of {config.daily_budget()} "
             f"for today. The budget resets at midnight UTC. With no key the "
             f"account is anonymous and worth {config.BUDGET_ANONYMOUS} credits: "
-            f"a free OpenAlex key — your own in Settings, or OPENALEX_API_KEY on "
-            f"the instance — raises it to {config.BUDGET_WITH_KEY}."
+            f"setting OPENALEX_API_KEY with a free account raises it to "
+            f"{config.BUDGET_WITH_KEY}."
         )
     row = s.scalar(
         select(BudgetLedger).where(
