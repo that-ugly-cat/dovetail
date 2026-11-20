@@ -21,6 +21,23 @@ from .. import config
 INSUFFICIENT_PROFILE = "insufficient profile"
 
 
+def subject_match(topic: float, subfield: float) -> float:
+    """The number the list by subject is ordered by, on a scale of 0 to 1.
+
+    `Score.combined` scaled by its own maximum: the topic score counted
+    `TOPIC_WEIGHT` times, plus the subfield score. The field score is not in
+    it. It is shown beside the three levels since 20 Nov 2026 because a reader
+    asked what the order was made of, and an order with no number behind it
+    invites guessing one. The three levels stay visible next to it for the
+    reason the module gives: a journal in the right discipline that does not
+    publish this particular thing has a decent match and a zero topic score,
+    and only the pair shows it.
+
+    Like `combined`, it is a declared default and not a validated measure.
+    """
+    return (config.TOPIC_WEIGHT * topic + subfield) / (config.TOPIC_WEIGHT + 1)
+
+
 @dataclass
 class Profile:
     """Three sparse vectors, one per level."""

@@ -392,3 +392,20 @@ details.explain[open] > summary { margin-bottom: 8px; color: var(--text); }
 details.explain p, details.explain li { color: var(--muted); font-size: 13.5px; max-width: 78ch; }
 details.explain p { margin: 8px 0; }
 details.explain ul { margin: 6px 0; padding-left: 20px; }
+
+/* ── the one number, and the control that reorders by it ── */
+.res .scores .overall { padding-right: 14px; border-right: 1px solid var(--border); }
+.res .scores .overall b { font-size: 17px; }
+.res .scores .cited { padding-left: 14px; border-left: 1px solid var(--border); }
+.orderby {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 0 auto;
+  font-size: 13px; color: var(--muted); white-space: nowrap;
+}
+.orderby select { width: auto; margin: 0; padding: 4px 8px; font-size: 13px; }
+@media (max-width: 720px) { .orderby { margin-left: 0; white-space: normal; flex-wrap: wrap; } }
+
+/* An explanation inside a card: no box of its own, the card is the box. */
+details.explain.inline { border: 0; padding: 0; margin: 8px 0 0; }
+.topics { margin: 6px 0; padding-left: 20px; }
+.topics li { margin: 8px 0; color: var(--text); font-size: 14px; }
+.topics .val { float: right; color: var(--muted-2); font-variant-numeric: tabular-nums; font-size: 13px; }

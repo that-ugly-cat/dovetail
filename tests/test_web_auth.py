@@ -745,3 +745,64 @@ def test_a_button_that_starts_something_slow_says_what_the_wait_is(client):
     # depends on a frame being drawn.
     assert "event.preventDefault()" in script and "form.dataset.busy" in script
     assert "requestAnimationFrame(" not in script
+
+
+def test_a_journal_shows_the_number_its_list_is_ordered_by(client):
+    """The list by subject is ordered by two of the three scores, combined. The
+    three were shown and the combination was not, so the order had nothing
+    visible behind it. It is shown beside them, scaled to 0–1, and named for
+    what it is — not as a verdict on the journal."""
+    from dovetail.matching.scoring import Score, subject_match
+    from dovetail.models import MatchResult
+
+    # The same quantity the matcher sorts on, scaled by its own maximum.
+    assert subject_match(1.0, 1.0) == 1.0 and subject_match(0.0, 0.0) == 0.0
+    a, b = Score(0.6, 0.3, 0.9, True), Score(0.2, 0.9, 0.1, True)
+    assert (a.combined() > b.combined()) == (subject_match(0.6, 0.3) > subject_match(0.2, 0.9))
+
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        v = Venue(display_name="A Journal", apc_usd=1500)
+        s.add(v)
+        run = MatchRun(
+            title="A paper", abstract="x", status="done",
+            text_profile={"topics": [{
+                "id": "https://openalex.org/T1", "display_name": "A Long Topic Name", "score": 0.9,
+                "subfield": {"display_name": "A Subfield"}, "field": {"display_name": "A Field"},
+                "domain": {"display_name": "A Domain"},
+            }]},
+            # What a consultation with a reference list records about it.
+            constraints={"_neighbourhood": {
+                "references_given": 40, "references_used": 40, "references_resolved": 40,
+                "window_since": "2021-01-01", "citing_works": 900, "breadth_gate": 2,
+                "venues_past_gate": 12, "minority_fields": [],
+            }},
+        )
+        s.add(run)
+        s.flush()
+        s.add(MatchResult(
+            run_id=run.id, venue_id=v.id, bucket="shortlist", position=1,
+            score_topic=0.6, score_subfield=0.3, score_field=0.9,
+        ))
+        s.add(MatchResult(
+            run_id=run.id, venue_id=v.id, bucket="neighbourhood", position=1,
+            neighbourhood={"refs_reached": 7, "refs_total": 40, "citing_links": 30,
+                           "recent_works": 400, "per_1000": 75.0, "cited_here": 0,
+                           "openalex_id": "S1", "via_field": None},
+        ))
+        run_id = run.id
+
+    page = client.get(f"/app/runs/{run_id}").text
+    assert "subject match<b>0.50</b>" in page          # (2 × 0.6 + 0.3) / 3
+    assert 'data-overall="0.5000"' in page
+    # A journal the references lead to also says how densely it cites them, and
+    # can be sorted on it; one that is not, offers nothing to sort on there.
+    assert 'data-citations="75.0"' in page and 'data-citations=""' in page
+    assert "cites your refs<b>75‰</b>" in page
+    assert 'data-fee="1500"' in page
+    # The lists are reordered one at a time, never merged.
+    assert 'data-list="subject"' in page and 'data-list="references"' in page
+    assert '<select id="order-by">' in page and "/static/js/orderby.js" in page
+    # And the topics can be read in full, with where each sits and what it means.
+    assert "Read the topics in full" in page
+    assert "A Domain › A Field ›" in page and 'href="https://openalex.org/T1"' in page

@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, config, db
 from .auth import COOKIE_NAME, current_user, require_admin
+from .matching.scoring import subject_match
 from .models import (
     FINALIST_BUCKETS,
     ArticleType,
@@ -1075,6 +1076,8 @@ def run_detail(request: Request, run_id: int, genre: str = "",
                 # of it: both profiles carry only positive weights, so their
                 # cosine is above zero precisely when they share a topic id.
                 "reachable": res.score_topic > 0,
+                # The figure the list by subject is ordered by, scaled to 0–1.
+                "overall": subject_match(res.score_topic, res.score_subfield),
             }
         )
     from . import crypto
@@ -1082,6 +1085,7 @@ def run_detail(request: Request, run_id: int, genre: str = "",
 
     return page(
         request, "run.html", user, s,
+        topic_weight=config.TOPIC_WEIGHT,
         nav="runs",
         run=run,
         buckets=buckets,

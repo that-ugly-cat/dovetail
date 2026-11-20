@@ -56,7 +56,7 @@ uv run dovetail seed            # resolve PaperTrail's venues, file alias propos
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
 uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
-uv run pytest                   # 199 tests
+uv run pytest                   # 200 tests
 ```
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
