@@ -345,3 +345,50 @@ dialog.modal::backdrop { background: var(--scrim); }
 .modal-body li { margin: 6px 0; }
 /* --muted-2 on --card is 4.19:1 in dark, under the line for small text. */
 .modal-body .muted { color: var(--muted); }
+
+/* ── something is on its way ──
+ * A button that was pressed says so, and stops taking clicks (forms.js). The
+ * spinner is drawn by CSS alone and inherits the button's own text colour, so
+ * it needs no colour of its own in either theme.
+ */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner, .btn.is-busy::before {
+  content: ""; display: inline-block; width: 12px; height: 12px;
+  margin-right: 8px; vertical-align: -1px;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+.btn.is-busy, .btn:disabled { opacity: .75; cursor: progress; }
+.btn:disabled:hover { background: var(--primary); }
+.btn-link:disabled:hover, .btn-danger:disabled:hover { background: transparent; }
+.busy-note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.busy-note[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .btn.is-busy::before { animation-duration: 2.4s; }
+}
+
+/* Two cards side by side only where each has room for a line of text: below
+   that they stack, instead of cutting every label to its first word. */
+.row.roomy { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+
+/* ── a long page, and how to get around it ── */
+.jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+.section-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 30px 0 4px; }
+.section-head h2 { margin: 0; }
+.section-head .count { color: var(--muted-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.section-intro { color: var(--muted); font-size: 14px; margin: 0 0 12px; max-width: 78ch; }
+[id] { scroll-margin-top: 12px; }
+
+/* The explanations a page can do without until somebody wants them. Closed by
+   default: they are for the second reading, and open they push the content the
+   page is for below the fold. */
+details.explain {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 14px; margin: 18px 0; background: transparent;
+}
+details.explain > summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+details.explain > summary:hover { color: var(--text); }
+details.explain[open] > summary { margin-bottom: 8px; color: var(--text); }
+details.explain p, details.explain li { color: var(--muted); font-size: 13.5px; max-width: 78ch; }
+details.explain p { margin: 8px 0; }
+details.explain ul { margin: 6px 0; padding-left: 20px; }

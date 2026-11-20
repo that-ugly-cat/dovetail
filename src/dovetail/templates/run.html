@@ -7,191 +7,202 @@
 {% if run.status == 'running' %}<meta http-equiv="refresh" content="5">{% endif %}
 {% endblock %}
 {% block body %}
+{% set nr = neighbourhood_report %}
+{% set finalists = buckets.shortlist + buckets.neighbourhood + buckets.conversation %}
+
 <div class="head">
   <h1>Consultation {{ run.id }}</h1>
   <span class="muted small">{{ run.created_at.strftime('%d %b %Y, %H:%M') }} UTC</span>
 </div>
 <p class="sub">{{ run.title }}</p>
 
-<div class="btnrow" style="margin-bottom:16px">
-  {% if run.word_count %}<span class="badge">{{ '{:,}'.format(run.word_count) }} words</span>{% endif %}
-  {% for k, v in (run.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge accent">{{ k }}: {{ v }}</span>{% endif %}{% endfor %}
-  {% if run.status == 'running' %}<span class="badge warn">running</span>
+<div class="btnrow" style="margin-bottom:14px">
+  {% if run.status == 'running' %}<span class="badge warn"><span class="spinner" aria-hidden="true"></span>working</span>
   {% elif run.status == 'failed' %}<span class="badge danger">failed</span>
-  {% elif run.status == 'refused' %}<span class="badge warn">refused</span>
-  {% else %}<span class="badge">{{ buckets.shortlist|length }} shortlisted</span>
-    {% if buckets.excluded %}<span class="badge warn">{{ buckets.excluded|length }} excluded</span>{% endif %}
-    {% if buckets.unclassifiable %}<span class="badge">{{ buckets.unclassifiable|length }} unclassifiable</span>{% endif %}
-  {% endif %}
+  {% elif run.status == 'refused' %}<span class="badge warn">no list produced</span>{% endif %}
+  {% if run.word_count %}<span class="badge">{{ '{:,}'.format(run.word_count) }} words</span>{% endif %}
+  {% if run.reference_dois %}<span class="badge">{{ run.reference_dois|length }} references</span>{% endif %}
+  {% for k, v in (run.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge accent">{{ {'funder': 'funder', 'max_apc': 'highest fee'}.get(k, k.replace('_', ' ')) }}: {{ v }}</span>{% endif %}{% endfor %}
 </div>
 
 {% if run.status == 'running' %}
-<div class="flash"><strong>Still running.</strong> The sweep is a hundred-odd calls and takes the
-better part of a minute. This page reloads itself every five seconds; closing it does not stop the
-run.</div>
+<div class="flash"><strong>Working on it.</strong> A consultation takes one to two minutes. This page
+refreshes by itself every few seconds, and closing it does not stop the work.</div>
 {% endif %}
 
 {% if run.status == 'failed' %}
 <div class="flash err">
-  <strong>The run failed — <code>{{ run.error_code }}</code>.</strong>
-  {% if run.error_code == 'budget' %}The daily OpenAlex budget ran out mid-run. It resets at midnight UTC.
-  {% elif run.error_code == 'endpoint_broken' %}An OpenAlex endpoint answered with an error that is not
-  about the budget, so waiting will not help — the call itself is broken.
-  {% elif run.error_code == 'openalex' %}OpenAlex refused a call.
-  {% else %}Something unforeseen went wrong, and whatever was written before it stopped is below.{% endif %}
-  {% if run.error_detail %}<div class="mono small" style="margin-top:8px">{{ run.error_detail }}</div>{% endif %}
+  <strong>The consultation stopped before it finished.</strong>
+  {% if run.error_code == 'budget' %}The OpenAlex budget for today ran out part-way. It resets at
+  midnight UTC.
+  {% elif run.error_code == 'endpoint_broken' %}OpenAlex answered with an error that has nothing to
+  do with the budget, so waiting will not help. Try again later.
+  {% elif run.error_code == 'openalex' %}OpenAlex refused a request.
+  {% else %}Something unexpected went wrong. Whatever was found before that is below.{% endif %}
+  {% if run.error_detail %}<div class="mono small" style="margin-top:8px">{{ run.error_code }} · {{ run.error_detail }}</div>{% endif %}
 </div>
 {% endif %}
 
 {% if run.refused_reason %}
-<div class="flash"><strong>Refused, and no list was produced.</strong> Which is an answer, not a
-failure: below the threshold the classification is unstable enough that a shortlist would mean
-nothing.<br>{{ run.refused_reason }}</div>
+<div class="flash"><strong>No list was produced.</strong> The text could not be classified reliably
+enough for a list of journals to mean anything, so Dovetail did not make one.
+<div class="small" style="margin-top:6px">{{ run.refused_reason }}</div></div>
 {% endif %}
 
 {% set dropped = (run.text_profile or {}).get('_dovetail_chars_dropped') %}
 {% if dropped %}
-<div class="flash">The classification ran on a shortened text: <strong>{{ dropped }} characters</strong>
-were dropped at a word boundary, because <code>/text/*</code> refuses more than 2000. The title was
-never cut. Everything below was measured against what remained.</div>
+<div class="flash">Your abstract is longer than OpenAlex accepts — 2,000 characters, title included —
+so its last <strong>{{ dropped }} characters</strong> were left out when it was classified. The title
+was kept whole.</div>
 {% endif %}
 
-<div class="row">
+{# ---- the kind-of-paper check, and what came of it ---------------------- #}
+
+{% set g = genre_flash %}
+{% if g.state == 'done' %}
+<div class="flash ok"><strong>Journals checked.</strong> {{ g.judged }} read{% if g.failed %};
+{{ g.failed }} could not be, because nothing is on record about what they have published
+recently{% endif %}. Each journal below now says whether it publishes this kind of paper. The order of
+the lists has not changed.</div>
+{% elif g.state == 'nokey' %}
+<div class="flash">Checking the journals uses a model, and that is paid for with your own Anthropic
+key. <a href="/app/settings">Add one in Settings</a>.</div>
+{% elif g.state == 'empty' %}
+<div class="flash">There are no candidate journals to check.</div>
+{% elif g.state == 'failed' %}
+<div class="flash err">
+  {% if g.detail == 'needs_workspace' %}
+  <strong>Your Anthropic key needs a workspace id.</strong> It is a key that works across several
+  workspaces, so each request has to say which one it is for. Add the id in
+  <a href="/app/settings">Settings</a> — the real identifier, not the name shown in the Console
+  address — or use a key that belongs to a single workspace, which needs nothing more.
+  Nothing was spent.
+  {% elif g.detail == 'no_credit' %}
+  <strong>Your Anthropic account has no credit left.</strong> Nothing else is affected: the lists
+  below do not depend on it.
+  {% elif g.detail == 'bad_key' %}
+  <strong>Anthropic refused your key.</strong> Check it in <a href="/app/settings">Settings</a>: it
+  may have been revoked, or pasted with a character missing.
+  {% else %}
+  <strong>The check stopped before it finished</strong>, usually because the OpenAlex budget ran
+  out. Nothing was left half-done.
+  <div class="mono small" style="margin-top:6px">{{ g.detail }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if finalists and run.status != 'running' %}
+{% set ns = namespace(same=0, different=0) %}
+{% for row in finalists %}{% if row.result.genre_verdict %}
+  {% if row.result.genre_verdict.fits %}{% set ns.same = ns.same + 1 %}{% else %}{% set ns.different = ns.different + 1 %}{% endif %}
+{% endif %}{% endfor %}
+{% set checked = ns.same + ns.different %}
+<div class="card">
+  <div class="head">
+    <h2 style="margin:0">Does each journal publish this kind of paper?</h2>
+    {% if checked %}<span class="muted small">{{ ns.same }} the same kind · {{ ns.different }} a different kind</span>{% endif %}
+  </div>
+  <p class="muted" style="margin:8px 0 0; max-width:78ch">The lists below match your manuscript's
+  <em>subject</em>. This checks its <em>form</em>: an empirical study and a conceptual essay on the
+  same subject belong in different journals. A model reads each journal's most recent titles and
+  says whether it publishes work of the same kind as yours. It adds a line to each journal and never
+  changes their order.</p>
+
+  {% if not user.is_admin() %}
+  <p class="muted small" style="margin:10px 0 0">Only an admin can run this check.</p>
+  {% elif not genre_ready %}
+  <p class="warn small" style="margin:10px 0 0">It is paid for with your own Anthropic key.
+  <a href="/app/settings">Add one in Settings</a> to use it.</p>
+  {% else %}
+  <form method="post" action="/app/runs/{{ run.id }}/read-finalists" style="margin:12px 0 0">
+    <div class="btnrow">
+      <button class="btn" type="submit"
+        data-busy-label="Checking {{ genre_estimate.venues }} journal{{ 's' if genre_estimate.venues != 1 }}…"
+        data-busy-note="genre-wait">{{ 'Check again' if checked else 'Check' }} {{ genre_estimate.venues }} journal{{ 's' if genre_estimate.venues != 1 }}</button>
+      <span class="muted small">about <strong>${{ '%.2f'|format(genre_estimate.usd_estimate) }}</strong> on your
+        Anthropic key{% if genre_estimate.index_fetches %}, plus {{ genre_estimate.openalex_credits }}
+        OpenAlex credits to look up what {{ genre_estimate.index_fetches }} of them published recently{% endif %}</span>
+    </div>
+    <p class="busy-note" id="genre-wait" hidden>This takes a few minutes: the model reads one journal
+    at a time. Keep this page open — it shows the result when it is done.</p>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ---- what went in ------------------------------------------------------ #}
+
+<div class="row roomy">
   <div class="card">
-    <h2>What the manuscript is, measured</h2>
+    <h2>How your abstract was classified</h2>
     {% if text_topics %}
     <ul class="bars">
       {% for t in text_topics %}
       <li>
         <span class="bar" style="--w: {{ (t.score * 100)|round(1) }}%"></span>
-        <span class="lab">{{ t.display_name }}
+        <span class="lab" title="{{ t.display_name }} · {{ t.subfield.display_name }} · {{ t.field.display_name }}">{{ t.display_name }}
           <span class="muted small">· {{ t.subfield.display_name }} · {{ t.field.display_name }}</span>
         </span>
         <span class="val">{{ '%.3f'|format(t.score) }}</span>
       </li>
       {% endfor %}
     </ul>
-    <p class="muted small" style="margin-bottom:0">This is the input. Every score on the right is a
-    cosine against it, so a journal that looks wrong here will look wrong everywhere below.</p>
+    <p class="muted small" style="margin-bottom:0">The topics OpenAlex reads in your title and
+    abstract. The list by subject is measured against these, so if they look wrong, it will be too.</p>
     {% else %}
-    <p class="muted" style="margin-bottom:0">No profile was kept for this run.</p>
+    <p class="muted" style="margin-bottom:0">The classification of this consultation was not kept.</p>
     {% endif %}
   </div>
 
   {% set sweep = (run.constraints or {}).get('_sweep') %}
   <div class="card">
-    <h2>How much was looked at</h2>
-    {% if sweep %}
-    {# Two mechanisms, counted apart. The second reaches journals that are
-       outside the first one's pool by construction — a journal only matches the
-       topics filter if the topic is among its top 25, and that list is
-       truncated — so adding the two totals together, or reading one as a
-       fraction of the other, would say something false. #}
+    <h2>What was searched</h2>
     <ul class="bars">
-      <li><span class="lab">Journals the topic filter can see</span><span class="val">{{ '{:,}'.format(sweep.pool) }}</span></li>
-      <li><span class="lab">of which fetched, in {{ sweep.pages }} page{{ 's' if sweep.pages != 1 }}</span>
+      {% if sweep %}
+      <li><span class="lab">Journals sharing a topic with your abstract</span><span class="val">{{ '{:,}'.format(sweep.pool) }}</span></li>
+      <li><span class="lab">of which looked up</span>
           <span class="val">{{ '{:,}'.format(sweep.fetched - (sweep.added_by_volume or 0)) }}</span></li>
-      <li><span class="lab">Plus, from grouping works by journal</span>
-          <span class="val">{% if sweep.added_by_volume %}{{ sweep.added_by_volume }}{% else %}0{% endif %}</span></li>
-      <li><span class="lab"><strong>Scored in total</strong></span>
-          <span class="val">{{ '{:,}'.format(sweep.fetched) }}</span></li>
+      {% if sweep.added_by_volume %}
+      <li><span class="lab">Others that publish on those topics</span><span class="val">{{ sweep.added_by_volume }}</span></li>
+      {% endif %}
+      {% endif %}
+      {% if nr and not nr.skipped %}
+      <li><span class="lab">References recognised, of {{ nr.references_given }} DOIs</span><span class="val">{{ nr.references_resolved }}</span></li>
+      <li><span class="lab">Papers citing them since {{ nr.window_since[:4] }}</span><span class="val">{{ '{:,}'.format(nr.citing_works) }}</span></li>
+      <li><span class="lab">Journals reached through at least {{ nr.breadth_gate }} references</span><span class="val">{{ '{:,}'.format(nr.venues_past_gate) }}</span></li>
+      {% endif %}
     </ul>
-    {% if sweep.truncated %}
-      <p class="warn small" style="margin-bottom:0">The sweep was cut short: the list below is not
-      the whole pool, and a journal missing from it may simply never have been fetched.</p>
-    {% else %}
-      <p class="muted small" style="margin-bottom:0">The whole pool was swept. The second mechanism
-      reaches journals the first cannot — a journal matches the topic filter only if the topic is
-      among its top 25 — so its journals are <em>outside</em> that pool, not a share of it. Measured
-      over seven papers, it adds candidates and has never yet changed an outcome.</p>
+    {% if sweep and sweep.truncated %}
+    <p class="warn small" style="margin-bottom:0">The search was cut short, so a journal missing from
+    the list by subject may simply not have been looked up.</p>
+    {% elif not sweep %}
+    <p class="muted small" style="margin:{{ '8px' if nr and not nr.skipped else '0' }} 0 0">No new
+    journals were searched for by subject in this consultation: your manuscript was compared with
+    the journals Dovetail already knew.</p>
     {% endif %}
-    {% else %}
-    <p class="muted">This run predates the coverage report, so how much of the pool it reached was
-    not recorded.</p>
-    <p class="muted small" style="margin-bottom:0">A limited sweep that does not say so reads as
-    «we looked at everything», which is why later runs carry these numbers.</p>
+    {% if nr and nr.skipped %}
+    <p class="muted small" style="margin:8px 0 0">A reference list was given, and only
+    {{ nr.references_resolved }} of its {{ nr.references_used }} DOIs are known to OpenAlex. That is
+    too few to say where your references are being read, so that list was not made.</p>
     {% endif %}
   </div>
 </div>
 
-{% set g = genre_flash %}
-{% if g.state == 'done' %}
-<div class="flash ok"><strong>Finalists read.</strong> {{ g.judged }} judged{% if g.failed %},
-{{ g.failed }} could not be — a journal with no recent index cannot be judged on one.{% else %}.{% endif %}
-The verdicts sit beside the scores and moved nothing: a judgement that is not reproducible cannot
-order a list that has to be explainable.</div>
-{% elif g.state == 'nokey' %}
-<div class="flash">Reading the finalists needs your own Anthropic key, because that call is charged
-to a person and not to a shared budget. <a href="/app/settings">Store one in settings</a>.</div>
-{% elif g.state == 'empty' %}
-<div class="flash">There is no shortlist to read.</div>
-{% elif g.state == 'failed' %}
-<div class="flash err">
-  {% if g.detail == 'needs_workspace' %}
-  <strong>Your Anthropic key needs a workspace id, and does not have a usable one.</strong> It is an
-  <em>identity-linked</em> key — scoped to «all workspaces» — so every request has to name the one it
-  acts in, and without it the API refuses even a call that asks the model to say «ok».
-  <div style="margin-top:8px">Two ways out, and the second is less work: put the id in
-  <a href="/app/settings">settings</a> (it must be the real identifier, not the slug in the Console
-  URL — <code>default</code> is refused), or issue a key scoped to <em>one</em> workspace instead,
-  which carries its own and needs nothing here.</div>
-  Nothing was spent and nothing partial was left behind.
-  {% elif g.detail == 'no_credit' %}
-  <strong>The Anthropic account has no credit left.</strong> This is your key and your balance, not
-  the shared OpenAlex budget — that one is untouched, and everything through stage 4 still works.
-  {% elif g.detail == 'bad_key' %}
-  <strong>The key was refused.</strong> Check it in <a href="/app/settings">settings</a> — it may
-  have been revoked, or pasted with something missing.
-  {% else %}
-  <strong>The pass failed before finishing</strong> — <code>{{ g.detail }}</code>. That is the whole
-  call rather than one journal: usually an exhausted OpenAlex budget. Nothing partial was left behind.
-  {% endif %}
-</div>
-{% endif %}
+{# ---- one journal ------------------------------------------------------- #}
 
-{% if buckets.shortlist and user.is_admin() %}
-<div class="card">
-  <div class="head">
-    <h2 style="margin:0">Stage 5a — does each one publish work of this <em>kind</em>?</h2>
-    {% if genre_ready %}
-    <form method="post" action="/app/runs/{{ run.id }}/read-finalists" style="margin:0">
-      <button class="btn btn-small" type="submit">Read the finalists</button>
-    </form>
-    {% endif %}
-  </div>
-  <p class="muted small" style="margin:8px 0 0">Form and method, not subject — stages 3 and 4 already
-  measured subject, and an empirical study and a conceptual essay on the same topic score the same
-  there and belong in different journals. Measured on 28 Aug 2026, over one shortlist: ten journals
-  the same kind, two not — a philosophy journal and a laboratory immunology one, neither reachable by
-  any score above.</p>
-  {% if genre_estimate %}
-  <p class="muted small" style="margin:8px 0 0">
-    {{ genre_estimate.venues }} journal{{ 's' if genre_estimate.venues != 1 }} ·
-    {{ genre_estimate.model_calls }} call{{ 's' if genre_estimate.model_calls != 1 }} to
-    <code>{{ genre_estimate.model }}</code>, roughly <strong>${{ '%.2f'|format(genre_estimate.usd_estimate) }}</strong>
-    on your key{% if genre_estimate.index_fetches %}, plus {{ genre_estimate.openalex_credits }}
-    OpenAlex credits to fetch {{ genre_estimate.index_fetches }} recent
-    ind{{ 'ex' if genre_estimate.index_fetches == 1 else 'exes' }} from the shared budget{% else %}.
-    Every recent index is already on record, so this costs no OpenAlex credits{% endif %}.
-    Two currencies, reported apart because they come out of different pockets.
-  </p>
-  {% endif %}
-  {% if not genre_ready %}
-  <p class="warn small" style="margin:8px 0 0">Needs your own Anthropic key —
-  <a href="/app/settings">settings</a>.</p>
-  {% endif %}
-</div>
-{% endif %}
+{% macro evidence(c) %}{% set e = c.evidence|plain_evidence %}{% if e.startswith('http') %} <a class="ev small" href="{{ e }}" rel="noreferrer">source</a>{% elif e %} <span class="ev small">— {{ e }}</span>{% endif %}{% endmacro %}
 
 {% macro result(row) %}
-<div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable %}unreachable{% endif %}">
+<div class="res {% if row.merit|length < 2 %}thin{% endif %} {% if not row.reachable and not row.result.neighbourhood %}unreachable{% endif %}">
   <div class="rhead">
     <span class="pos">{{ row.result.position }}</span>
     <a class="vname" href="/app/venues/{{ row.venue.id }}">{{ row.venue.display_name }}</a>
-    {% if row.merit|length < 2 %}<span class="badge danger">thin on merit</span>{% endif %}
-    {% if not row.reachable %}<span class="badge warn">stage 2 would not have found it</span>{% endif %}
+    {% if row.merit|length < 2 %}<span class="badge danger"
+      title="Fewer than two reasons of merit hold this journal up, however well it does on logistics">thin on merit</span>{% endif %}
+    {% if not row.reachable %}<span class="badge warn"
+      title="It publishes on none of the topics OpenAlex read in your abstract">no topic in common</span>{% endif %}
     {% if row.venue.oa_model %}<span class="badge">{{ row.venue.oa_model.value.replace('_', ' ') }}</span>{% endif %}
-    <span class="scores">
+    <span class="scores" title="How close the journal's published work is to your abstract, from the narrowest level to the broadest. 0 to 1.">
       <span>topic<b>{{ '%.4f'|format(row.result.score_topic) }}</b></span>
       <span>subfield<b>{{ '%.4f'|format(row.result.score_subfield) }}</b></span>
       <span>field<b>{{ '%.4f'|format(row.result.score_field) }}</b></span>
@@ -201,30 +212,31 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
   {% set v = row.result.genre_verdict %}
   {% if v %}
   <div class="verdict {{ 'fits' if v.fits else 'misfits' }}">
-    <span class="badge {{ 'ok' if v.fits else 'warn' }}">{{ 'same kind' if v.fits else 'different kind' }}</span>
+    <span class="badge {{ 'ok' if v.fits else 'warn' }}">{{ 'publishes this kind of paper' if v.fits else 'publishes a different kind of paper' }}</span>
     <span class="badge">confidence: {{ v.confidence }}</span>
     <div style="margin-top:6px">{{ v.sentence }}</div>
-    <div class="muted small" style="margin-top:4px">this manuscript reads as <em>{{ v.manuscript_kind }}</em>;
-    the journal's recent index is <em>{{ v.journal_kind }}</em> · judged by {{ v.model }}, and it moved nothing</div>
+    <div class="muted small" style="margin-top:4px">Your manuscript reads as <em>{{ v.manuscript_kind }}</em>;
+    this journal's recent articles are <em>{{ v.journal_kind }}</em>. Judged by {{ v.model }}.</div>
   </div>
   {% endif %}
 
   {% if not row.result.score_topic and not row.result.score_subfield and not row.result.neighbourhood %}
-  <div class="warn small" style="margin-top:6px">No profile: this zero is «I don't know», not «out of scope».</div>
+  <div class="warn small" style="margin-top:6px">Nothing is on record about what this journal
+  publishes, so these zeros mean «unknown», not «unsuitable».</div>
   {% endif %}
 
   <div class="cols">
     <div>
       <h3>Merit ({{ row.merit|length }})</h3>
       <ul class="crit {% if not row.merit %}none{% endif %}">
-        {% for c in row.merit %}<li>{{ c.label }}{% if c.evidence %} <span class="ev small">— {{ c.evidence }}</span>{% endif %}</li>
-        {% else %}<li>nothing of merit holds this one up</li>{% endfor %}
+        {% for c in row.merit %}<li>{{ c.label|plain_label }}{{ evidence(c) }}</li>
+        {% else %}<li>no reason of merit was found</li>{% endfor %}
       </ul>
     </div>
     <div>
       <h3>Logistics ({{ row.logistics|length }})</h3>
       <ul class="crit {% if not row.logistics %}none{% endif %}">
-        {% for c in row.logistics %}<li>{{ c.label }}{% if c.evidence %} <span class="ev small">— {{ c.evidence }}</span>{% endif %}</li>
+        {% for c in row.logistics %}<li>{{ c.label|plain_label }}{{ evidence(c) }}</li>
         {% else %}<li>—</li>{% endfor %}
       </ul>
     </div>
@@ -234,94 +246,123 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
   <div class="why">
     {% for c in row.result.excluded_by or [] %}
     <div class="{{ 'err' if c.outcome == 'excluded' else 'warn' }}">
-      <span class="badge {{ 'danger' if c.outcome == 'excluded' else 'warn' }}">{{ c.outcome }}</span>
-      <strong>{{ c.constraint }}</strong> <span class="muted">{{ c.reason }}</span>
+      <span class="badge {{ 'danger' if c.outcome == 'excluded' else 'warn' }}">{{ 'excluded' if c.outcome == 'excluded' else 'to check' }}</span>
+      <strong>{{ c.constraint|plain_constraint }}</strong> <span class="muted">{{ c.reason }}</span>
     </div>
     {% endfor %}
     {% for f in row.result.flags or [] %}
-    <div class="muted small">! {{ f }}</div>
+    <div class="muted small">! {{ f|plain_flag }}</div>
     {% endfor %}
   </div>
   {% endif %}
 </div>
 {% endmacro %}
 
-{# Three groups and not one list, because they are not on the same axis.
-   Concatenated, a journal with no profile reads as the worst of the shortlist —
-   which is how a hand-declared venue with score 0.0000 came out as «13» in a
-   list capped at twelve. #}
-<h2>The list</h2>
-{% if buckets.shortlist %}
-  {% for row in buckets.shortlist %}{{ result(row) }}{% endfor %}
-{% elif total_rows %}
-  <div class="card"><p class="muted" style="margin:0">Nothing passed the constraints. What follows
-  is everything that did not, with the reason attached — an empty list is not an answer.</p></div>
-{% else %}
-  <div class="card"><p class="empty" style="padding:0">This run produced no list.</p></div>
+{# ---- the lists ---------------------------------------------------------
+   Kept apart and numbered apart, because they are not on one axis: the first
+   is ordered by closeness of subject, the next two by citation, and the last
+   two are not ordered at all. Run together, a journal nothing is known about
+   reads as the worst of the first list. #}
+
+{% if total_rows %}
+<nav class="jump" aria-label="Sections of this page">
+  {% if buckets.shortlist %}<a class="chip" href="#by-subject">By subject · {{ buckets.shortlist|length }}</a>{% endif %}
+  {% if buckets.neighbourhood %}<a class="chip" href="#by-references">By your references · {{ buckets.neighbourhood|length }}</a>{% endif %}
+  {% if buckets.conversation %}<a class="chip" href="#smaller-groups">From smaller groups of references · {{ buckets.conversation|length }}</a>{% endif %}
+  {% if buckets.excluded %}<a class="chip" href="#excluded">Excluded · {{ buckets.excluded|length }}</a>{% endif %}
+  {% if buckets.unclassifiable %}<a class="chip" href="#unknown">Could not be assessed · {{ buckets.unclassifiable|length }}</a>{% endif %}
+  <a class="chip" href="#how-to-read">How to read this</a>
+</nav>
 {% endif %}
 
-{% if neighbourhood_report %}
-<h2>Where your references are being read</h2>
-{% set nr = neighbourhood_report %}
-{% if nr.skipped %}
-<div class="card"><p class="muted" style="margin:0">A reference list was given, and only
-{{ nr.references_resolved }} of its {{ nr.references_used }} DOIs are known to OpenAlex. Below
-that the citing journals are a few papers' readership and not a conversation, so nothing is
-listed.</p></div>
+<div class="section-head" id="by-subject">
+  <h2>Candidate journals, by subject</h2>
+  {% if buckets.shortlist %}<span class="count">{{ buckets.shortlist|length }}</span>{% endif %}
+</div>
+{% if buckets.shortlist %}
+  <p class="section-intro">Journals whose published work is closest to the topics of your abstract,
+  closest first. The number is a place in this list, not a ranking of journals.</p>
+  {% for row in buckets.shortlist %}{{ result(row) }}{% endfor %}
+{% elif run.status == 'running' %}
+  <div class="card"><p class="muted" style="margin:0">Nothing yet.</p></div>
+{% elif buckets.excluded %}
+  <div class="card"><p class="muted" style="margin:0">No journal passed your constraints. The ones
+  that came closest are <a href="#excluded">further down</a>, each with the constraint that removed
+  it.</p></div>
 {% else %}
-<p class="sub">A second road to a candidate, and it does not pass through the topics at all. For
-each of the {{ nr.references_resolved }} references OpenAlex knows (of {{ nr.references_given }}
-DOIs given), the journals that published the works citing it since {{ nr.window_since }}. A journal
-is listed when it is reached through at least {{ nr.breadth_gate }} different references, densest
-first: citation links per thousand of what it published in the same years.
-<strong>Not the shortlist's axis</strong>, which is why these are numbered on their own.</p>
+  <div class="card"><p class="muted" style="margin:0">This consultation found no journal by subject.</p></div>
+{% endif %}
+
+{% if nr and not nr.skipped %}
+<div class="section-head" id="by-references">
+  <h2>Candidate journals, by your references</h2>
+  {% if buckets.neighbourhood %}<span class="count">{{ buckets.neighbourhood|length }}</span>{% endif %}
+</div>
+<p class="section-intro">Journals whose recent papers cite the works you cite. This uses your
+reference list alone, so it reaches journals the subject match cannot. A journal is listed when at
+least {{ nr.breadth_gate }} of your references lead to it; first come those where the largest share
+of what they publish cites them. Journals already in the list by subject are not repeated here.</p>
 {% if buckets.neighbourhood %}
   {% for row in buckets.neighbourhood %}{{ result(row) }}{% endfor %}
 {% else %}
-<div class="card"><p class="muted" style="margin:0">Every journal the references lead to is
-already in the list above, or was removed by a constraint.</p></div>
-{% endif %}
+<div class="card"><p class="muted" style="margin:0">Every journal your references lead to is already
+in the list by subject, or was removed by one of your constraints.</p></div>
 {% endif %}
 {% endif %}
 
 {% if buckets.conversation %}
-<h2>The smaller conversations in your bibliography</h2>
-<p class="sub">The same count, read inside one field of the references at a time. A bibliography
-is usually mostly about the paper's <em>subject</em>, and the journals where its <em>argument</em>
-belongs are reached through the few references that are not. Counted together those are outvoted;
-here each minority field
-({% for f in neighbourhood_report.minority_fields %}{{ f }}{% if not loop.last %}, {% endif %}{% endfor %})
-gets up to three journals of its own.</p>
+<div class="section-head" id="smaller-groups">
+  <h2>From the smaller groups of your references</h2>
+  <span class="count">{{ buckets.conversation|length }}</span>
+</div>
+<p class="section-intro">Most of a bibliography is about a paper's subject, and those references
+outvote the rest. Here the smaller groups
+({% for f in nr.minority_fields %}{{ f }}{% if not loop.last %}, {% endif %}{% endfor %}) are read one
+at a time, up to three journals each. For a paper whose argument belongs to a different field from
+its subject, this is often where the right journals are.</p>
 {% for row in buckets.conversation %}{{ result(row) }}{% endfor %}
 {% endif %}
 
 {% if buckets.excluded %}
-<h2>Excluded, and shown anyway</h2>
-<p class="sub">Fewer than three journals passed the constraints, so these are here with the
-constraint that removed each one. Returning an empty list would be a worse answer than returning
-this one.</p>
+<div class="section-head" id="excluded">
+  <h2>Excluded by your constraints</h2>
+  <span class="count">{{ buckets.excluded|length }}</span>
+</div>
+<p class="section-intro">Fewer than three journals passed your constraints, so the closest ones that
+did not are shown here, each with the constraint that removed it.</p>
 {% for row in buckets.excluded %}{{ result(row) }}{% endfor %}
 {% endif %}
 
 {% if buckets.unclassifiable %}
-<h2>Unclassifiable</h2>
-<p class="sub">No constraint excludes these, and no score applies to them: there is not enough on
-record to build a profile. <strong>Their zero means «I don't know», not «out of scope»</strong> —
-which is why they are not numbered among the others rather than placed last. Open one's record and
-build it a profile from articles it has published, and the next run will score it like the rest.</p>
+<div class="section-head" id="unknown">
+  <h2>Could not be assessed</h2>
+  <span class="count">{{ buckets.unclassifiable|length }}</span>
+</div>
+<p class="section-intro">Dovetail knows these journals exist and not what they publish, so it cannot
+compare them with your manuscript. <strong>Their zeros mean «unknown», not «unsuitable».</strong> Open
+one and describe it from a few of its articles, and the next consultation will assess it like the
+rest.</p>
 {% for row in buckets.unclassifiable %}{{ result(row) }}{% endfor %}
 {% endif %}
 
-<p class="note">A journal standing on fewer than two criteria of merit is marked, however well it
-does on logistics. That rule comes from a real choice that rested on three logistical reasons and one
-about merit — and it was the one about merit that failed.</p>
-<p class="note">The score measures how <em>concentrated</em> a journal is on this subject, not how
-suitable it is. The cosine is invariant to scale but not to shape, so against a narrow manuscript it
-rewards narrow journals. Those are different things, and the score itself is not yet validated.</p>
-{% if neighbourhood_report and not neighbourhood_report.skipped %}
-<p class="note">The citation neighbourhood is a statement about the <em>bibliography</em>, not about
-the argument. A manuscript whose references are mostly about its subject gets the subject's
-journals from it, whatever its thesis: measured on 20 Nov 2026, on a paper with 73 of its 89
-references in one field. Density favours small specialist journals for the same reason the cosine does.</p>
-{% endif %}
+<details class="explain" id="how-to-read">
+  <summary>How to read this page</summary>
+  <p><strong>These are lists, not rankings.</strong> Each journal is compared with this one
+  manuscript, among the journals this consultation found. A place in a list says nothing outside
+  it, and the three lists are not comparable with each other.</p>
+  <p><strong>Merit and logistics are kept apart.</strong> Merit is what makes a journal a good home
+  for the argument; logistics is cost, access and speed. A journal with fewer than two reasons of
+  merit is marked <em>thin on merit</em>, however well it does on logistics.</p>
+  <p><strong>The subject scores measure concentration, not suitability.</strong> They say how much of
+  what a journal publishes is on your topics, so they favour narrow journals over broad ones that
+  would also take the paper. They have not been validated against real outcomes.</p>
+  {% if nr and not nr.skipped %}
+  <p><strong>The lists by reference describe your bibliography, not your argument.</strong> If most
+  of your references are about the paper's subject, most of those journals will be too — which is
+  what the smaller groups are there to correct. Small specialist journals come first here for the
+  same reason they do by subject.</p>
+  {% endif %}
+  <p><strong>A missing fact never removes a journal.</strong> When a journal's fee or access model
+  is unknown, a constraint marks it for checking instead of excluding it.</p>
+</details>
 {% endblock %}

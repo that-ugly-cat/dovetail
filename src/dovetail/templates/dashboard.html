@@ -1,85 +1,31 @@
 {% extends "base.html" %}{% block title %}Overview — Dovetail{% endblock %}
 {% block body %}
-<h1>Overview</h1>
-<p class="sub">A list of candidate journals for a paper, with the criteria that hold each one up.</p>
-
-<h3>Inventory</h3>
-<div class="grid">
-  <div class="stat">
-    <div class="n">{{ '{:,}'.format(inv.journals) }}</div>
-    <div class="lbl">journals known</div>
-    <div class="foot">{{ '{:,}'.format(inv.core) }} flagged core by OpenAlex{% if inv.not_journals %},
-      and <a href="/app/venues?kind=any">{{ inv.not_journals }} things that are not journals</a>{% endif %}</div>
-  </div>
-  <div class="stat">
-    <div class="n {% if inv.unprofiled %}warn{% endif %}">{{ '{:,}'.format(inv.profiled) }}</div>
-    <div class="lbl">with a topic profile</div>
-    <div class="foot">{{ '{:,}'.format(inv.unprofiled) }} cannot be scored at all</div>
-  </div>
-  <div class="stat">
-    <div class="n">{{ '{:,}'.format(inv.doaj) }}</div>
-    <div class="lbl">in DOAJ</div>
-    <div class="foot">{{ '{:,}'.format(inv.apc_known) }} carry an APC figure</div>
-  </div>
-  <div class="stat">
-    <div class="n {% if not inv.with_guidelines %}warn{% endif %}">{{ '{:,}'.format(inv.with_guidelines) }}</div>
-    <div class="lbl">with guidelines read</div>
-    <div class="foot">article types and word limits, which no API carries</div>
-  </div>
+<div class="head">
+  <h1>Overview</h1>
+  {% if user.is_admin() %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
 </div>
-
-<p class="note">A journal with no profile scores zero the same way an unrelated one does, and the two
-zeros mean opposite things. That is why they are counted apart here and marked apart everywhere else.
-The same reason the repositories are counted apart from the journals: the sweep drags them in because
-Zenodo carries 12.2 million works, and calling them journals would be a small untruth propping up the
-bigger numbers.
-{% if inv.last_touched %}Newest field on record: {{ inv.last_touched.strftime('%d %b %Y') }}.{% endif %}</p>
-
-<h3>Work</h3>
-<div class="grid">
-  <div class="stat">
-    <div class="n">{{ runs_total }}</div>
-    <div class="lbl">consultations</div>
-    <div class="foot"><a href="/app/runs">all of them</a></div>
-  </div>
-  <div class="stat">
-    <div class="n {% if pending %}warn{% endif %}">{{ pending }}</div>
-    <div class="lbl">waiting for a person</div>
-    <div class="foot"><a href="/app/proposals">the queue</a></div>
-  </div>
-  <div class="stat">
-    <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
-    <div class="lbl">classifications left today</div>
-    <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits{% if budget.own_key %}, on your own key{% endif %}</div>
-  </div>
-  <div class="stat">
-    <div class="n">{{ '{:,}'.format(budget.spent) }}</div>
-    <div class="lbl">credits spent today</div>
-    <div class="foot">resets at midnight UTC</div>
-  </div>
-</div>
+<p class="sub">Candidate journals for a manuscript, with the reasons that hold each one up.</p>
 
 {% if not budget.keyed %}
-<div class="flash">No OpenAlex key is in use, so this runs on the anonymous budget — a tenth of what
-a free account gets — and the sweep for new candidates cannot run at all, because OpenAlex refuses
-cursor paging without a key. <a href="/app/settings">Store your own in Settings</a>: it is free, and
-the page says how to get one.</div>
+<div class="flash"><strong>No OpenAlex key is in use.</strong> Without one the daily budget is a
+tenth of what a free account gets, and Dovetail cannot search for new journals at all.
+<a href="/app/settings">Add your own in Settings</a>: it is free, and the page says how to get one.</div>
 {% endif %}
 
-<div class="head"><h2>Recent consultations</h2>
-  {% if user.is_admin() %}<a class="btn btn-small" href="/app/runs/new">New consultation</a>{% endif %}</div>
+<div class="section-head"><h2>Recent consultations</h2>
+  {% if recent %}<a class="small" href="/app/runs">all {{ runs_total }}</a>{% endif %}</div>
 {% if recent %}
 <div class="card pad0 table-wrap"><table class="table">
-  <thead><tr><th>#</th><th>Manuscript</th><th>Constraints</th><th class="n">Shortlisted</th><th>When</th></tr></thead>
+  <thead><tr><th>#</th><th>Manuscript</th><th>Constraints</th><th class="n">Journals listed</th><th>When</th></tr></thead>
   <tbody>
   {% for r in recent %}
   <tr>
     <td class="n"><a href="/app/runs/{{ r.id }}">{{ r.id }}</a></td>
     <td>
       <a class="name" href="/app/runs/{{ r.id }}">{{ r.title[:80] }}</a>
-      {% if r.refused_reason %}<div class="warn small">refused — no list was produced</div>{% endif %}
+      {% if r.refused_reason %}<div class="warn small">no list was produced</div>{% endif %}
     </td>
-    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
+    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k.replace('_', ' ') }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
     <td class="n muted">{{ result_counts.get(r.id, 0) }}</td>
     <td class="muted small">{{ r.created_at.strftime('%d %b %Y, %H:%M') }}</td>
   </tr>
@@ -88,13 +34,68 @@ the page says how to get one.</div>
 </table></div>
 {% else %}
 <div class="card">
-  <p class="muted" style="margin-top:0">No consultation has been run on this instance yet.</p>
-  <p class="muted small" style="margin-bottom:0">{% if user.is_admin() %}<a href="/app/runs/new">Start one</a> —
-  it spends from the budget above, and the screen says how much before you press it.
-  {% else %}Starting one needs an admin: it spends the shared OpenAlex budget.{% endif %}</p>
+  <p class="muted" style="margin:0">No consultation yet.
+  {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>: paste a title and an abstract, and
+  the form says what it will cost before you press the button.
+  {% else %}Starting one needs an admin, because it spends an OpenAlex budget.{% endif %}</p>
 </div>
 {% endif %}
 
-<p class="note">A consultation is a list, not a ranking: the score is computed against one paper and
-the set is whatever the sweep reached that day, so a position means nothing outside its own run.</p>
+<div class="section-head"><h2>Today</h2></div>
+<div class="grid">
+  <div class="stat">
+    <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
+    <div class="lbl">consultations left today</div>
+    <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} OpenAlex
+      credits{% if budget.own_key %}, on your own key{% else %}, shared by everyone here{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(budget.spent) }}</div>
+    <div class="lbl">credits spent today</div>
+    <div class="foot">resets at midnight UTC</div>
+  </div>
+  <div class="stat">
+    <div class="n {% if pending %}warn{% endif %}">{{ pending }}</div>
+    <div class="lbl">{{ 'proposal' if pending == 1 else 'proposals' }} to review</div>
+    <div class="foot"><a href="/app/proposals">open the queue</a></div>
+  </div>
+</div>
+
+<div class="section-head"><h2>What Dovetail knows</h2></div>
+<div class="grid">
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(inv.journals) }}</div>
+    <div class="lbl">journals</div>
+    <div class="foot"><a href="/app/venues">browse them</a>{% if inv.not_journals %} ·
+      <a href="/app/venues?kind=any">{{ inv.not_journals }} repositories and other records</a>{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n {% if inv.unprofiled %}warn{% endif %}">{{ '{:,}'.format(inv.profiled) }}</div>
+    <div class="lbl">with known subjects</div>
+    <div class="foot">{{ '{:,}'.format(inv.unprofiled) }} cannot be compared with a manuscript</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ '{:,}'.format(inv.doaj) }}</div>
+    <div class="lbl">fully open access</div>
+    <div class="foot">listed in DOAJ · {{ '{:,}'.format(inv.apc_known) }} with a known fee</div>
+  </div>
+  <div class="stat">
+    <div class="n {% if not inv.with_guidelines %}warn{% endif %}">{{ '{:,}'.format(inv.with_guidelines) }}</div>
+    <div class="lbl">with article types on record</div>
+    <div class="foot">word limits, read from the author guidelines</div>
+  </div>
+</div>
+
+<details class="explain">
+  <summary>What these numbers mean</summary>
+  <p><strong>A consultation costs OpenAlex credits</strong>: 100 to classify the manuscript, a few
+  dozen to search for journals, and one per reference when you paste a reference list. «Consultations
+  left» counts only the first of those.</p>
+  <p><strong>Journals grow with use.</strong> Dovetail keeps every journal a consultation has looked
+  up. It is not a census: a journal missing here has simply not come up yet.</p>
+  <p><strong>A journal with no known subjects is not a bad match.</strong> Nothing is on record about
+  what it publishes, so it cannot be compared at all. In a consultation it is listed apart, under
+  «could not be assessed».</p>
+  {% if inv.last_touched %}<p>Most recent update to any journal: {{ inv.last_touched.strftime('%d %b %Y') }}.</p>{% endif %}
+</details>
 {% endblock %}

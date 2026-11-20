@@ -39,9 +39,9 @@ can tell: try again in a moment.</div>
       onclick="document.getElementById('openalex-help').showModal()">?</button></h2>
   <p class="muted">A consultation is paid for in OpenAlex credits. With a key of your own it spends
   <strong>your</strong> daily budget of {{ '{:,}'.format(own_budget) }} credits; without one it
-  spends the budget everybody on this instance shares
-  ({{ '{:,}'.format(shared_budget) }} credits{% if not instance_keyed %}, and the instance has no key
-  of its own, so the sweep for new candidates cannot run at all{% endif %}).</p>
+  spends the budget everybody here shares
+  ({{ '{:,}'.format(shared_budget) }} credits{% if not instance_keyed %}, and since this instance has
+  no key of its own, Dovetail cannot search for new journals at all{% endif %}).</p>
 
   <p class="small" style="margin:0 0 12px">Today you are spending from
   {% if budget.own_key %}<strong>your own key</strong>{% else %}<strong>the shared budget</strong>{% endif %}:
@@ -56,7 +56,7 @@ can tell: try again in a moment.</div>
     <p class="muted small" style="margin:-4px 0 0">The key is tried against OpenAlex before it is
     kept, which costs it one credit. Saving the field empty removes the stored key.</p>
     <div class="btnrow" style="margin-top:12px">
-      <button class="btn" type="submit">{% if has_openalex_key %}Save{% else %}Store{% endif %}</button>
+      <button class="btn" type="submit" data-busy-label="Checking the key…">{% if has_openalex_key %}Save{% else %}Store{% endif %}</button>
       {% if has_openalex_key %}<span class="badge ok">a key is stored</span>{% endif %}
       <button type="button" class="btn btn-link"
         onclick="document.getElementById('openalex-help').showModal()">How do I get one?</button>
@@ -84,11 +84,11 @@ can tell: try again in a moment.</div>
       <li><strong>A budget of your own:</strong> $1 a day, which is
         {{ '{:,}'.format(own_budget) }} credits, against the 1,000 a request with no key gets — and
         that anonymous allowance is shared by everything coming from the same address.</li>
-      <li><strong>The sweep works.</strong> Looking for new candidate journals pages through
-        OpenAlex with a cursor, and OpenAlex refuses that without a key.</li>
+      <li><strong>Dovetail can search for new journals.</strong> OpenAlex only allows that kind of
+        search with a key.</li>
       <li><strong>What a consultation costs:</strong> 100 credits to classify the manuscript, up to
-        about 40 for the sweep, and one per reference when you paste a reference list. The form
-        shows the figure before you press the button.</li>
+        about 40 to search for journals, and one per reference when you paste a reference list. The
+        form shows the figure before you press the button.</li>
     </ul>
     <p class="muted small">The budget resets at midnight UTC. The key is stored encrypted and is
     never shown again, here or to whoever runs the server; you can revoke it at any time from the
@@ -120,8 +120,8 @@ will be offered again once there is one.</div>{% endif %}
   <h2>Anthropic API key</h2>
   <p class="muted">Two steps ask a model, and each is charged to whoever's key runs it:</p>
   <ul class="muted" style="margin-top:0">
-    <li><strong>Reading the finalists</strong> — whether a journal publishes work of the same
-      <em>kind</em> as your manuscript: form and method, not subject
+    <li><strong>Checking the kind of paper</strong> — whether each candidate journal publishes work of
+      the same <em>kind</em> as your manuscript: form and method, not subject
       (<code>{{ model }}</code>, about a cent a journal).</li>
     <li><strong>Reading author guidelines</strong> — a journal's article types and word limits,
       each number checked against the page before it is filed for approval
@@ -143,7 +143,7 @@ will be offered again once there is one.</div>{% endif %}
     It is an identifier rather than a secret, so it is stored in the clear and shown back — which is
     the point, since you only go looking for it after a call has been refused.</p>
     <div class="btnrow" style="margin-top:12px">
-      <button class="btn" type="submit">{% if has_key %}Save{% else %}Store{% endif %}</button>
+      <button class="btn" type="submit" data-busy-label="Saving…">{% if has_key %}Save{% else %}Store{% endif %}</button>
       {% if has_key %}<span class="badge ok">a key is stored</span>{% endif %}
       {% if workspace_id %}<span class="badge">workspace set</span>{% endif %}
     </div>
@@ -155,8 +155,8 @@ will be offered again once there is one.</div>{% endif %}
 whoever started it, and this server holds no model credential of its own. The same goes for an
 OpenAlex key stored here: it pays for your consultations and nobody else's. Both are encrypted with
 Fernet, decrypted in memory when they are used, and never written to a log.</p>
-<p class="note">Removing a key is emptying its field and saving. Everything through stage 4 — the
-sweep, the scores, the constraints, the criteria — works with no Anthropic key at all.</p>
+<p class="note">To remove a key, empty its field and save. A consultation itself needs no Anthropic
+key: only the two steps above do.</p>
 <p class="note">The model is recorded on every verdict and every proposal it writes. Something read
 back a year from now should say what produced it.</p>
 {% endblock %}

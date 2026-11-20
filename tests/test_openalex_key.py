@@ -235,7 +235,7 @@ def test_a_sweep_with_no_key_anywhere_is_refused_before_it_spends(client):
     key. The refusal now comes first, and says where to get one."""
     r = client.post("/app/runs/new",
                     data={"title": "T", "abstract": "word " * 100, "discover": "on"})
-    assert r.status_code == 200 and "The sweep needs an OpenAlex key" in r.text
+    assert r.status_code == 200 and "Searching for new journals needs an OpenAlex key" in r.text
     with db.session_scope() as s:
         assert s.query(MatchRun).count() == 0
     # Without the sweep the same run is accepted: nothing in it pages.

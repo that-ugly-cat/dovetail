@@ -94,7 +94,7 @@ def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
     terms = [
         {
             "call": "classify_text",
-            "label": "Classifying the manuscript",
+            "label": "Classifying your title and abstract",
             "detail": "/text/topics, once — the one call that cannot be skipped",
             "credits": _c.COST_TEXT,
         }
@@ -103,19 +103,19 @@ def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
         terms += [
             {
                 "call": "sources_by_topics",
-                "label": "Sweeping for candidates",
+                "label": "Searching for journals on your topics",
                 "detail": f"/sources, up to {_c.MAX_CANDIDATE_PAGES} pages of 200",
                 "credits": _c.MAX_CANDIDATE_PAGES * _c.COST_SOURCES,
             },
             {
                 "call": "journals_publishing_on",
-                "label": "Journals that publish on the subject as a sideline",
+                "label": "Journals that publish on those topics less often",
                 "detail": "/works grouped by source, once — the topics filter cannot reach them",
                 "credits": _c.COST_WORKS,
             },
             {
                 "call": "sources_by_ids",
-                "label": "Fetching the records those groups named",
+                "label": "Looking those journals up",
                 # Group results cap at 200, and the batch is 100, so this is two
                 # calls at the very most however broad the topic.
                 "detail": "/sources by id, at most two batches of 100",
@@ -130,19 +130,19 @@ def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
         terms += [
             {
                 "call": "works_by_dois",
-                "label": "Resolving the reference list",
+                "label": "Recognising your references",
                 "detail": f"/works by DOI, {references} references in batches of 40",
                 "credits": math.ceil(references / 40) * _c.COST_WORKS_FILTER,
             },
             {
                 "call": "sources_citing",
-                "label": "Where each reference is being cited",
+                "label": "Finding where each reference is cited",
                 "detail": "/works grouped by source, once per reference",
                 "credits": references * _c.COST_WORKS_FILTER,
             },
             {
                 "call": "sources_by_ids",
-                "label": "Fetching the journals the references lead to",
+                "label": "Looking up the journals they lead to",
                 "detail": (
                     f"/sources by id, at most {_c.NEIGHBOURHOOD_MAX_SOURCES} "
                     f"in batches of 100"

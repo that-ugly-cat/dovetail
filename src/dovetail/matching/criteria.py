@@ -45,7 +45,7 @@ def build(
                 MERIT,
                 "publishes on at least one of the text's topics",
                 1.0,
-                "topic shared between the text and the journal's profile",
+                "a topic OpenAlex reads both in your abstract and in what the journal publishes",
             )
         )
 

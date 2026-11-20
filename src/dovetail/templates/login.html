@@ -5,18 +5,18 @@
   <div class="cta">
   {% if gateway %}
     <a class="btn" href="/app">Continue with Borant ID</a>
-    <p class="muted small" style="margin-top:12px">There is nothing to type: the gateway vouches for
-    you, or it does not. That link goes to a page the gateway protects, which is what makes it ask.</p>
+    <p class="muted small" style="margin-top:12px">There is nothing to type here: Borant ID signs
+    you in.</p>
   {% else %}
     <div class="card narrow" style="text-align:left">
       <form method="post" action="/login">
         <label>Email<input name="email" type="email" required autofocus></label>
         <label>Password<input name="password" type="password" required></label>
         {% if error %}<p class="err small">{{ error }}</p>{% endif %}
-        <button class="btn" type="submit" style="margin-top:8px">Sign in</button>
+        <button class="btn" type="submit" style="margin-top:8px" data-busy-label="Signing in…">Sign in</button>
       </form>
     </div>
-    <p class="muted small">There is no sign-up. Accounts are created from the command line.</p>
+    <p class="muted small">There is no sign-up here. Ask whoever runs this instance for an account.</p>
   {% endif %}
   </div>
 </div>

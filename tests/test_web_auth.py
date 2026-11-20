@@ -543,12 +543,16 @@ def test_a_venue_with_no_profile_is_not_the_last_of_the_shortlist(client):
         run_id = run.id
 
     page = client.get(f"/app/runs/{run_id}").text
-    assert "Excluded, and shown anyway" in page
-    assert "Unclassifiable" in page
-    # The unclassifiable venue must appear after its own heading, not inside the
-    # shortlist that precedes it.
-    assert page.index("Unclassifiable") < page.index("No Profile At All")
-    assert page.index("Scored Journal") < page.index("Excluded, and shown anyway")
+    excluded = '<h2>Excluded by your constraints</h2>'
+    unknown = '<h2>Could not be assessed</h2>'
+    assert excluded in page and unknown in page
+    # The venue nothing is known about must appear after its own heading, not
+    # inside the list by subject that precedes it.
+    assert page.index(unknown) < page.index("No Profile At All")
+    assert page.index("Scored Journal") < page.index(excluded)
+    # And the note the scorer wrote for itself is shown in words a reader has.
+    assert "insufficient profile" not in page
+    assert "nothing is on record about what this journal publishes" in page
 
 
 def test_the_header_counts_the_shortlist_and_not_every_row(client):
@@ -568,9 +572,9 @@ def test_the_header_counts_the_shortlist_and_not_every_row(client):
         run_id = run.id
 
     page = client.get(f"/app/runs/{run_id}").text
-    assert "1 shortlisted" in page
-    assert "1 unclassifiable" in page
-    assert "2 shortlisted" not in page
+    assert "By subject · 1<" in page
+    assert "Could not be assessed · 1<" in page
+    assert "By subject · 2" not in page
 
 
 # --- declaring a journal by hand ------------------------------------------
@@ -684,3 +688,60 @@ def test_declaring_a_journal_keeps_unknown_as_a_third_answer(client):
         # the same as being excluded from it.
         assert v.is_core is None
         assert {fv.source for fv in v.verifications} == {"manual"}
+
+
+# --- what the interface says, and what it does while it waits -------------
+
+
+def test_no_page_talks_to_a_reader_in_the_tools_own_vocabulary(client):
+    """«Stage 5a» on a button means nothing to somebody who was never told there
+    were stages. The pages speak of what a person is doing — a consultation, a
+    list by subject, a check on the kind of paper — and the pipeline's own words
+    stay in the code and in the spec."""
+    import re
+
+    from dovetail.models import MatchResult
+
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        v = Venue(display_name="A Journal", venue_type="journal", is_core=True)
+        s.add(v)
+        run = MatchRun(title="A paper", abstract="x", status="done")
+        s.add(run)
+        s.flush()
+        for bucket in ("shortlist", "neighbourhood", "conversation", "excluded", "unclassifiable"):
+            s.add(MatchResult(run_id=run.id, venue_id=v.id, bucket=bucket, position=1))
+        run_id, venue_id = run.id, v.id
+
+    jargon = re.compile(r"stage \d|sweep|shortlist|unclassifiable|the cut\b|basket", re.I)
+    for path in ("/app", "/app/runs", "/app/runs/new", f"/app/runs/{run_id}", "/app/venues",
+                 f"/app/venues/{venue_id}", f"/app/venues/{venue_id}/profile",
+                 "/app/venues/new", "/app/proposals", "/app/settings", "/app/admin/users"):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        # What a person reads: the markup's own attributes and the scripts are
+        # not addressed to them.
+        text = re.sub(r"<script.*?</script>|<[^>]+>", " ", r.text, flags=re.S)
+        found = jargon.findall(text)
+        assert not found, f"{path} says {sorted(set(found))}"
+
+
+def test_a_button_that_starts_something_slow_says_what_the_wait_is(client):
+    """The three requests that take longer than a click feels: each button names
+    its own waiting state, and the script that locks a form once it is sent is
+    on every page."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        v = Venue(display_name="A Journal")
+        s.add(v)
+        s.flush()
+        venue_id = v.id
+    assert 'data-busy-label="Starting…"' in client.get("/app/runs/new").text
+    assert 'data-busy-label="Classifying…"' in client.get(f"/app/venues/{venue_id}/profile").text
+    for path in ("/app", "/app/settings", "/login"):
+        assert "/static/js/forms.js" in client.get(path).text
+    script = client.get("/static/js/forms.js").text
+    # A second submit of a form already on its way is stopped, and nothing in it
+    # depends on a frame being drawn.
+    assert "event.preventDefault()" in script and "form.dataset.busy" in script
+    assert "requestAnimationFrame(" not in script

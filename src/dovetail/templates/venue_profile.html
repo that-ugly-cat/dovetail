@@ -1,15 +1,14 @@
-{% extends "base.html" %}{% block title %}Profile {{ venue.display_name }} — Dovetail{% endblock %}
+{% extends "base.html" %}{% block title %}Describe {{ venue.display_name }} — Dovetail{% endblock %}
 {% block body %}
-<h1>Give {{ venue.display_name }} a profile</h1>
-<p class="sub">From the articles it has <strong>actually published</strong>, classified one by one.
-The same idea as building a profile from a corpus rather than from a declared taxonomy — done with
-the instrument already at hand.</p>
+<h1>Describe {{ venue.display_name }} from its articles</h1>
+<p class="sub">Paste a few articles the journal has published. Dovetail classifies each one and takes
+the journal's subjects from them, so that it can be compared with a manuscript.</p>
 
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
 {% if report %}
 <div class="flash ok">
-  <strong>Profiled.</strong> {{ report.articles_classified }} article{{ 's' if report.articles_classified != 1 }}
+  <strong>Done.</strong> {{ report.articles_classified }} article{{ 's' if report.articles_classified != 1 }}
   classified, <strong>{{ report.topics_found }} topics</strong> found, {{ report.credits_spent }} credits spent.
   <div class="small" style="margin-top:6px">{{ report.caveat }}</div>
 </div>
@@ -17,15 +16,15 @@ the instrument already at hand.</p>
 {% endif %}
 
 {% if venue.topics %}
-<div class="flash">This journal already has a profile of {{ venue.topics|length }} topics. Profiling
-it again <strong>replaces</strong> that profile with the one built from what you paste below; it does
-not add to it.</div>
+<div class="flash">This journal's subjects are already on record ({{ venue.topics|length }} topics).
+Doing this again <strong>replaces</strong> them with what the articles below give; it does not add
+to them.</div>
 {% endif %}
 
 <div class="card">
   <h2>What it costs</h2>
-  <p class="muted" style="margin:0"><strong>{{ per_article }} credits per article</strong>, because
-  each one is a separate classification. {{ '{:,}'.format(remaining) }} of
+  <p class="muted" style="margin:0"><strong>{{ per_article }} OpenAlex credits per article</strong>:
+  each one is classified separately. {{ '{:,}'.format(remaining) }} of
   {{ '{:,}'.format(budget) }} are left today.</p>
   <p class="muted small" id="tally" style="margin:8px 0 0"></p>
 </div>
@@ -39,26 +38,28 @@ not add to it.</div>
     <p class="muted small" style="margin:-4px 0 0">One article per block, separated by a line
     containing only <code>---</code>. The <strong>first line of a block is the title</strong> and
     everything after it is the abstract. Each abstract needs at least {{ min_words }} words: below
-    that the classification is unstable, and an article too short to classify would spend
-    {{ per_article }} credits to add noise.</p>
+    that it cannot be classified reliably, and Dovetail will not spend {{ per_article }} credits on
+    it.</p>
 
     <div class="btnrow" style="margin-top:14px">
-      <button class="btn" type="submit">Classify and build the profile</button>
+      <button class="btn" type="submit" data-busy-label="Classifying…" data-busy-note="profile-wait">Classify the articles</button>
       <a class="btn btn-link" href="/app/venues/{{ venue.id }}">Cancel</a>
     </div>
+    <p class="busy-note" id="profile-wait" hidden>A few seconds an article. Keep this page open.</p>
   </div>
 </form>
 
-<p class="note"><strong>Five to ten is the right size, taken from different years.</strong> Ten
-articles from the same special issue describe that issue, not the journal — and the profile they
-produce would then send the wrong papers here for as long as nobody rebuilds it.</p>
-<p class="note">The coverage figure stays empty, deliberately. On a journal indexed by OpenAlex it
-means «how much of the output these topics cover», and here the sample <em>is</em> everything that is
-known — calling that coverage would dress an unmeasured thing as a measurement.</p>
-<p class="note">A profile built this way starts at a disadvantage the score does not correct for: the
-cosine is invariant to scale but not to shape, so a handful of articles gives a flat vector, and a
-flat vector scores low against a pointed manuscript. It measures how <em>concentrated</em> a journal
-looks, and a small sample never looks concentrated.</p>
+<p class="note"><strong>Five to ten articles, from different years.</strong> Ten from one special
+issue describe that issue, not the journal, and would send the wrong manuscripts here until someone
+does this again.</p>
+<details class="explain">
+  <summary>What a description from a few articles cannot do</summary>
+  <p>A journal described from a handful of articles looks less focused than one OpenAlex has
+  thousands of works for, so in a consultation it tends to come lower in the list by subject than it
+  deserves. Read its place there with that in mind.</p>
+  <p>The share of the journal's output these topics cover is left blank: with a sample this small it
+  would be a guess.</p>
+</details>
 
 <script>
 // A live count of what the paste will cost. The static rate above is the real

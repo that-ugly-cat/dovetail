@@ -4,13 +4,13 @@
   <h1>Consultations</h1>
   {% if user.is_admin() %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
 </div>
-<p class="sub">Each one is kept with the profile it used and a snapshot of the journals it scored, so
-an outcome can be read back against the data of the day and not of today.</p>
+<p class="sub">Every consultation is kept as it was on the day, so it can be read again later
+against what was known then.</p>
 
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>#</th><th>Manuscript</th><th class="n">Words</th><th>Constraints</th>
-    <th class="n">Shortlisted</th><th>Status</th><th>When</th>
+    <th class="n">Journals listed</th><th>Status</th><th>When</th>
   </tr></thead>
   <tbody>
   {% for r in runs %}
@@ -18,26 +18,26 @@ an outcome can be read back against the data of the day and not of today.</p>
     <td class="n"><a href="/app/runs/{{ r.id }}">{{ r.id }}</a></td>
     <td>
       <a class="name" href="/app/runs/{{ r.id }}">{{ r.title[:90] }}</a>
-      {% if r.refused_reason %}<div class="warn small">refused: {{ r.refused_reason[:120] }}</div>{% endif %}
+      {% if r.refused_reason %}<div class="warn small">no list: {{ r.refused_reason[:120] }}</div>{% endif %}
     </td>
     <td class="n muted">{{ '{:,}'.format(r.word_count) if r.word_count else '—' }}</td>
-    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
+    <td>{% for k, v in (r.constraints or {}).items() %}{% if not k.startswith('_') %}<span class="badge">{{ k.replace('_', ' ') }}: {{ v }}</span> {% endif %}{% else %}<span class="muted">—</span>{% endfor %}</td>
     <td class="n muted">{{ counts.get(r.id, 0) }}</td>
-    <td>{% if r.status == 'running' %}<span class="badge warn">running</span>
-        {% elif r.status == 'failed' %}<span class="badge danger">{{ r.error_code }}</span>
-        {% elif r.status == 'refused' %}<span class="badge warn">refused</span>
+    <td>{% if r.status == 'running' %}<span class="badge warn"><span class="spinner" aria-hidden="true"></span>working</span>
+        {% elif r.status == 'failed' %}<span class="badge danger" title="{{ r.error_code }}">failed</span>
+        {% elif r.status == 'refused' %}<span class="badge warn">no list</span>
         {% else %}<span class="muted small">done</span>{% endif %}</td>
     <td class="muted small">{{ r.created_at.strftime('%d %b %Y, %H:%M') }}</td>
   </tr>
   {% else %}
   <tr><td colspan="7" class="empty">
-    No consultation has been run yet.
-    {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>, or run it from the CLI or over MCP.{% else %}Starting one needs an admin: it spends the shared OpenAlex budget.{% endif %}
+    No consultation yet.
+    {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>.{% else %}Starting one needs an admin, because it spends an OpenAlex budget.{% endif %}
   </td></tr>
   {% endfor %}
   </tbody>
 </table></div>
 
-<p class="note">A refused run is kept like any other. Refusing to produce a list when the text is too
-short to classify is an answer, and one worth being able to look up later.</p>
+<p class="note">A consultation that produced no list is kept too. Declining to list journals for a
+text too short to classify is an answer, and it is worth being able to find it again.</p>
 {% endblock %}

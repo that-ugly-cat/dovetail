@@ -1,9 +1,8 @@
-{% extends "base.html" %}{% block title %}Declare a journal — Dovetail{% endblock %}
+{% extends "base.html" %}{% block title %}Add a journal — Dovetail{% endblock %}
 {% block body %}
-<h1>Declare a journal</h1>
-<p class="sub">For a journal that exists, publishes, and that no index covers. It goes straight into
-the table rather than through the queue — the queue is for what an agent <em>infers</em>, and here
-the person filling the form is the person who would approve it.</p>
+<h1>Add a journal by hand</h1>
+<p class="sub">For a journal that exists and that OpenAlex does not list. It is added straight away,
+with you as its source.</p>
 
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
@@ -36,23 +35,20 @@ the person filling the form is the person who would approve it.</p>
         <input name="anvur_class" value="{{ form.anvur_class or '' }}"></label>
     </div>
 
-    <label>Where you checked <span class="muted">— goes onto the verification stamp</span>
+    <label>Where you checked <span class="muted">— a link, kept as the source of these facts</span>
       <input name="note_url" type="url" value="{{ form.note_url or '' }}"></label>
 
     <div class="btnrow" style="margin-top:14px">
-      <button class="btn" type="submit">Declare it</button>
+      <button class="btn" type="submit" data-busy-label="Adding…">Add the journal</button>
       <a class="btn btn-link" href="/app/venues">Cancel</a>
     </div>
   </div>
 </form>
 
-<p class="note"><strong>Unknown is a third answer, and it survives the form.</strong> Leaving
-«in DOAJ» or «open access» unknown is not the same as saying no: a constraint never excludes on a
-missing field, it marks the journal for checking. Ticking a box you have not verified would turn
-«nobody looked» into «no», which is the one substitution the whole tool is built to refuse.</p>
-<p class="note">A declared journal arrives <strong>unclassifiable</strong> and stays that way until it
-has a profile: it cannot be scored, and its zero means «I don't know». The profile is built from
-articles it actually published — <code>dovetail profile-venue</code> — which costs 100 credits per
-article, so five to ten from different years is the right size. Ten from one special issue describe
-that issue, not the journal.</p>
+<p class="note"><strong>Leave «unknown» where you have not checked.</strong> A consultation never
+excludes a journal for a fact it does not have; it marks the journal for checking. Answering «no»
+without having looked would exclude it for no reason.</p>
+<p class="note">A journal added by hand cannot be compared with a manuscript until you describe it
+from a few of its articles — five to ten, from different years, at 100 OpenAlex credits each. The
+next page offers it.</p>
 {% endblock %}

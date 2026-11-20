@@ -1,92 +1,110 @@
 {% extends "base.html" %}{% block title %}New consultation — Dovetail{% endblock %}
 {% block body %}
 <h1>New consultation</h1>
-<p class="sub">Title, abstract and word count in; a list of candidate journals out. This is the one
-screen that spends an OpenAlex budget —
-{% if estimate.own_key %}<strong>your own key's</strong>{% else %}<strong>the one this instance
-shares</strong>, unless you <a href="/app/settings">store a key of your own</a>{% endif %} — which is
-why it needs an admin.</p>
-{% if not estimate.keyed %}
-<div class="flash"><strong>No OpenAlex key is in use, so the sweep cannot run.</strong> OpenAlex
-refuses cursor paging to a request without one. <a href="/app/settings">Store your own key</a> — it
-is free — or untick the sweep below.</div>
-{% endif %}
+<p class="sub">Paste a title and an abstract, and Dovetail lists candidate journals with the reasons
+for each. Add the reference list for a second list, found a different way.</p>
 
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
-<div class="card">
-  <h2>What it will cost, before you press it</h2>
-  <div class="table-wrap"><table class="table">
-    <tbody>
-    {% for t in estimate.terms %}
-    <tr><td>{{ t.label }} <span class="muted small">— {{ t.detail }}</span></td>
-        <td class="n">{{ t.credits }} credits</td></tr>
-    {% endfor %}
-    <tr><td>Enriching the finalists from DOAJ</td><td class="n">free</td></tr>
-    <tr><td><strong>At most</strong></td><td class="n"><strong>{{ estimate.total }}</strong></td></tr>
-    {% if not estimate.references %}
-    <tr><td>With a reference list <span class="muted small">— one credit per DOI, plus the journals
-        they lead to; at most {{ estimate.max_references }} DOIs are read</span></td>
-        <td class="n">up to {{ estimate.total_with_max_references }}</td></tr>
-    {% endif %}
-    <tr><td class="muted">Left today{% if estimate.own_key %} on your own key{% endif %}</td>
-        <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
-    </tbody>
-  </table></div>
-  <p class="muted small" style="margin-bottom:0">Every figure comes from the rate-limit headers
-  OpenAlex returns, so this is arithmetic and not a guess — and it is a <strong>ceiling</strong>: the
-  sweep stops early when the pool runs out, and the last two lines only happen if the grouping found
-  journals the topic filter missed. A real run on 28 Aug 2026 spent 133 of these {{ estimate.total }}.
-  The budget resets at midnight UTC.</p>
-</div>
+{% if not estimate.keyed %}
+<div class="flash"><strong>No OpenAlex key is in use, so Dovetail cannot search for new
+journals.</strong> <a href="/app/settings">Add your own key in Settings</a> — it is free — or untick
+that option below to compare your manuscript with the journals already known here.</div>
+{% endif %}
 
 <form method="post" action="/app/runs/new">
   <div class="card">
+    <h2>The manuscript</h2>
     <label>Title<input name="title" value="{{ form.title or '' }}" required></label>
     <label>Abstract
       <textarea name="abstract" rows="10" required
         placeholder="At least {{ min_words }} words.">{{ form.abstract or '' }}</textarea>
     </label>
-    <p class="muted small" style="margin:-4px 0 0">Below {{ min_words }} words the classification is
-    unstable — the same paper cut to one sentence comes back with topics <em>disjoint</em> from those
-    of the full abstract — so Dovetail refuses rather than guesses. Above 2000 characters the API
-    refuses instead, and the text is cut at a word boundary with the number of dropped characters
-    recorded on the run.</p>
+    <p class="muted small" style="margin:-4px 0 0">At least {{ min_words }} words: a shorter text is
+    classified too unreliably for the list to mean anything, and Dovetail will decline. Beyond about
+    300 words the end is left out, and the consultation says so.</p>
 
+    <label>Reference list <span class="muted">— optional, pasted in any format</span>
+      <textarea name="references" id="references" rows="6"
+        placeholder="Paste the bibliography as it is. Only the DOIs in it are read.">{{ form.references or '' }}</textarea>
+    </label>
+    <p class="muted small" style="margin:-4px 0 0">With it, Dovetail also finds the journals whose
+    recent papers cite the works you cite. That reaches journals the abstract alone does not: a paper
+    <em>about</em> a technology or a disease is otherwise matched to the journals of that technology
+    or disease. References without a DOI — books, mostly — are not read.
+    <span id="refs-tally"></span></p>
+  </div>
+
+  <div class="card">
+    <h2>Constraints <span class="muted small" style="font-weight:400">— optional</span></h2>
     <div class="row">
-      <label>Word count <span class="muted">— optional, used by the word-limit constraint</span>
+      <label>Word count
         <input name="word_count" inputmode="numeric" value="{{ form.word_count or '' }}"></label>
       <label>Funder <span class="muted">— e.g. <code>snsf</code></span>
         <input name="funder" value="{{ form.funder or '' }}"></label>
-      <label>Maximum APC in USD <span class="muted">— optional</span>
+      <label>Highest fee you can pay, in USD
         <input name="max_apc" inputmode="numeric" value="{{ form.max_apc or '' }}"></label>
     </div>
+    <p class="muted small" style="margin:0">The word count is checked against each journal's limits,
+    where they are on record. A funder excludes the journals it does not pay for. A journal whose fee
+    or access is unknown is never removed: it is marked for you to check.</p>
+  </div>
 
-    <label>Reference list <span class="muted">— optional: paste it as it is</span>
-      <textarea name="references" rows="6"
-        placeholder="Any format. Only the DOIs are read.">{{ form.references or '' }}</textarea>
-    </label>
-    <p class="muted small" style="margin:-4px 0 8px">With a reference list Dovetail also asks where
-    the works you cite are themselves being cited, and lists those journals separately. It is the
-    road to a journal that the topics cannot take: a paper <em>about</em> a technology is classified
-    by the technology. References without a DOI — books, mostly — are not seen.</p>
-
+  <div class="card">
+    <h2>What to do</h2>
     <label class="check"><input type="checkbox" name="discover" {% if form.discover is not defined or form.discover %}checked{% endif %}>
-      Sweep OpenAlex for new candidates <span class="muted small">— unticked, it scores only the journals already in the table</span></label>
+      Search OpenAlex for new journals <span class="muted small">— unticked, only the journals Dovetail already knows are considered</span></label>
     <label class="check"><input type="checkbox" name="doaj" {% if form.doaj is not defined or form.doaj %}checked{% endif %}>
-      Enrich the finalists from DOAJ <span class="muted small">— free, one call per shortlisted journal</span></label>
+      Look up the candidates in DOAJ <span class="muted small">— free: licence, fees and time to publication</span></label>
+
+    <h3>What it will cost</h3>
+    <div class="table-wrap"><table class="table">
+      <tbody>
+      {% for t in estimate.terms %}
+      <tr><td>{{ t.label }}</td><td class="n">{{ t.credits }}</td></tr>
+      {% endfor %}
+      <tr><td><strong>At most</strong></td><td class="n"><strong id="cost-total" data-base="{{ estimate.total - estimate.references_cost }}">{{ estimate.total }}</strong> credits</td></tr>
+      <tr><td class="muted">Left today{% if estimate.own_key %} on your own key{% endif %}</td>
+          <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted small" style="margin:8px 0 0">OpenAlex credits, from
+    {% if estimate.own_key %}<strong>your own key</strong>{% else %}<strong>the budget everybody here
+    shares</strong> — <a href="/app/settings">add a key of your own</a> to use yours instead{% endif %}.
+    This is a ceiling: a consultation usually spends less. A reference list adds one credit per DOI,
+    up to {{ estimate.max_references }} DOIs. The budget resets at midnight UTC.</p>
 
     <div class="btnrow" style="margin-top:14px">
-      <button class="btn" type="submit" {% if not estimate.affordable %}disabled{% endif %}>Run it</button>
+      <button class="btn" type="submit" data-busy-label="Starting…"
+        {% if not estimate.affordable %}disabled{% endif %}>Start the consultation</button>
       <a class="btn btn-link" href="/app/runs">Cancel</a>
     </div>
+    <p class="muted small" style="margin:10px 0 0">It takes one to two minutes. You are taken to the
+    consultation's page straight away, and it fills in as the work goes on; closing the page does not
+    stop it.</p>
   </div>
 </form>
 
-<p class="note">A constraint never removes a journal on a field that is missing or out of date — it
-marks it. So <em>funder</em> and <em>maximum APC</em> narrow the reading of the list, they do not
-prune it behind your back: everything they touch stays visible with the reason attached.</p>
-<p class="note">The sweep is a hundred-odd calls and takes the better part of a minute, so pressing
-the button sends you to the consultation's own page while it is still filling in. Closing the tab
-does not stop it.</p>
+<script>
+// How many DOIs are in the box, and what they add to the ceiling. The server
+// counts again when the form is sent: this only saves a surprise.
+(function () {
+  var box = document.getElementById('references'), out = document.getElementById('refs-tally');
+  var total = document.getElementById('cost-total');
+  if (!box || !out || !total) return;
+  var base = parseInt(total.dataset.base, 10), max = {{ estimate.max_references }};
+  var perBatch = 40, fixed = {{ estimate.references_fixed }};
+  function tally() {
+    var found = box.value.toLowerCase().match(/10\.\d{4,9}\/[^\s"'<>]+/g) || [];
+    var n = Math.min(new Set(found).size, max);
+    if (!box.value.trim()) { out.textContent = ''; total.textContent = base; return; }
+    out.textContent = n + ' DOI' + (n === 1 ? '' : 's') + ' found'
+      + (n < {{ min_references }} ? ' — at least {{ min_references }} are needed.' : '.');
+    out.className = n < {{ min_references }} ? 'warn' : '';
+    total.textContent = n ? base + n + Math.ceil(n / perBatch) + fixed : base;
+  }
+  box.addEventListener('input', tally);
+  tally();
+})();
+</script>
 {% endblock %}

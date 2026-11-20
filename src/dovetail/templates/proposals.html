@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% block title %}Queue — Dovetail{% endblock %}
 {% block body %}
-<h1>Queue</h1>
-<p class="sub">Nothing reaches the table without passing through here. Agents and scripts propose;
-a person decides.</p>
+<h1>Review queue</h1>
+<p class="sub">Changes to journal records proposed by an assistant or a script. Nothing here takes
+effect until a person approves it.</p>
 
 <div class="filters">
   {% for st in ['pending', 'approved', 'rejected'] %}
@@ -12,38 +12,69 @@ a person decides.</p>
 </div>
 
 {% if not user.is_admin() %}
-<div class="flash">You are signed in as a reader: you can see what is waiting, and approving it needs
-an admin. That is not a hidden button — the route itself declines.</div>
+<div class="flash">You are signed in as a reader: you can see what is waiting. Approving or
+rejecting needs an admin.</div>
 {% endif %}
 
 {% for p in proposals %}
 <div class="card">
   <div class="btnrow">
-    <span class="badge accent">{{ p.kind }}</span>
+    <span class="badge accent">{{ {'update_venue': 'change to a journal', 'new_venue': 'new journal', 'new_alias': 'another name for a journal'}.get(p.kind, p.kind) }}</span>
     <span class="badge {{ 'ok' if p.confidence == 'high' else ('warn' if p.confidence == 'low' else '') }}">confidence: {{ p.confidence }}</span>
     {% if p.venue_id and venues.get(p.venue_id) %}
       <a class="chip" href="/app/venues/{{ p.venue_id }}">{{ venues[p.venue_id].display_name }}</a>{% endif %}
     <span class="muted small" style="margin-left:auto">{{ p.created_at.strftime('%d %b %Y, %H:%M') }}</span>
   </div>
 
+  {% set fields = p.fields or {} %}
+  {% set types = fields.get('article_types') %}
+  {% if fields and not (types and fields|length == 1) %}
   <div class="table-wrap" style="margin-top:12px"><table class="table">
     <thead><tr><th>Field</th><th>Proposed value</th></tr></thead>
     <tbody>
-    {% for k, v in (p.fields or {}).items() %}
+    {% for k, v in fields.items() %}{% if k != 'article_types' %}
     <tr><td class="mono">{{ k }}</td><td>{{ v }}</td></tr>
-    {% else %}
-    <tr><td colspan="2" class="muted">No fields carried.</td></tr>
-    {% endfor %}
+    {% endif %}{% endfor %}
     </tbody>
   </table></div>
+  {% elif not fields %}
+  <p class="muted" style="margin:12px 0 0">This proposal carries no fields.</p>
+  {% endif %}
+
+  {# Article types read as a table, which is what they are. Printed as the raw
+     value they are a wall of brackets nobody can check against the guidelines. #}
+  {% if types is iterable and types is not string and types is not mapping %}
+  <div class="table-wrap" style="margin-top:12px"><table class="table">
+    <thead><tr><th>Article type</th><th class="n">Words</th><th>What the count includes</th>
+      <th class="n">Abstract</th><th class="n">Refs</th><th class="n">Figures</th><th>Unsolicited</th></tr></thead>
+    <tbody>
+    {% for t in types %}{% if t is mapping %}
+    <tr>
+      <td>{{ t.get('name', '—') }}
+        {% if t.get('evidence') %}<div class="muted small">«{{ t.evidence }}»</div>{% endif %}
+        {% if t.get('notes') %}<div class="muted small">{{ t.notes }}</div>{% endif %}</td>
+      <td class="n">{{ '{:,}'.format(t.word_limit) if t.get('word_limit') else '—' }}</td>
+      <td class="small {{ 'warn' if t.get('word_limit') and not t.get('word_limit_scope') else 'muted' }}">
+        {{ t.get('word_limit_scope') or ('missing — will not be written' if t.get('word_limit') else '—') }}</td>
+      <td class="n muted">{{ t.get('abstract_limit') or '—' }}</td>
+      <td class="n muted">{{ t.get('refs_limit') or '—' }}</td>
+      <td class="n muted">{{ t.get('figures_limit') or '—' }}</td>
+      <td class="muted">{{ 'yes' if t.get('unsolicited') else ('no' if t.get('unsolicited') is not none else '—') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="warn small">Not in a form that can be written: {{ t }}</td></tr>
+    {% endif %}{% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
 
   <p style="white-space:pre-wrap; margin:12px 0 0">{{ p.rationale }}</p>
   {% if p.source_url %}<p class="small" style="margin:6px 0 0"><a href="{{ p.source_url }}" rel="noreferrer">{{ p.source_url }}</a></p>{% endif %}
 
   {% if p.status.value == 'pending' and user.is_admin() %}
   <div class="btnrow" style="margin-top:14px">
-    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/approve"><button class="btn btn-small">Approve</button></form>
-    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/reject"><button class="btn btn-danger btn-small">Reject</button></form>
+    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/approve"><button class="btn btn-small" data-busy-label="Approving…">Approve</button></form>
+    <form class="inline" method="post" action="/app/proposals/{{ p.id }}/reject"><button class="btn btn-danger btn-small" data-busy-label="Rejecting…">Reject</button></form>
   </div>
   {% endif %}
 </div>
@@ -51,7 +82,7 @@ an admin. That is not a hidden button — the route itself declines.</div>
 <div class="card"><p class="empty" style="padding:0">Nothing {{ status_filter }}.</p></div>
 {% endfor %}
 
-<p class="note">Approving writes the proposed fields onto the journal's record and dates them.
-Rejecting leaves the record alone and keeps the proposal, so the same suggestion arriving twice is
-visible as such.</p>
+<p class="note">Approving writes the proposed facts onto the journal's record, with their source and
+today's date. A word limit that does not say what it counts is left out. Rejecting changes nothing
+and keeps the proposal, so the same suggestion arriving twice can be recognised.</p>
 {% endblock %}

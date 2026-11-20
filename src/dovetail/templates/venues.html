@@ -5,9 +5,10 @@
 
 <div class="head">
   <h1>Journals</h1>
-  {% if user.is_admin() %}<a class="btn" href="/app/venues/new">Declare a journal</a>{% endif %}
+  {% if user.is_admin() %}<a class="btn" href="/app/venues/new">Add a journal by hand</a>{% endif %}
 </div>
-<p class="sub">Whatever past sweeps and hand-declared venues have put in the table. Not a census.</p>
+<p class="sub">Every journal a consultation has looked up, plus the ones added by hand. It grows
+with use and is not a census: a journal missing here has not come up yet.</p>
 
 <div class="card">
   <form class="searchbar" method="get" action="/app/venues">
@@ -23,9 +24,9 @@
       {% for m in oa_models %}<option value="{{ m }}" {% if args.oa == m %}selected{% endif %}>{{ m.replace('_', ' ') }}</option>{% endfor %}
     </select>
     <select name="profile">
-      <option value="">profile: any</option>
-      <option value="yes" {% if args.profile == 'yes' %}selected{% endif %}>has a profile</option>
-      <option value="no" {% if args.profile == 'no' %}selected{% endif %}>no profile</option>
+      <option value="">subjects: any</option>
+      <option value="yes" {% if args.profile == 'yes' %}selected{% endif %}>subjects known</option>
+      <option value="no" {% if args.profile == 'no' %}selected{% endif %}>subjects unknown</option>
     </select>
     <select name="doaj">
       <option value="">DOAJ: any</option>
@@ -33,9 +34,9 @@
       <option value="no" {% if args.doaj == 'no' %}selected{% endif %}>not in DOAJ</option>
     </select>
     <select name="core">
-      <option value="">core: any</option>
-      <option value="yes" {% if args.core == 'yes' %}selected{% endif %}>core only</option>
-      <option value="no" {% if args.core == 'no' %}selected{% endif %}>not core</option>
+      <option value="">curated: any</option>
+      <option value="yes" {% if args.core == 'yes' %}selected{% endif %}>curated only</option>
+      <option value="no" {% if args.core == 'no' %}selected{% endif %}>not curated</option>
     </select>
     <select name="risk">
       <option value="">risk: any</option>
@@ -52,11 +53,10 @@
       <a class="btn btn-link btn-small" href="/app/venues">Clear</a>
     {% endif %}
   </form>
-  <p class="muted small" style="margin:10px 0 0">Search is lexical: a miss means «not with these
-  words», never «does not exist». The default order is by size, which is the same bias stage 2 has to
-  fight — it is here because it puts recognisable names first, not because bigger is better. And the
-  default <strong>kind</strong> is <code>journal</code>: the sweep also drags in repositories, because
-  Zenodo carries 12.2 million works and therefore touches every topic there is.</p>
+  <p class="muted small" style="margin:10px 0 0">The search matches words in the name, so a miss
+  means «not with these words», not «not here». Only journals are shown unless you pick another
+  kind: consultations also bring back repositories and book series, which are kept and never
+  proposed.</p>
 </div>
 
 <div class="pager">
@@ -77,14 +77,14 @@
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>Journal</th><th>Kind</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
-    <th class="n">Works</th><th class="n">h</th><th>Profile</th><th>ANVUR</th><th>Risk</th>
+    <th class="n">Works</th><th class="n">h</th><th>Subjects</th><th>ANVUR</th><th>Risk</th>
   </tr></thead>
   <tbody>
   {% for v in venues %}
   <tr>
     <td>
       <a class="name" href="/app/venues/{{ v.id }}">{{ v.display_name }}</a>
-      {% if not v.is_core %}<span class="badge warn" title="type:journal includes news bulletins">not core</span>{% endif %}
+      {% if not v.is_core %}<span class="badge warn" title="Outside OpenAlex's curated set of journals, which also holds news bulletins and duplicates. Never proposed.">not curated</span>{% endif %}
       <div class="muted small">{{ v.host_organization_name or 'publisher not declared' }}</div>
     </td>
     <td>{% if v.venue_type == 'journal' %}<span class="muted small">journal</span>
@@ -96,7 +96,7 @@
     <td class="n muted">{{ '{:,}'.format(v.works_count) if v.works_count else '—' }}</td>
     <td class="n muted">{{ v.h_index if v.h_index is not none else '—' }}</td>
     <td>{% if v.topics %}<span class="muted small">{{ v.topics|length }} topics</span>
-        {% else %}<span class="badge warn">none</span>{% endif %}</td>
+        {% else %}<span class="badge warn">unknown</span>{% endif %}</td>
     <td class="muted mono">{{ v.anvur_class or '—' }}</td>
     <td>{% set lvl = (v.predatory_risk or {}).get('level') %}
         {% if lvl == 'high' %}<span class="badge danger">high</span>
@@ -117,12 +117,16 @@
 </div>
 {% endif %}
 
-<p class="note">An unknown APC is not a free journal: the field is missing on roughly nine journals in
-ten, which is why no constraint here excludes on it. A journal with no profile is not out of scope
-either — it is a journal nothing is known about.</p>
-<p class="note">Anything that is not a <code>journal</code> is kept in the table and never
-shortlisted: a repository is somewhere a paper is <em>deposited</em>, not somewhere it is submitted
-for review, and stage 4 says so in those words. Keeping them visible rather than filtering them out
-of the sweep is the same rule as everywhere else here — a venue excluded upstream cannot be
-inspected, and this list is the place to inspect what the sweep brought back.</p>
+<details class="explain">
+  <summary>What the columns mean</summary>
+  <p><strong>An unknown fee is not a free journal.</strong> The fee is missing for about nine
+  journals in ten, so a consultation never excludes a journal for it: it marks it for checking.</p>
+  <p><strong>Subjects unknown</strong> means nothing is on record about what the journal publishes.
+  It cannot be compared with a manuscript, which is different from being a poor match.</p>
+  <p><strong>Risk</strong> flags signs often found in predatory journals. None of them is proof on
+  its own.</p>
+  <p><strong>Repositories and book series</strong> are kept so that you can see what a consultation
+  brought back, and are never proposed: a repository is where a paper is deposited, not where it is
+  submitted.</p>
+</details>
 {% endblock %}

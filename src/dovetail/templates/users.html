@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% block title %}Users — Dovetail{% endblock %}
 {% block body %}
 <h1>Users</h1>
-<p class="sub">A reader looks. An admin spends the OpenAlex budget and turns proposals into facts.
-The split is by what a thing <em>costs</em>, not by seniority.</p>
+<p class="sub">A reader can look at everything. An admin can also start consultations, which spend an
+OpenAlex budget, and approve proposals.</p>
 
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th><th>Active</th><th>Since</th></tr></thead>
@@ -27,9 +27,9 @@ The split is by what a thing <em>costs</em>, not by seniority.</p>
   </tbody>
 </table></div>
 
-<p class="note">You cannot remove your own admin role here. Locking yourself out is not a permission
-question, it is a mistake the app declines to make on your behalf.</p>
-<p class="note">Someone the gateway vouches for arrives as a reader, and a local account is never
-matched to a gateway subject by email — that is how one person ends up with another person's account.
-Linking the two is done once, by hand, with <code>map_borant.py</code>.</p>
+<p class="note">You cannot remove your own admin role, so that nobody locks themselves out by
+mistake.</p>
+<p class="note">Someone who signs in through Borant ID for the first time arrives as a reader. A
+local account is not merged with a Borant ID one automatically, even when the email is the same:
+ask whoever runs this instance to link them.</p>
 {% endblock %}

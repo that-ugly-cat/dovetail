@@ -12,6 +12,7 @@ it is the mistake this codebase's older sibling made once and wrote down.
 
 from __future__ import annotations
 
+import re
 import contextlib
 import os
 from datetime import datetime, timezone
@@ -64,6 +65,104 @@ def _asset_version() -> str:
 
 
 templates.env.globals.update(ASSETS=_asset_version())
+
+
+def _plain_flag(flag: str) -> str:
+    """A flag as the scorer wrote it, in words for somebody reading the list.
+
+    The flags are stored on each result as the scorer's own short notes, and
+    one of them is also a value the matcher compares against, so they are not
+    reworded at the source: a consultation recorded last month must read the
+    same as one recorded today. They are translated where they are shown.
+    """
+    if flag == "insufficient profile":
+        return "nothing is on record about what this journal publishes"
+    if flag.startswith("profile coverage "):
+        return (
+            f"its listed topics cover only {flag.removeprefix('profile coverage ')} of "
+            f"what it publishes, so the subject scores are unreliable"
+        )
+    if flag.startswith("broad generalist"):
+        return (
+            "a very large general journal: only its 25 most frequent topics are on "
+            "record, so a low subject score may be wrong"
+        )
+    return {
+        "OA but outside DOAJ": "open access, but not listed in DOAJ",
+        "publisher not declared": "no publisher on record",
+        "not indexed": "not found in any index on record",
+    }.get(flag, flag)
+
+
+_LABELS = {
+    "publishes on at least one of the text's topics": "publishes on at least one topic of your abstract",
+    "passes every declared constraint": "meets all your constraints",
+}
+
+# Evidence that only names the field a criterion was read from. The label
+# already says what the field says, so beside it these are noise.
+_BARE_FIELDS = {"constraints", "is_in_doaj", "apc_usd", "indexed_in", "guidelines"}
+
+_CITATIONS = re.compile(
+    r"^(\d+) citation links, ([\d.]+) per 1000 of the (\d+) works it published in the window$"
+)
+
+
+def _plain_label(label: str) -> str:
+    return _LABELS.get(label, label)
+
+
+def _plain_evidence(evidence: str | None) -> str:
+    """What stands behind a criterion, without the names of the code's own
+    fields. Translated here for the reason the flags are: these strings are
+    stored with each consultation, and old ones have to read like new ones."""
+    e = (evidence or "").strip()
+    if not e or e in _BARE_FIELDS:
+        return ""
+    for level in ("topic", "subfield"):
+        if e.startswith(f"{level} cosine "):
+            return f"{level} score {e.removeprefix(f'{level} cosine ')}"
+    if e.startswith("topic shared between the text"):
+        return "a topic OpenAlex reads both in your abstract and in what the journal publishes"
+    if e.startswith("DOAJ publication_time_weeks"):
+        return "as the journal declares it to DOAJ: time to publication, not to a decision"
+    if e.startswith("primary location of the references"):
+        return "according to OpenAlex"
+    if e.startswith("field ") and "desk reject" in e:
+        return e.split(" — ")[0].replace("field ", "field score ").replace(", topic ", ", topic score ") + (
+            ": the usual shape of an «out of scope» rejection"
+        )
+    m = _CITATIONS.match(e)
+    if m:
+        links, density, works = m.groups()
+        return (
+            f"{links} citations to them in the {int(works):,} works it published "
+            f"in those years, or {float(density):g} per 1,000"
+        )
+    return e
+
+
+_CONSTRAINTS = {
+    "venue_type": "kind of record",
+    "is_core": "curated journals only",
+    "funder:snsf": "funder: SNSF",
+    "max_apc": "highest fee",
+    "must_be_indexed_in": "indexing",
+    "anvur_class": "ANVUR band",
+    "exclude_venues": "already tried",
+}
+
+
+def _plain_constraint(name: str) -> str:
+    return _CONSTRAINTS.get(name, name.replace("_", " "))
+
+
+templates.env.filters.update(
+    plain_flag=_plain_flag,
+    plain_label=_plain_label,
+    plain_evidence=_plain_evidence,
+    plain_constraint=_plain_constraint,
+)
 
 # The MCP transport is built before the app so its session manager exists: it is
 # created lazily by `streamable_http_app()`, and reaching for it earlier raises.
@@ -323,8 +422,12 @@ def _inventory(s: Session) -> dict:
     rest of the tool is built to keep.
     """
     total = _count(s)
-    journals = _count(s, Venue.venue_type == "journal")
-    profiled = _count(s, HAS_PROFILE)
+    is_journal = Venue.venue_type == "journal"
+    journals = _count(s, is_journal)
+    # Every figure on the overview is about journals, so that they can be read
+    # against each other. Counted over all records, «with known subjects» came
+    # out larger than «journals», which is true and reads as a mistake.
+    profiled = _count(s, is_journal, HAS_PROFILE)
     return {
         "total": total,
         # Counted apart because the table is not all journals and the label used
@@ -334,10 +437,10 @@ def _inventory(s: Session) -> dict:
         "journals": journals,
         "not_journals": total - journals,
         "profiled": profiled,
-        "unprofiled": total - profiled,
-        "core": _count(s, Venue.is_core.is_(True)),
-        "doaj": _count(s, Venue.is_in_doaj.is_(True)),
-        "apc_known": _count(s, Venue.apc_usd.isnot(None)),
+        "unprofiled": journals - profiled,
+        "core": _count(s, is_journal, Venue.is_core.is_(True)),
+        "doaj": _count(s, is_journal, Venue.is_in_doaj.is_(True)),
+        "apc_known": _count(s, is_journal, Venue.apc_usd.isnot(None)),
         "with_guidelines": s.scalar(
             select(func.count(func.distinct(ArticleType.venue_id)))
         ) or 0,
@@ -739,6 +842,11 @@ def estimate_run(s: Session, discover: bool, references: int = 0,
         # printed on, so its length is not known when the page is drawn. What
         # can be said beforehand is the rate and the ceiling, and both are.
         "references": references,
+        # What the reference list adds to this estimate, and the part of that
+        # which does not depend on how long the list is. The form recomputes the
+        # total as the list is pasted, from these two and the per-DOI rate.
+        "references_cost": total - cost_ceiling(discover, 0),
+        "references_fixed": cost_ceiling(discover, 1) - cost_ceiling(discover, 0) - 2,
         "max_references": config.MAX_REFERENCES,
         "total_with_max_references": cost_ceiling(discover, config.MAX_REFERENCES),
         "remaining": remaining,
@@ -762,7 +870,8 @@ def new_run_form(request: Request, user: User = Depends(require_admin),
     # a 422 that mentions parsing.
     return page(request, "run_new.html", user, s, nav="runs",
                 estimate=estimate_run(s, discover=True, user=user),
-                min_words=config.MIN_ABSTRACT_WORDS, form={}, error=None)
+                min_words=config.MIN_ABSTRACT_WORDS,
+                min_references=config.MIN_REFERENCES, form={}, error=None)
 
 
 def _execute_run(run_id: int, discover: bool, use_doaj: bool,
@@ -858,7 +967,8 @@ def new_run(
     def refuse(msg: str):
         return page(request, "run_new.html", user, s, nav="runs",
                     estimate=estimate_run(s, discover_on, len(dois), user),
-                    min_words=config.MIN_ABSTRACT_WORDS, form=form, error=msg)
+                    min_words=config.MIN_ABSTRACT_WORDS,
+                    min_references=config.MIN_REFERENCES, form=form, error=msg)
 
     # Both checks are free and both are done *before* anything is written. The
     # short-abstract guard rail costs nothing to evaluate, so failing it should
@@ -872,16 +982,16 @@ def new_run(
     est = estimate_run(s, discover_on, len(dois), user)
     if discover_on and not est["keyed"]:
         return refuse(
-            "The sweep needs an OpenAlex key and there is none: OpenAlex refuses "
-            "cursor paging to a request without one, so the run would spend its "
-            "classification and then stop at the first page. Store your own key "
-            "in Settings — it is free — or untick the sweep."
+            "Searching for new journals needs an OpenAlex key, and there is none: "
+            "the consultation would spend 100 credits classifying your abstract "
+            "and then be refused. Add your own key in Settings — it is free — or "
+            "untick «Search OpenAlex for new journals»."
         )
     if not est["affordable"]:
         return refuse(
-            f"Not enough budget: classifying costs {est['classify']} credits and "
-            f"{est['remaining']} are left of {est['budget']} for today. It resets "
-            f"at midnight UTC."
+            f"Not enough budget: classifying the abstract costs {est['classify']} "
+            f"credits and {est['remaining']} are left of {est['budget']} for today. "
+            f"It resets at midnight UTC."
         )
     # With a reference list the run is known to spend one credit per DOI on top
     # of the rest, so the whole ceiling has to fit: a neighbourhood that stops
@@ -890,14 +1000,16 @@ def new_run(
     if dois and not est["affordable_with_references"]:
         return refuse(
             f"Not enough budget for the reference list: with {len(dois)} DOIs this "
-            f"run can spend up to {est['total']} credits and {est['remaining']} are "
-            f"left for today. Run it without the references, or after midnight UTC."
+            f"consultation can spend up to {est['total']} credits and "
+            f"{est['remaining']} are left for today. Start it without the "
+            f"references, or after midnight UTC."
         )
     if references.strip() and len(dois) < config.MIN_REFERENCES:
         return refuse(
-            f"Only {len(dois)} DOIs were found in the reference list, and the "
-            f"citation neighbourhood needs at least {config.MIN_REFERENCES}. "
-            f"References without a DOI are not read. Clear the box to run without it."
+            f"Only {len(dois)} DOIs were found in the reference list, and at least "
+            f"{config.MIN_REFERENCES} are needed to say where your references are "
+            f"being read. References without a DOI are not read. Empty the box to "
+            f"start without it."
         )
 
     constraints = {}
