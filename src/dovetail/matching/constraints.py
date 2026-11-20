@@ -184,27 +184,6 @@ def evaluate(
                     Outcome("must_be_indexed_in", EXCLUDED, f"not indexed in {', '.join(missing)}")
                 )
 
-    # -- ANVUR band ----------------------------------------------------------
-    # The ANVUR band is **per competition sector**: a bare letter means nothing,
-    # and Future of Science and Ethics is band A for 11/C3, not in general. So
-    # the field carries "sector:band" (e.g. "11/C3:A", comma separated for more
-    # than one) and the comparison is membership, not equality: with equality,
-    # asking for "11/C3:A" would exclude a journal that also covers another
-    # sector.
-    anvur = constraints.get("anvur_class")
-    if anvur:
-        declared = [x.strip() for x in (venue.anvur_class or "").split(",") if x.strip()]
-        if not declared:
-            outcomes.append(Outcome("anvur_class", NEEDS_CHECK, "ANVUR band not detected"))
-        elif anvur not in declared:
-            outcomes.append(
-                Outcome(
-                    "anvur_class",
-                    EXCLUDED,
-                    f"covers {', '.join(declared)}, {anvur} required",
-                )
-            )
-
     return outcomes
 
 

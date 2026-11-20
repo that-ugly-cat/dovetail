@@ -26,7 +26,6 @@ class FakeVenue:
     oa_model: str = "closed_or_unknown"
     apc_usd: int | None = None
     indexed_in: list | None = None
-    anvur_class: str | None = None
     works_count: int | None = 500
     h_index: int | None = 40
     host_organization_name: str | None = "A publisher"
@@ -75,20 +74,6 @@ def test_a_stale_field_flags_and_does_not_exclude():
         FakeVenue(apc_usd=1000), {"max_apc": 3000}, verified_at={"apc_usd": old}
     )
     assert outcomes and outcomes[0].outcome == constraints_mod.NEEDS_CHECK
-
-
-# --- the ANVUR band is per sector ----------------------------------------
-
-
-def test_the_anvur_band_is_matched_per_sector():
-    """A bare letter means nothing: Future of Science and Ethics is band A for
-    11/C3, not in general. With equality, a journal covering two sectors would
-    be excluded."""
-    venue = FakeVenue(anvur_class="11/C3:A, 11/C2:A")
-    assert not any(
-        o.excludes() for o in constraints_mod.evaluate(venue, {"anvur_class": "11/C3:A"})
-    )
-    assert any(o.excludes() for o in constraints_mod.evaluate(venue, {"anvur_class": "11/C1:A"}))
 
 
 # --- merit against logistics ---------------------------------------------

@@ -37,7 +37,6 @@ def add_venue(
     is_in_doaj: bool | None = None,
     is_oa: bool | None = None,
     apc_usd: int | None = None,
-    anvur_class: str | None = None,
     note_url: str | None = None,
 ) -> Venue:
     """Create (or update) a hand-declared venue."""
@@ -58,7 +57,6 @@ def add_venue(
         "is_in_doaj": is_in_doaj,
         "is_oa": is_oa,
         "apc_usd": apc_usd,
-        "anvur_class": anvur_class,
     }
     fields = {k: v for k, v in fields.items() if v is not None}
     for k, v in fields.items():

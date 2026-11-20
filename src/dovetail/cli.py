@@ -257,9 +257,6 @@ def add_venue(
     doaj: bool = typer.Option(None, "--doaj/--no-doaj"),
     oa: bool = typer.Option(None, "--oa/--no-oa"),
     apc: int = typer.Option(None),
-    anvur: str = typer.Option(
-        None, help='Band per sector, e.g. "11/C3:A" (comma separated for more than one).'
-    ),
 ):
     """Declare by hand a journal no index knows about.
 
@@ -280,7 +277,6 @@ def add_venue(
             is_in_doaj=doaj,
             is_oa=oa,
             apc_usd=apc,
-            anvur_class=anvur,
         )
         typer.echo(f"venue #{v.id}: {v.display_name} · {getattr(v.oa_model, 'value', v.oa_model)}")
         typer.echo(

@@ -169,7 +169,7 @@ in the web app is what writes the article types; until 20 Nov 2026 nothing did.
 
 ```bash
 uv run dovetail add-venue --name "Future of Science and Ethics" \
-    --publisher "Fondazione Umberto Veronesi" --oa --no-doaj --anvur "11/C3:A"
+    --publisher "Fondazione Umberto Veronesi" --oa --no-doaj
 uv run --with pymupdf python scripts/pdf_to_articles.py article*.pdf > articles.json
 uv run dovetail profile-venue --name "Future of Science and Ethics" --articles articles.json
 ```

@@ -154,7 +154,6 @@ _CONSTRAINTS = {
     "funder:snsf": "funder: SNSF",
     "max_apc": "highest fee",
     "must_be_indexed_in": "indexing",
-    "anvur_class": "ANVUR band",
     "exclude_venues": "already tried",
 }
 
@@ -673,7 +672,6 @@ def new_venue(
     homepage_url: str = Form(""),
     host_organization_name: str = Form(""),
     apc_usd: str = Form(""),
-    anvur_class: str = Form(""),
     note_url: str = Form(""),
     is_in_doaj: str = Form(""),
     is_oa: str = Form(""),
@@ -695,7 +693,7 @@ def new_venue(
     name = display_name.strip()
     form = {"display_name": name, "issn_l": issn_l, "homepage_url": homepage_url,
             "host_organization_name": host_organization_name, "apc_usd": apc_usd,
-            "anvur_class": anvur_class, "note_url": note_url,
+            "note_url": note_url,
             "is_in_doaj": is_in_doaj, "is_oa": is_oa}
     if not name:
         return page(request, "venue_new.html", user, s, nav="venues", form=form,
@@ -717,7 +715,6 @@ def new_venue(
         is_in_doaj=tri(is_in_doaj),
         is_oa=tri(is_oa),
         apc_usd=int(apc_usd) if apc_usd.strip().isdigit() else None,
-        anvur_class=anvur_class.strip() or None,
         note_url=note_url.strip() or None,
     )
     s.flush()

@@ -77,7 +77,7 @@ with use and is not a census: a journal missing here has not come up yet.</p>
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
     <th>Journal</th><th>Kind</th><th>ISSN</th><th>Open access</th><th class="n">APC</th>
-    <th class="n">Works</th><th class="n">h</th><th>Subjects</th><th>ANVUR</th><th>Risk</th>
+    <th class="n">Works</th><th class="n">h</th><th>Subjects</th><th>Risk</th>
   </tr></thead>
   <tbody>
   {% for v in venues %}
@@ -97,7 +97,6 @@ with use and is not a census: a journal missing here has not come up yet.</p>
     <td class="n muted">{{ v.h_index if v.h_index is not none else '—' }}</td>
     <td>{% if v.topics %}<span class="muted small">{{ v.topics|length }} topics</span>
         {% else %}<span class="badge warn">unknown</span>{% endif %}</td>
-    <td class="muted mono">{{ v.anvur_class or '—' }}</td>
     <td>{% set lvl = (v.predatory_risk or {}).get('level') %}
         {% if lvl == 'high' %}<span class="badge danger">high</span>
         {% elif lvl == 'low' %}<span class="badge warn">low</span>

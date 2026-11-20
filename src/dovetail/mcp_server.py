@@ -98,7 +98,6 @@ def _venue_brief(v: Venue) -> dict[str, Any]:
         "publisher": v.host_organization_name,
         "oa_model": getattr(v.oa_model, "value", v.oa_model),
         "apc_usd": v.apc_usd,
-        "anvur": v.anvur_class,
         "predatory_risk": (v.predatory_risk or {}).get("level"),
     }
     if v.venue_type and v.venue_type != "journal":
@@ -865,8 +864,7 @@ def propose_venue(
 
     Use for journals no index knows about. `fields` takes `display_name` and
     optionally `issn_l`, `homepage_url`, `host_organization_name`, `is_oa`,
-    `is_in_doaj`, `apc_usd`, `anvur_class` (as `sector:band`, e.g. `11/C3:A` —
-    a band with no sector means nothing).
+    `is_in_doaj`, `apc_usd`.
 
     `rationale` should say where the claim comes from. It is read by whoever
     approves, and "it looked right" is not a reason a person can check.

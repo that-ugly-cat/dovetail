@@ -44,7 +44,6 @@ WRITABLE = {
     "is_oa",
     "is_in_doaj",
     "apc_usd",
-    "anvur_class",
     "indexed_in",
 }
 

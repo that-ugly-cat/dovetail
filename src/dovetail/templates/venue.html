@@ -17,7 +17,6 @@ articles.
   {% if venue.is_core %}<span class="badge ok" title="In OpenAlex's curated set of journals">curated</span>
   {% else %}<span class="badge warn" title="Outside OpenAlex's curated set of journals. Never proposed in a consultation.">not curated</span>{% endif %}
   {% if venue.is_in_doaj %}<span class="badge ok">in DOAJ</span>{% endif %}
-  {% if venue.anvur_class %}<span class="badge">ANVUR {{ venue.anvur_class }}</span>{% endif %}
   {% for ix in venue.indexed_in or [] %}<span class="badge">{{ ix }}</span>{% endfor %}
 </div>
 

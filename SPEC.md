@@ -175,7 +175,7 @@ Campi da API (rinfrescabili in blocco) e campi da guidelines (uno alla volta, vi
 | `recent_titles[]` | OpenAlex | titoli e anni degli ultimi ~25 lavori. È ciò che lo **stadio 5a** legge per giudicare la forma; cacheato qui perché è inventario, costa 10 crediti a rivista e cambia sul tempo di un fascicolo |
 | ~~`corpus_embedding`, `corpus_sampled_at`, `corpus_n`~~ | — | **mai costruiti.** La v0.3 li prevedeva per sostituire la tassonomia con gli embedding; il punteggio è rimasto il coseno sui topic a tre livelli. Restano elencati perché la §6 li nomina ancora come previsti, e perché il piano non è stato abbandonato ma non eseguito |
 | `license[]`, `review_process`, `publication_time_weeks`, `has_waiver` | DOAJ | solo full OA |
-| `anvur_class` | ANVUR | per settore, rilevante 11/C2 |
+| ~~`anvur_class`~~ | — | **tolto il 20 nov 2026.** La fascia ANVUR conta solo per chi è valutato in Italia, e in uno strumento che ora ha più utenti era una colonna vuota per quasi tutti: in produzione non la portava nessuna rivista. Chi ne ha bisogno la legge dagli elenchi ANVUR |
 | `indexed_in[]` | NLM / Scopus | |
 | `predatory_risk` | derivato + manuale | vedi §9 |
 | `verified_at` **per campo** | — | vedi §10 |
@@ -289,7 +289,7 @@ query più corte.
 |---|---|---|
 | Sherpa Romeo | self-archiving, embarghi, versioni | chiave gratuita, non testata |
 | Journal Checker Tool (cOAlition S) | conformità venue × finanziatore × istituzione | **`/api/` risponde 404**: nessuna API pubblica. Il vincolo SNSF si deriva da `oa_model`, con i limiti di §8 |
-| ANVUR liste classe A | classe per settore concorsuale | fogli di calcolo, ingestione periodica a mano |
+| ~~ANVUR liste classe A~~ | classe per settore concorsuale | **scartata il 20 nov 2026**, con il campo che avrebbe alimentato (§4) |
 | NLM Catalog | indicizzazione MEDLINE/PubMed | non testata |
 
 **Nota sugli endpoint `/text/*`:** il 27 ago `/text/keywords` ha risposto **500** mentre nella stessa
@@ -553,7 +553,7 @@ saputo segmentare» è accettabile; indovinare no.
   OpenAlex `apc_usd 2290`, DOAJ `apc.max USD 2390`. Regola: **DOAJ vince quando presente**, perché
   è autodichiarato dall'editore e aggiornato al delisting; OpenAlex è il fallback; la shortlist
   mostra entrambi quando divergono di più del 10%.
-- `language`, `must_be_indexed_in`, `anvur_class`.
+- `language`, `must_be_indexed_in`. (`anvur_class` c'era fino al 20 nov 2026.)
 - **`exclude_venues`** — popolata da PaperTrail **attraverso `venue_alias`** (§4), mai per fuzzy
   match al volo.
 - **`accepts_unsolicited`** — la corsia dell'opinion non sollecitata alle generaliste risulta chiusa,
@@ -1408,6 +1408,9 @@ Filosofia Morale, dal 2025**, cioè il settore in cui l'ASN *non* ha dato l'abil
 Da cui una correzione al modello: `anvur_class` porta ora `settore:fascia` e il confronto è per
 appartenenza. Una fascia senza il suo settore non vuol dire niente, e confrontarla per uguaglianza
 escluderebbe una rivista valida per più settori.
+
+*Il campo è stato tolto il 20 novembre 2026: vale solo per l'Italia, e nessuna rivista in produzione
+lo portava. Il paragrafo resta per la ragione che lo aveva fatto nascere.*
 
 ---
 

@@ -129,7 +129,6 @@ class Venue(Base):
 
     # Italian habilitation ranking, as `sector:band` (e.g. "11/C3:A"), comma
     # separated for more than one. A band with no sector means nothing.
-    anvur_class: Mapped[str | None] = mapped_column(String(64))
     indexed_in: Mapped[list | None] = mapped_column(JSON)
     predatory_risk: Mapped[dict | None] = mapped_column(JSON)
 
