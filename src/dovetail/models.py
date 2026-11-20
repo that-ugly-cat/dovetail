@@ -226,6 +226,11 @@ class MatchRun(Base):
     scoring_config_version: Mapped[str | None] = mapped_column(String(32))
     refused_reason: Mapped[str | None] = mapped_column(Text)
 
+    # The DOIs found in the reference list, when one was given. Kept because the
+    # citation neighbourhood is computed from them and nothing else, so a run
+    # can be redone, or read, without asking for the list again.
+    reference_dois: Mapped[list | None] = mapped_column(JSON)
+
     # `running` | `done` | `refused` | `failed`.
     #
     # A run started from the web answers before it has finished — a full sweep
@@ -249,6 +254,13 @@ class MatchRun(Base):
     )
 
 
+# The baskets a person is meant to read as candidates. Stage 5a judges these,
+# DOAJ enriches these, and the blind sheet is drawn from these. `excluded` and
+# `unclassifiable` are shown for a different reason — so that nothing vanishes —
+# and are not candidates.
+FINALIST_BUCKETS = ("shortlist", "neighbourhood", "conversation")
+
+
 class MatchResult(Base):
     __tablename__ = "match_result"
 
@@ -268,6 +280,12 @@ class MatchResult(Base):
     #                       list is not an answer.
     #   `unclassifiable`  — no profile, so it cannot be scored at all. Its zero
     #                       means «I don't know», not «out of scope».
+    #   `neighbourhood`   — reached through the reference list and not through
+    #                       the topics: journals where the works this manuscript
+    #                       cites are themselves being cited. Ordered by
+    #                       citation density, which is not the shortlist's axis.
+    #   `conversation`    — the same, read inside one minority field of the
+    #                       references, where the majority field cannot bury it.
     #
     # `cut` has always returned three lists and the CLI has always printed them
     # under three headers. Persistence concatenated them into one running
@@ -303,11 +321,38 @@ class MatchResult(Base):
     # flag and writes the sentence that motivates it; nothing moves.
     genre_verdict: Mapped[dict | None] = mapped_column(JSON)
 
+    # What ties this venue to the manuscript's bibliography, when the citation
+    # neighbourhood reached it (`neighbourhood.Evidence.to_json`). Present on a
+    # shortlisted row too: that is a journal two independent roads lead to.
+    neighbourhood: Mapped[dict | None] = mapped_column(JSON)
+
     run: Mapped[MatchRun] = relationship(back_populates="results")
     venue: Mapped[Venue] = relationship()
     criteria: Mapped[list[Criterion]] = relationship(
         back_populates="result", cascade="all, delete-orphan"
     )
+
+
+class BlindSheet(Base):
+    """The key to one blind sheet: which row was which.
+
+    It was not stored at first, on purpose — scoring rebuilt the shuffle from
+    the seed, so that nothing on disk could tell the judge the answer. But the
+    shuffle is over the venue table, and the table grows at every consultation
+    that sweeps: a sheet printed on Monday and scored on Friday was scored
+    against different decoys under the same numbers. The key is therefore kept,
+    here and nowhere a judge is sent: no page and no MCP tool reads this table.
+    """
+
+    __tablename__ = "blind_sheet"
+    __table_args__ = (UniqueConstraint("run_id", "seed", name="uq_blind_sheet_run_seed"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("match_run.id"), index=True)
+    seed: Mapped[int] = mapped_column(Integer)
+    # [{"n": 1, "venue_id": 12, "origin": "topics" | "references" | "decoy"}, …]
+    key: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Criterion(Base):

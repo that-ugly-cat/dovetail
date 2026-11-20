@@ -10,3 +10,6 @@ dovetail.db
 uv.lock
 build-check.db
 validation/case.local.json
+
+# Blind sheets name unpublished manuscripts; the key lives in the database.
+validation/sheets/

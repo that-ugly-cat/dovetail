@@ -314,3 +314,42 @@ def test_the_estimator_answers_without_a_key_and_without_calling_anything(tmp_pa
     assert out["model_calls"] == 1 and out["usd_estimate"] > 0
     assert out["openalex_credits"] == 10
     assert out["already_judged"] == 0
+
+
+def test_a_venue_scored_and_not_kept_is_not_reported_as_never_considered(tmp_path, monkeypatch):
+    """Only the baskets are stored, so a journal below the cut has no row — and
+    `explain_match` used to answer «was not in run». On 18 Sep 2026 that sentence
+    was read as «never entered the consultation» for four journals that
+    had been scored in it, and the fault was looked for in the wrong stage."""
+    from dovetail import db, mcp_server
+    from dovetail.models import MatchRun, Venue
+
+    monkeypatch.setenv("DOVETAIL_DB", str(tmp_path / "m3.db"))
+    db.create_all(tmp_path / "m3.db")
+    with db.session_scope() as s:
+        v = Venue(
+            display_name="An Ethics Journal", works_count=500, topics_coverage=1.0,
+            topics=[{"id": "T9", "count": 50, "subfield": "Philosophy",
+                     "field": "Arts and Humanities"}],
+        )
+        s.add(v)
+        s.flush()
+        run = MatchRun(
+            title="A paper", abstract="x", status="done",
+            text_profile={"topics": [{
+                "id": "https://openalex.org/T1", "score": 0.9,
+                "subfield": {"display_name": "Artificial Intelligence"},
+                "field": {"display_name": "Computer Science"},
+            }]},
+        )
+        s.add(run)
+        s.flush()
+        run_id, venue_id = run.id, v.id
+
+    out = mcp_server.explain_match(run_id, venue_id)
+    assert "error" not in out
+    assert out["listed"] is False
+    assert out["scope"]["reachable_at_stage_2"] is False
+    assert "scored in this consultation and not kept" in out["why"]
+    assert "references" in out["reading"]
+    assert mcp_server.explain_match(run_id, 99999) == {"error": "no venue 99999"}

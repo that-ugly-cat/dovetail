@@ -37,6 +37,12 @@ OPENALEX_BASE = "https://api.openalex.org"
 COST_SOURCES = 1  # /sources          X-RateLimit-Cost-USD 0.0001
 COST_TEXT = 100  # /text/*           X-RateLimit-Cost-Required-USD 0.01
 COST_WORKS = 10  # /works?search=    X-RateLimit-Cost-USD 0.001
+# A /works call that only filters — by DOI, or by `cites:` with a group_by — is
+# charged like /sources and not like a search. Read from
+# `X-RateLimit-Credits-Used` on 20 Nov 2026, on both shapes the citation
+# neighbourhood uses. The grouped call in `journals_publishing_on` was priced at
+# COST_WORKS before this was measured and has not been re-measured since.
+COST_WORKS_FILTER = 1
 
 # Daily budget, in credits (1 credit = $0.0001).
 BUDGET_ANONYMOUS = 1_000  # $0.10/day with no account: ten classifications
@@ -95,6 +101,44 @@ MIN_SHORTLIST = 3
 GENERALIST_WORKS_THRESHOLD = 50_000
 
 STALE_DAYS = 180
+
+# --- Citation neighbourhood (SPEC.md §6b) ---------------------------------
+
+# One grouped call per reference, so this is also the ceiling on what the
+# second channel can spend. A long bibliography is cut, in the order given, and
+# the report says how many were dropped.
+MAX_REFERENCES = 150
+
+# Below this many resolved references the neighbourhood is three papers'
+# readership and not a conversation. It declines instead of answering.
+MIN_REFERENCES = 5
+
+# Citing works are counted from 1 January of (this year - N), and a journal's
+# output is counted over the same window, so the density compares like with like.
+NEIGHBOURHOOD_YEARS_BACK = 5
+
+# A journal has to be reached through this share of the references — and never
+# fewer than two — before its density is looked at. Without the gate one heavily
+# cited reference puts its whole readership in the list.
+NEIGHBOURHOOD_MIN_BREADTH_SHARE = 0.05
+
+# A journal with a handful of recent works turns six citations into the highest
+# density in the list. Below this it is not measured.
+NEIGHBOURHOOD_MIN_RECENT_WORKS = 30
+
+# Source records fetched per run to turn citation counts into densities, in
+# batches of 100 for one credit each. Taken in order of breadth when cut.
+NEIGHBOURHOOD_MAX_SOURCES = 1500
+
+# The references are also read field by field. A field holding at least this
+# many of them, and less than the share below, is a minority conversation: its
+# own journals are listed, a few each, because in the overall count the majority
+# field buries them. Measured 20 Nov 2026 on a paper with 73 of its 89 references
+# in one field: the journals of the other fields were all there, between the
+# twentieth and the hundredth place.
+MIN_FIELD_REFERENCES = 4
+MAJORITY_FIELD_SHARE = 0.6
+MAX_CONVERSATION_PER_FIELD = 3
 
 # How much the topic cosine weighs against the subfield cosine when ordering.
 # Not validated: see the docstring of `Score.combined`.

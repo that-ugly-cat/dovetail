@@ -58,7 +58,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import config
-from .models import MatchResult, MatchRun, Venue
+from .models import FINALIST_BUCKETS, BlindSheet, MatchResult, MatchRun, Venue
+
+# Where a row of the sheet came from. Two arms and a control: the journals the
+# topic channel shortlisted, the journals the reference list led to, and the
+# decoys. Reported apart, because the question since 20 Nov 2026 is no longer
+# only «is the list better than chance» but «which road finds better journals».
+TOPICS, REFERENCES, DECOY = "topics", "references", "decoy"
 
 
 # --- 1. known negatives ---------------------------------------------------
@@ -186,6 +192,7 @@ class SheetRow:
     oa_model: str | None
     apc_usd: int | None
     is_decoy: bool = field(repr=False, default=False)
+    origin: str = field(repr=False, default=TOPICS)
 
 
 def blind_sheet(
@@ -212,14 +219,30 @@ def blind_sheet(
     as good as how hard the decoys are**, so they are ordered by how much they
     share with the manuscript and the closest are taken.
 
-    `seed` is explicit and recorded, so the sheet is reproducible and the answers
-    can be scored later without keeping state in between.
+    `seed` is explicit and recorded, and **the key is stored the first time a
+    sheet is built**: a second call with the same run and seed returns the same
+    rows whatever has happened to the venue table since. It used to rebuild the
+    shuffle instead, and a sweep between printing and scoring silently changed
+    which journals the numbers stood for.
+
+    Both channels are on the sheet when the run has both: the topic shortlist
+    and the journals the reference list led to, each row remembering which, so
+    the two can be scored against the same decoys.
     """
+    stored = session.scalar(
+        select(BlindSheet).where(BlindSheet.run_id == run.id, BlindSheet.seed == seed)
+    )
+    if stored is not None:
+        return [
+            _sheet_row(k["n"], session.get(Venue, k["venue_id"]), k["origin"])
+            for k in stored.key
+        ]
+
     finalists = list(
         session.scalars(
             select(MatchResult)
-            .where(MatchResult.run_id == run.id, MatchResult.bucket == "shortlist")
-            .order_by(MatchResult.position)
+            .where(MatchResult.run_id == run.id, MatchResult.bucket.in_(FINALIST_BUCKETS))
+            .order_by(MatchResult.bucket, MatchResult.position)
         )
     )
     if not finalists:
@@ -236,7 +259,14 @@ def blind_sheet(
     ]
 
     rng = random.Random(seed)
-    n_decoys = min(len(pool), len(finalists) * decoys_per_finalist)
+    # As many decoys as the larger arm, not as the two together: the control has
+    # to be big enough to give each arm a rate to be compared with, and a sheet
+    # twice as long is an hour nobody finds.
+    arms = [
+        sum(1 for r in finalists if r.bucket == "shortlist"),
+        sum(1 for r in finalists if r.bucket != "shortlist"),
+    ]
+    n_decoys = min(len(pool), max(arms) * decoys_per_finalist)
     # Shuffle first, then sort by closeness: the shuffle keeps the choice
     # reproducible-but-arbitrary among equally close candidates, and the sort
     # takes the hardest ones. Sorting a pool that arrived in table order would
@@ -246,22 +276,36 @@ def blind_sheet(
     decoys = pool[:n_decoys]
 
     rows = [
-        (session.get(Venue, r.venue_id), False) for r in finalists
-    ] + [(v, True) for v in decoys]
+        (session.get(Venue, r.venue_id), TOPICS if r.bucket == "shortlist" else REFERENCES)
+        for r in finalists
+    ] + [(v, DECOY) for v in decoys]
     rng.shuffle(rows)
 
-    return [
-        SheetRow(
-            n=i,
-            venue_id=v.id,
-            display_name=v.display_name,
-            publisher=v.host_organization_name,
-            oa_model=getattr(v.oa_model, "value", v.oa_model),
-            apc_usd=v.apc_usd,
-            is_decoy=decoy,
+    session.add(
+        BlindSheet(
+            run_id=run.id,
+            seed=seed,
+            key=[
+                {"n": i, "venue_id": v.id, "origin": origin}
+                for i, (v, origin) in enumerate(rows, start=1)
+            ],
         )
-        for i, (v, decoy) in enumerate(rows, start=1)
-    ]
+    )
+    session.flush()
+    return [_sheet_row(i, v, origin) for i, (v, origin) in enumerate(rows, start=1)]
+
+
+def _sheet_row(n: int, v: Venue, origin: str) -> SheetRow:
+    return SheetRow(
+        n=n,
+        venue_id=v.id,
+        display_name=v.display_name,
+        publisher=v.host_organization_name,
+        oa_model=getattr(v.oa_model, "value", v.oa_model),
+        apc_usd=v.apc_usd,
+        is_decoy=origin == DECOY,
+        origin=origin,
+    )
 
 
 def _fields_of(run: MatchRun) -> set[str]:
@@ -305,7 +349,25 @@ def score_sheet(rows: list[SheetRow], marks: dict[int, bool]) -> dict:
     p_finalists = hit / len(finalists)
     p_decoys = (decoy_hit / len(decoys)) if decoys else None
 
+    # Each channel against the same control. With one judge and a dozen rows an
+    # arm these are small numbers, and the difference between two lifts is
+    # smaller still: read the direction, not the decimals.
+    by_origin = {}
+    for origin in (TOPICS, REFERENCES):
+        arm = [r for r in finalists if r.origin == origin]
+        if not arm:
+            continue
+        arm_hit = sum(1 for r in arm if marks[r.n])
+        rate = arm_hit / len(arm)
+        by_origin[origin] = {
+            "judged": len(arm),
+            "accepted": f"{arm_hit}/{len(arm)}",
+            "precision": round(rate, 3),
+            "lift": round(rate - p_decoys, 3) if p_decoys is not None else None,
+        }
+
     return {
+        "by_origin": by_origin,
         "finalists_judged": len(finalists),
         "finalists_accepted": f"{hit}/{len(finalists)}",
         "precision_at_n": round(p_finalists, 3),

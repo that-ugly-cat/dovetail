@@ -11,8 +11,8 @@ from sqlalchemy import select
 from . import config, db, seed as seed_mod
 from .db import BudgetExhausted
 from .matching import criteria as criteria_mod
-from .matching.pipeline import Refusal, run_match
-from .models import MatchResult, MatchRun, Proposal, ProposalStatus, Venue
+from .matching.pipeline import Refusal
+from .models import FINALIST_BUCKETS, MatchResult, MatchRun, Proposal, ProposalStatus, Venue
 from .sources.doaj import DoajClient
 from .sources.enrich import enrich_from_doaj
 from .sources.openalex import (
@@ -127,17 +127,28 @@ def match(
         None,
         help="JSON of a classification already done: skips stage 1 and its 100 credits.",
     ),
+    references_file: Path = typer.Option(
+        None,
+        help="The reference list, in any format: only its DOIs are read. Adds the "
+        "citation neighbourhood, at one credit per DOI.",
+    ),
 ):
     """Stages 1 to 4. Produce and record a shortlist."""
+    from .matching.neighbourhood import extract_dois
+    from .matching.pipeline import run_match_full
+
     db.init_engine()
     abstract = abstract_file.read_text(encoding="utf-8").strip()
+    references = (
+        extract_dois(references_file.read_text(encoding="utf-8")) if references_file else []
+    )
     constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
     client = OpenAlexClient()
     precomputed = json.loads(profile.read_text(encoding="utf-8")) if profile else None
 
     with db.session_scope() as s:
         try:
-            run, shortlist, excluded_shown, unclassifiable = run_match(
+            out = run_match_full(
                 s,
                 client,
                 title,
@@ -147,7 +158,10 @@ def match(
                 discover=discover,
                 precomputed_profile=precomputed,
                 doaj=DoajClient() if doaj else None,
+                references=references,
             )
+            run, shortlist = out.run, out.shortlist
+            excluded_shown, unclassifiable = out.excluded_shown, out.unclassifiable
         except Refusal as e:
             typer.secho(f"refused: {e}", fg=typer.colors.YELLOW)
             raise typer.Exit(code=3)
@@ -165,6 +179,31 @@ def match(
 
         typer.echo(f"\nrun #{run.id} · {len(shortlist)} venues shortlisted\n")
         _print(shortlist)
+        report = out.neighbourhood_report
+        if report and report.get("skipped"):
+            typer.secho(
+                f"\nCITATION NEIGHBOURHOOD — skipped: only "
+                f"{report['references_resolved']} of {report['references_used']} DOIs "
+                f"are known to OpenAlex.\n",
+                fg=typer.colors.YELLOW,
+            )
+        elif report:
+            typer.secho(
+                f"\nCITATION NEIGHBOURHOOD — where the works you cite are being cited. "
+                f"{report['references_resolved']} references resolved, journals reached "
+                f"through at least {report['breadth_gate']} of them, densest first. "
+                f"Not the shortlist's axis:\n",
+                fg=typer.colors.CYAN,
+            )
+            _print(out.neighbourhood)
+            if out.conversations:
+                typer.secho(
+                    "\nTHE SMALLER CONVERSATIONS — the same count inside each "
+                    f"minority field of the references "
+                    f"({', '.join(report['minority_fields'])}):\n",
+                    fg=typer.colors.CYAN,
+                )
+                _print(out.conversations)
         if excluded_shown:
             typer.secho(
                 "\nFewer than three venues pass the constraints. Here are the excluded "
@@ -552,9 +591,9 @@ def score_sheet_cmd(
 ):
     """Phase 1b, measure 2: score a filled sheet.
 
-    Rebuilds the same shuffle from the same seed, so which rows were decoys is
-    recovered rather than stored — nothing sitting on disk in the meantime can
-    tell the judge the answer.
+    Reads back the key stored when the sheet was built. It used to rebuild the
+    shuffle from the seed, which only gives the same sheet if the venue table
+    has not grown in between, and every sweep grows it.
     """
     from .validation import blind_sheet, parse_marks, score_sheet
 
@@ -599,7 +638,7 @@ def check_negatives_cmd(
         results = list(
             s.scalars(select(MatchResult).where(MatchResult.run_id == run_id))
         )
-        shortlisted = {r.venue_id for r in results if r.bucket == "shortlist"}
+        shortlisted = {r.venue_id for r in results if r.bucket in FINALIST_BUCKETS}
         reachable = {r.venue_id for r in results if r.score_topic > 0}
         outcomes = check_negatives(
             s,

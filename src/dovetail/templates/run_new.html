@@ -16,6 +16,11 @@ screen that spends the shared OpenAlex budget, which is why it needs an admin.</
     {% endfor %}
     <tr><td>Enriching the finalists from DOAJ</td><td class="n">free</td></tr>
     <tr><td><strong>At most</strong></td><td class="n"><strong>{{ estimate.total }}</strong></td></tr>
+    {% if not estimate.references %}
+    <tr><td>With a reference list <span class="muted small">— one credit per DOI, plus the journals
+        they lead to; at most {{ estimate.max_references }} DOIs are read</span></td>
+        <td class="n">up to {{ estimate.total_with_max_references }}</td></tr>
+    {% endif %}
     <tr><td class="muted">Left today</td>
         <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
     </tbody>
@@ -48,6 +53,15 @@ screen that spends the shared OpenAlex budget, which is why it needs an admin.</
       <label>Maximum APC in USD <span class="muted">— optional</span>
         <input name="max_apc" inputmode="numeric" value="{{ form.max_apc or '' }}"></label>
     </div>
+
+    <label>Reference list <span class="muted">— optional: paste it as it is</span>
+      <textarea name="references" rows="6"
+        placeholder="Any format. Only the DOIs are read.">{{ form.references or '' }}</textarea>
+    </label>
+    <p class="muted small" style="margin:-4px 0 8px">With a reference list Dovetail also asks where
+    the works you cite are themselves being cited, and lists those journals separately. It is the
+    road to a journal that the topics cannot take: a paper <em>about</em> a technology is classified
+    by the technology. References without a DOI — books, mostly — are not seen.</p>
 
     <label class="check"><input type="checkbox" name="discover" {% if form.discover is not defined or form.discover %}checked{% endif %}>
       Sweep OpenAlex for new candidates <span class="muted small">— unticked, it scores only the journals already in the table</span></label>

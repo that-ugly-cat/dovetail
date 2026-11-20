@@ -154,7 +154,7 @@ def test_the_sheet_gives_nothing_away(run_with_field):
 
     fields = set(vars(rows[0]))
     assert fields == {"n", "venue_id", "display_name", "publisher", "oa_model",
-                      "apc_usd", "is_decoy"}
+                      "apc_usd", "is_decoy", "origin"}
 
     # The judge is told decoys exist — the instructions say so outright, and
     # hiding it would be deceiving someone into doing unpaid work under a false
@@ -243,3 +243,26 @@ def test_marks_can_be_written_either_way():
     assert parse_marks(table) == {1: True, 2: False}
     assert parse_marks("1y 2n 3y") == {1: True, 2: False, 3: True}
     assert parse_marks("1y, 2n,3y") == {1: True, 2: False, 3: True}
+
+
+def test_a_sweep_between_filling_and_scoring_does_not_move_the_decoys(run_with_field):
+    """The sheet a person filled in is the sheet that gets scored.
+
+    Scoring used to rebuild the shuffle from the seed, and the shuffle is over
+    the venue table — which grows at every consultation that sweeps. A journal
+    added between the day the sheet was printed and the day it was scored
+    reshuffled the pool, different decoys came out under the same numbers, and
+    the marks were applied to journals the judge had never been shown. Nothing
+    failed: it produced a number.
+    """
+    with db.session_scope() as s:
+        run = s.get(MatchRun, run_with_field["run"])
+        printed = [(r.n, r.venue_id, r.is_decoy) for r in blind_sheet(s, run, seed=42)]
+        for i in range(15):
+            s.add(Venue(
+                display_name=f"Journal D{i}", is_core=True,
+                topics=[{"id": "T9", "field": "Social Sciences"}],
+            ))
+        s.flush()
+        scored = [(r.n, r.venue_id, r.is_decoy) for r in blind_sheet(s, run, seed=42)]
+    assert scored == printed

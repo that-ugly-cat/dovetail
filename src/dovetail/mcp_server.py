@@ -26,8 +26,11 @@ from sqlalchemy import or_, select
 from . import config, db
 from .db import BudgetExhausted
 from .matching import criteria as criteria_mod
-from .matching.pipeline import Refusal, run_match
+from .matching.neighbourhood import extract_dois
+from .matching.pipeline import Refusal, run_match_full
+from .matching.scoring import score_venue, text_profile, venue_profile
 from .models import (
+    FINALIST_BUCKETS,
     ArticleType,
     Criterion,
     MatchResult,
@@ -127,6 +130,11 @@ def _row_out(r) -> dict[str, Any]:
             for o in r.outcomes
         ],
         "flags": list(r.score.notes) + r.predatory["flags"],
+        # Present when the reference list leads here. On a shortlisted row it
+        # means two independent roads reach this journal.
+        "cited_by_your_literature": (
+            r.neighbourhood.to_json() if r.neighbourhood is not None else None
+        ),
     }
 
 
@@ -299,7 +307,7 @@ def explain_match(run_id: int, venue_id: int) -> dict:
             )
         )
         if res is None:
-            return {"error": f"venue {venue_id} was not in run {run_id}"}
+            return _explain_unlisted(s, run_id, venue_id)
         crits = list(s.scalars(select(Criterion).where(Criterion.result_id == res.id)))
         venue = s.get(Venue, venue_id)
         return {
@@ -315,6 +323,17 @@ def explain_match(run_id: int, venue_id: int) -> dict:
                 "unclassifiable": (
                     "no profile, so no score applies: its zero means «I don't know», "
                     "NOT «out of scope». Do not compare it with a scored venue"
+                ),
+                "neighbourhood": (
+                    "reached through the reference list, not through the topics: "
+                    "its recent papers cite the works this manuscript cites. "
+                    "Ordered by citation density, which is a different axis from "
+                    "the shortlist's"
+                ),
+                "conversation": (
+                    "reached through the references of one minority field of the "
+                    "bibliography, read on its own so the majority field does not "
+                    "bury it. See `cited_by_your_literature.via_field`"
                 ),
             }.get(res.bucket, res.bucket),
             "position": res.position,
@@ -341,10 +360,80 @@ def explain_match(run_id: int, venue_id: int) -> dict:
                 "Absent means stage 5a has not been run on this consultation."
             ),
             "evidence": {c.label: c.evidence for c in crits},
+            "cited_by_your_literature": res.neighbourhood,
             "constraints": res.excluded_by,
             "flags": res.flags,
             "snapshot_works_count": (res.venue_snapshot or {}).get("works_count"),
         }
+
+
+def _explain_unlisted(s, run_id: int, venue_id: int) -> dict:
+    """A venue with no row in this run: say which of three things that means.
+
+    Only the baskets are stored, so a journal that was scored and fell below the
+    cut leaves no row — and this used to answer «was not in run», which reads as
+    «never considered». It sent a diagnosis the wrong way on 18 Sep 2026: four
+    journals were reported as never having entered a consultation they
+    had in fact been scored in. Every venue in the table is scored in every run,
+    so the score can be recomputed from what the run kept, at no cost.
+
+    It is recomputed against **today's** record of the venue, not a snapshot —
+    there is none for a row that was never written — and says so.
+    """
+    run = s.get(MatchRun, run_id)
+    venue = s.get(Venue, venue_id)
+    if run is None:
+        return {"error": f"no consultation {run_id}"}
+    if venue is None:
+        return {"error": f"no venue {venue_id}"}
+    topics = (run.text_profile or {}).get("topics") or []
+    if not topics:
+        return {
+            "run_id": run_id,
+            "venue": venue.display_name,
+            "listed": False,
+            "why": "this consultation has no text profile, so nothing was scored in it",
+        }
+    if venue.created_at and run.created_at and venue.created_at > run.created_at:
+        note = (
+            "this venue entered the table after the consultation ran, so it was "
+            "not among its candidates; the figures below are what it would score now"
+        )
+    else:
+        note = (
+            "scored in this consultation and not kept: only the baskets are "
+            "stored. Recomputed from the run's text profile against today's "
+            "record of the venue, which may have changed since"
+        )
+    score = score_venue(
+        text_profile(topics),
+        venue_profile(venue.topics or []),
+        venue.works_count,
+        venue.topics_coverage,
+    )
+    return {
+        "run_id": run_id,
+        "venue": venue.display_name,
+        "listed": False,
+        "why": note,
+        "scope": {
+            "topic": round(score.topic, 4),
+            "subfield": round(score.subfield, 4),
+            "field": round(score.field, 4),
+            "reachable_at_stage_2": score.stage2_reachable,
+            "reliable": score.reliable,
+        },
+        "reading": (
+            "not reachable at stage 2 means the venue shares no topic with the "
+            "text: every reachable venue is ordered before it, so it cannot enter "
+            "the shortlist whatever its subfield score. That is a statement about "
+            "OpenAlex's topics, not about the journal — a reference list gives "
+            "the run a second road (`references`)."
+            if not score.stage2_reachable
+            else "reachable, and below the cut of this run's shortlist"
+        ),
+        "flags": list(score.notes),
+    }
 
 
 @server.tool()
@@ -483,7 +572,8 @@ def estimate_genre_judgement(run_id: int) -> dict:
         results = list(
             s.scalars(
                 select(MatchResult).where(
-                    MatchResult.run_id == run_id, MatchResult.bucket == "shortlist"
+                    MatchResult.run_id == run_id,
+                    MatchResult.bucket.in_(FINALIST_BUCKETS),
                 )
             )
         )
@@ -543,8 +633,11 @@ def judge_finalists(run_id: int) -> dict:
         results = list(
             s.scalars(
                 select(MatchResult)
-                .where(MatchResult.run_id == run_id, MatchResult.bucket == "shortlist")
-                .order_by(MatchResult.position)
+                .where(
+                    MatchResult.run_id == run_id,
+                    MatchResult.bucket.in_(FINALIST_BUCKETS),
+                )
+                .order_by(MatchResult.bucket, MatchResult.position)
             )
         )
         if not results:
@@ -604,8 +697,17 @@ def match_venues(
     funder: str | None = None,
     max_apc: int | None = None,
     discover: bool = True,
+    references: str = "",
 ) -> dict:
     """Candidate journals for a manuscript. **Slow and expensive: read this.**
+
+    **Pass the reference list whenever you have it** (`references`: the pasted
+    list in any format, or just the DOIs — only DOIs are read, up to 150). The
+    topics classify a text by its *object*, so a normative or conceptual paper
+    about a technology or a disease comes back with the journals that build the
+    technology or treat the disease. With references the run also asks where the
+    works the manuscript cites are themselves cited, and returns those journals
+    in `neighbourhood` and `conversations`. One more credit per DOI.
 
     Costs roughly 120 OpenAlex credits (a classification is 100) and takes a
     couple of minutes with `discover=True`, because it sweeps the entire
@@ -631,7 +733,7 @@ def match_venues(
     with db.session_scope() as s:
         constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
         try:
-            run, shortlist, excluded_shown, unclassifiable = run_match(
+            out = run_match_full(
                 s,
                 OpenAlexClient(),
                 title,
@@ -640,6 +742,7 @@ def match_venues(
                 constraints,
                 discover=discover,
                 doaj=DoajClient(),
+                references=extract_dois(references),
             )
         except Refusal as e:
             return {"refused": str(e)}
@@ -648,10 +751,25 @@ def match_venues(
         except OpenAlexError as e:
             return {"error": str(e)}
 
+        run, shortlist = out.run, out.shortlist
+        excluded_shown, unclassifiable = out.excluded_shown, out.unclassifiable
         sweep = (run.constraints or {}).get("_sweep") or {}
         return {
             "run_id": run.id,
             "shortlist": [_row_out(r) for r in shortlist],
+            # The second road. Its order is citation density, not the
+            # shortlist's cosine: never merge the two lists into one.
+            "neighbourhood": [_row_out(r) for r in out.neighbourhood],
+            "conversations": [_row_out(r) for r in out.conversations],
+            "neighbourhood_report": out.neighbourhood_report
+            or {
+                "skipped": "no_references",
+                "note": (
+                    "no reference list was passed, so only the topic channel ran. "
+                    "For a conceptual or normative paper check whether the obvious "
+                    "journals are in the shortlist before trusting it."
+                ),
+            },
             "excluded_shown": [_row_out(r) for r in excluded_shown],
             "unclassifiable": [
                 {**_venue_brief(r.venue), "why": list(r.score.notes)} for r in unclassifiable
@@ -662,6 +780,8 @@ def match_venues(
                 "the score measures how concentrated a journal is on your subject, "
                 "not how suitable it is — those are different things",
                 "the score itself is unvalidated; see SPEC.md §2 and §16c",
+                "the neighbourhood describes the bibliography, not the argument: "
+                "references that are mostly about the subject give the subject's journals",
             ],
         }
 

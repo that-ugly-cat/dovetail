@@ -218,6 +218,61 @@ class OpenAlexClient:
             if w.get("title")
         ]
 
+    def works_by_dois(self, session: Session, dois: list[str]) -> list[dict]:
+        """The works behind a manuscript's reference list, forty DOIs a call.
+
+        Forty and not a hundred because a DOI is around thirty characters and
+        the filter travels in the URL. A DOI OpenAlex does not know simply does
+        not come back: the caller compares what it sent with what it got.
+        """
+        out: list[dict] = []
+        for start in range(0, len(dois), 40):
+            batch = dois[start : start + 40]
+            spend(session, config.COST_WORKS_FILTER)
+            payload = self._call(
+                session,
+                "/works",
+                {
+                    "filter": f"doi:{'|'.join(batch)}",
+                    "per-page": 100,
+                    "select": "id,doi,title,publication_year,primary_location,primary_topic",
+                },
+            )
+            out.extend(payload.get("results") or [])
+        return out
+
+    def sources_citing(self, session: Session, work_id: str, since: str) -> dict:
+        """Where the works that cite one reference were published, since a date.
+
+        One grouped call per reference rather than one for the whole list, and
+        the difference is the point: grouped together, a review cited four
+        thousand times outvotes twenty papers cited forty times each, and the
+        list becomes that one review's readership. Kept apart, the caller can
+        count how many *different* references lead to a journal.
+
+        Groups cap at 200, so for a heavily cited reference the tail of journals
+        with one citing work each is cut. That loses breadth at the margin and
+        nothing at the top.
+        """
+        spend(session, config.COST_WORKS_FILTER)
+        payload = self._call(
+            session,
+            "/works",
+            {
+                "filter": f"cites:{work_id},from_publication_date:{since}",
+                "group_by": "primary_location.source.id",
+                "per-page": 200,
+            },
+        )
+        return {
+            "count": (payload.get("meta") or {}).get("count", 0),
+            "groups": [
+                (short_id(g.get("key", "")), g.get("count", 0))
+                for g in (payload.get("group_by") or [])
+                if g.get("key") and g.get("key") != "unknown"
+            ],
+        }
+
     def sources_by_ids(self, session: Session, ids: list[str]) -> list[dict]:
         """Fetch full records for a batch of OpenAlex source ids.
 

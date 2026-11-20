@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from . import auth, config, db
 from .auth import COOKIE_NAME, current_user, require_admin
 from .models import (
+    FINALIST_BUCKETS,
     ArticleType,
     Criterion,
     FieldVerification,
@@ -687,7 +688,7 @@ def runs(request: Request, user: User = Depends(current_user), s: Session = Depe
     return page(request, "runs.html", user, s, nav="runs", runs=rows, counts=counts)
 
 
-def estimate_run(s: Session, discover: bool) -> dict:
+def estimate_run(s: Session, discover: bool, references: int = 0) -> dict:
     """What a consultation will cost, before it is started. Free, and no calls.
 
     The house rule for a tool that spends: next to the thing that spends there
@@ -700,14 +701,20 @@ def estimate_run(s: Session, discover: bool) -> dict:
     calls stage 2 makes. An estimate that is under is worse than none, because
     it is the one people believe.
     """
-    from .matching.pipeline import cost_terms
+    from .matching.pipeline import cost_ceiling, cost_terms
 
-    terms = cost_terms(discover)
+    terms = cost_terms(discover, references)
     total = sum(t["credits"] for t in terms)
     remaining = db.credits_remaining(s)
     return {
         "terms": terms,
         "total": total,
+        # The reference list is pasted into the same form the estimate is
+        # printed on, so its length is not known when the page is drawn. What
+        # can be said beforehand is the rate and the ceiling, and both are.
+        "references": references,
+        "max_references": config.MAX_REFERENCES,
+        "total_with_max_references": cost_ceiling(discover, config.MAX_REFERENCES),
         "remaining": remaining,
         "budget": config.daily_budget(),
         # A ceiling and not a bill: the sweep stops when the pool runs out, and
@@ -716,6 +723,7 @@ def estimate_run(s: Session, discover: bool) -> dict:
         # it is the one affordability is about.
         "classify": config.COST_TEXT,
         "affordable": remaining >= config.COST_TEXT,
+        "affordable_with_references": remaining >= total,
     }
 
 
@@ -798,19 +806,22 @@ def new_run(
     max_apc: str = Form(""),
     discover: str = Form(""),
     doaj: str = Form(""),
+    references: str = Form(""),
     user: User = Depends(require_admin),
     s: Session = Depends(get_db),
 ):
+    from .matching.neighbourhood import extract_dois
     from .matching.pipeline import Refusal, guard_rail
 
     discover_on, doaj_on = discover == "on", doaj == "on"
+    dois = extract_dois(references)[: config.MAX_REFERENCES]
     form = {"title": title, "abstract": abstract, "word_count": word_count,
-            "funder": funder, "max_apc": max_apc,
+            "funder": funder, "max_apc": max_apc, "references": references,
             "discover": discover_on, "doaj": doaj_on}
 
     def refuse(msg: str):
         return page(request, "run_new.html", user, s, nav="runs",
-                    estimate=estimate_run(s, discover_on),
+                    estimate=estimate_run(s, discover_on, len(dois)),
                     min_words=config.MIN_ABSTRACT_WORDS, form=form, error=msg)
 
     # Both checks are free and both are done *before* anything is written. The
@@ -822,12 +833,28 @@ def new_run(
         guard_rail(abstract)
     except Refusal as e:
         return refuse(str(e))
-    est = estimate_run(s, discover_on)
+    est = estimate_run(s, discover_on, len(dois))
     if not est["affordable"]:
         return refuse(
             f"Not enough budget: classifying costs {est['classify']} credits and "
             f"{est['remaining']} are left of {est['budget']} for today. It resets "
             f"at midnight UTC."
+        )
+    # With a reference list the run is known to spend one credit per DOI on top
+    # of the rest, so the whole ceiling has to fit: a neighbourhood that stops
+    # halfway through the references is a list built from the first half of the
+    # alphabet.
+    if dois and not est["affordable_with_references"]:
+        return refuse(
+            f"Not enough budget for the reference list: with {len(dois)} DOIs this "
+            f"run can spend up to {est['total']} credits and {est['remaining']} are "
+            f"left for today. Run it without the references, or after midnight UTC."
+        )
+    if references.strip() and len(dois) < config.MIN_REFERENCES:
+        return refuse(
+            f"Only {len(dois)} DOIs were found in the reference list, and the "
+            f"citation neighbourhood needs at least {config.MIN_REFERENCES}. "
+            f"References without a DOI are not read. Clear the box to run without it."
         )
 
     constraints = {}
@@ -843,6 +870,7 @@ def new_run(
         constraints=constraints,
         scoring_config_version=config.SCORING_CONFIG_VERSION,
         status="running",
+        reference_dois=dois or None,
     )
     s.add(run)
     s.flush()
@@ -866,7 +894,10 @@ def run_detail(request: Request, run_id: int, genre: str = "",
     # has always printed them. Drawn as one ordered list, a venue with no
     # profile reads as the worst of the shortlist rather than as something that
     # is not on that axis at all.
-    buckets: dict[str, list] = {"shortlist": [], "excluded": [], "unclassifiable": []}
+    buckets: dict[str, list] = {
+        "shortlist": [], "neighbourhood": [], "conversation": [],
+        "excluded": [], "unclassifiable": [],
+    }
     for res in s.scalars(
         select(MatchResult)
         .where(MatchResult.run_id == run_id)
@@ -904,9 +935,12 @@ def run_detail(request: Request, run_id: int, genre: str = "",
         # stored by this user, on an instance able to store one at all.
         genre_ready=crypto.available() and bool(user.anthropic_key_encrypted),
         genre_estimate=(
-            genre_mod.cost_estimate(s, [r["result"] for r in buckets["shortlist"]])
-            if buckets["shortlist"] else None
+            genre_mod.cost_estimate(
+                s, [r["result"] for b in FINALIST_BUCKETS for r in buckets[b]]
+            )
+            if any(buckets[b] for b in FINALIST_BUCKETS) else None
         ),
+        neighbourhood_report=(run.constraints or {}).get("_neighbourhood"),
         genre_flash={"state": genre, "judged": judged, "failed": failed, "detail": detail},
         # The manuscript's own profile: the input every score below is measured
         # against, and until now the one thing the page did not show.
@@ -941,7 +975,10 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
     results = list(
         s.scalars(
             select(MatchResult)
-            .where(MatchResult.run_id == run_id, MatchResult.bucket == "shortlist")
+            .where(
+                MatchResult.run_id == run_id,
+                MatchResult.bucket.in_(FINALIST_BUCKETS),
+            )
             .order_by(MatchResult.position)
         )
     )

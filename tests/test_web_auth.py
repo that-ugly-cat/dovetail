@@ -355,6 +355,54 @@ def test_a_run_started_from_the_web_is_never_left_saying_running(client, monkeyp
         assert run.finished_at is not None
 
 
+def test_a_reference_list_is_reduced_to_its_dois_and_kept_on_the_run(client, monkeypatch):
+    """The form takes the list as pasted. What the run keeps is what the
+    neighbourhood is computed from, so it can be redone without asking again."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    monkeypatch.setattr("dovetail.web._execute_run", lambda *a, **kw: None)
+    refs = "\n".join(
+        f"Author {i}. A title. Journal. https://doi.org/10.1000/ref{i}." for i in range(6)
+    )
+    r = client.post(
+        "/app/runs/new",
+        data={"title": "T", "abstract": "word " * 100, "references": refs},
+    )
+    assert r.status_code == 303
+    with db.session_scope() as s:
+        run = s.query(MatchRun).one()
+        assert run.reference_dois == [f"10.1000/ref{i}" for i in range(6)]
+
+
+def test_a_reference_list_with_too_few_dois_is_refused_before_anything_is_spent(client):
+    """A list of books has no DOIs. Running anyway would spend the
+    classification and return a neighbourhood that silently is not there."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    r = client.post(
+        "/app/runs/new",
+        data={"title": "T", "abstract": "word " * 100,
+              "references": "Fricker M. Epistemic injustice. OUP; 2007. doi:10.1000/one"},
+    )
+    assert r.status_code == 200 and "Only 1 DOIs were found" in r.text
+    with db.session_scope() as s:
+        assert s.query(MatchRun).count() == 0
+
+
+def test_the_reference_list_is_priced_before_the_run_starts(client):
+    """One credit per DOI is known the moment the form is posted, so a run that
+    cannot afford its own reference list is refused with the figure."""
+    sign_in(client, "admin@example.org", "pw-admin")
+    with db.session_scope() as s:
+        db.spend(s, config.daily_budget() - config.COST_TEXT - 5)
+    refs = " ".join(f"10.1000/ref{i}" for i in range(40))
+    r = client.post(
+        "/app/runs/new",
+        data={"title": "T", "abstract": "word " * 100, "references": refs},
+    )
+    assert r.status_code == 200 and "Not enough budget for the reference list" in r.text
+    with db.session_scope() as s:
+        assert s.query(MatchRun).count() == 0
+
+
 # --- stage 5a, and the key that pays for it -------------------------------
 
 

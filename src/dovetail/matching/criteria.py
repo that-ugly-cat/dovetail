@@ -28,7 +28,13 @@ class Crit:
     evidence: str
 
 
-def build(venue, score, constraint_outcomes, word_count: int | None = None) -> list[Crit]:
+def build(
+    venue,
+    score,
+    constraint_outcomes,
+    word_count: int | None = None,
+    neighbourhood=None,
+) -> list[Crit]:
     crits: list[Crit] = []
 
     # -- merit ---------------------------------------------------------------
@@ -68,6 +74,32 @@ def build(venue, score, constraint_outcomes, word_count: int | None = None) -> l
                 f"«out of scope» desk reject",
             )
         )
+
+    # The citation neighbourhood, when a reference list was given. Merit, and
+    # evidence of a different kind from the three above: those read OpenAlex's
+    # topics, this reads who cites what the manuscript cites.
+    if neighbourhood is not None:
+        where = f" in {neighbourhood.via_field}" if neighbourhood.via_field else ""
+        crits.append(
+            Crit(
+                MERIT,
+                f"its recent papers cite {neighbourhood.refs_reached} of your "
+                f"{neighbourhood.refs_total} references{where}",
+                1.0,
+                f"{neighbourhood.citing_links} citation links, "
+                f"{neighbourhood.per_1000:g} per 1000 of the "
+                f"{neighbourhood.recent_works} works it published in the window",
+            )
+        )
+        if neighbourhood.cited_here:
+            crits.append(
+                Crit(
+                    MERIT,
+                    f"published {neighbourhood.cited_here} of the works you cite",
+                    1.0,
+                    "primary location of the references, from OpenAlex",
+                )
+            )
 
     types = [t for t in (venue.article_types or []) if t.word_limit]
     if types and word_count:

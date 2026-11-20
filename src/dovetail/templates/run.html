@@ -209,7 +209,7 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
   </div>
   {% endif %}
 
-  {% if not row.result.score_topic and not row.result.score_subfield %}
+  {% if not row.result.score_topic and not row.result.score_subfield and not row.result.neighbourhood %}
   <div class="warn small" style="margin-top:6px">No profile: this zero is «I don't know», not «out of scope».</div>
   {% endif %}
 
@@ -260,6 +260,41 @@ to a person and not to a shared budget. <a href="/app/settings">Store one in set
   <div class="card"><p class="empty" style="padding:0">This run produced no list.</p></div>
 {% endif %}
 
+{% if neighbourhood_report %}
+<h2>Where your references are being read</h2>
+{% set nr = neighbourhood_report %}
+{% if nr.skipped %}
+<div class="card"><p class="muted" style="margin:0">A reference list was given, and only
+{{ nr.references_resolved }} of its {{ nr.references_used }} DOIs are known to OpenAlex. Below
+that the citing journals are a few papers' readership and not a conversation, so nothing is
+listed.</p></div>
+{% else %}
+<p class="sub">A second road to a candidate, and it does not pass through the topics at all. For
+each of the {{ nr.references_resolved }} references OpenAlex knows (of {{ nr.references_given }}
+DOIs given), the journals that published the works citing it since {{ nr.window_since }}. A journal
+is listed when it is reached through at least {{ nr.breadth_gate }} different references, densest
+first: citation links per thousand of what it published in the same years.
+<strong>Not the shortlist's axis</strong>, which is why these are numbered on their own.</p>
+{% if buckets.neighbourhood %}
+  {% for row in buckets.neighbourhood %}{{ result(row) }}{% endfor %}
+{% else %}
+<div class="card"><p class="muted" style="margin:0">Every journal the references lead to is
+already in the list above, or was removed by a constraint.</p></div>
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% if buckets.conversation %}
+<h2>The smaller conversations in your bibliography</h2>
+<p class="sub">The same count, read inside one field of the references at a time. A bibliography
+is usually mostly about the paper's <em>subject</em>, and the journals where its <em>argument</em>
+belongs are reached through the few references that are not. Counted together those are outvoted;
+here each minority field
+({% for f in neighbourhood_report.minority_fields %}{{ f }}{% if not loop.last %}, {% endif %}{% endfor %})
+gets up to three journals of its own.</p>
+{% for row in buckets.conversation %}{{ result(row) }}{% endfor %}
+{% endif %}
+
 {% if buckets.excluded %}
 <h2>Excluded, and shown anyway</h2>
 <p class="sub">Fewer than three journals passed the constraints, so these are here with the
@@ -283,4 +318,10 @@ about merit — and it was the one about merit that failed.</p>
 <p class="note">The score measures how <em>concentrated</em> a journal is on this subject, not how
 suitable it is. The cosine is invariant to scale but not to shape, so against a narrow manuscript it
 rewards narrow journals. Those are different things, and the score itself is not yet validated.</p>
+{% if neighbourhood_report and not neighbourhood_report.skipped %}
+<p class="note">The citation neighbourhood is a statement about the <em>bibliography</em>, not about
+the argument. A manuscript whose references are mostly about its subject gets the subject's
+journals from it, whatever its thesis: measured on 20 Nov 2026, on a paper with 73 of its 89
+references in one field. Density favours small specialist journals for the same reason the cosine does.</p>
+{% endif %}
 {% endblock %}

@@ -2,6 +2,7 @@
 
     1. text profile, with a guard rail
     2. candidate generation, **without constraints**
+    2b. the citation neighbourhood, when a reference list was given (§6b)
     3. scope score at three levels
     4. constraints, criteria, cut
 
@@ -10,6 +11,7 @@ Stage 5 (reading the finalists with an LLM) belongs to Phase 4 and is not here.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -31,6 +33,7 @@ from ..sources.openalex import OpenAlexClient, normalize_source, short_id
 from ..provenance import stamp
 from . import constraints as constraints_mod
 from . import criteria as criteria_mod
+from . import neighbourhood as neighbourhood_mod
 from .scoring import INSUFFICIENT_PROFILE, score_venue, text_profile, venue_profile
 
 
@@ -85,7 +88,7 @@ def classify(session: Session, client: OpenAlexClient, title: str, abstract: str
 # `test_the_estimate_names_every_call_that_spends` walks the source of
 # `generate_candidates` and fails if a call appears there that is not named here,
 # which is the drift that produced the error in the first place.
-def cost_terms(discover: bool = True) -> list[dict]:
+def cost_terms(discover: bool = True, references: int = 0) -> list[dict]:
     from .. import config as _c
 
     terms = [
@@ -119,11 +122,39 @@ def cost_terms(discover: bool = True) -> list[dict]:
                 "credits": 2 * _c.COST_SOURCES,
             },
         ]
+    references = min(references, _c.MAX_REFERENCES)
+    if references:
+        # The second channel. Priced on the number of DOIs in the reference
+        # list, which is known before the button is pressed; the last term is
+        # the ceiling the fetch is cut at, and a real run uses a fraction of it.
+        terms += [
+            {
+                "call": "works_by_dois",
+                "label": "Resolving the reference list",
+                "detail": f"/works by DOI, {references} references in batches of 40",
+                "credits": math.ceil(references / 40) * _c.COST_WORKS_FILTER,
+            },
+            {
+                "call": "sources_citing",
+                "label": "Where each reference is being cited",
+                "detail": "/works grouped by source, once per reference",
+                "credits": references * _c.COST_WORKS_FILTER,
+            },
+            {
+                "call": "sources_by_ids",
+                "label": "Fetching the journals the references lead to",
+                "detail": (
+                    f"/sources by id, at most {_c.NEIGHBOURHOOD_MAX_SOURCES} "
+                    f"in batches of 100"
+                ),
+                "credits": math.ceil(_c.NEIGHBOURHOOD_MAX_SOURCES / 100) * _c.COST_SOURCES,
+            },
+        ]
     return terms
 
 
-def cost_ceiling(discover: bool = True) -> int:
-    return sum(t["credits"] for t in cost_terms(discover))
+def cost_ceiling(discover: bool = True, references: int = 0) -> int:
+    return sum(t["credits"] for t in cost_terms(discover, references))
 
 
 # --- stage 2 --------------------------------------------------------------
@@ -205,6 +236,9 @@ class Row:
     outcomes: list
     criteria: list
     predatory: dict
+    # Set when the citation neighbourhood reached this venue. Beside the score
+    # and never folded into it: see `neighbourhood.py`.
+    neighbourhood: object | None = None
 
     @property
     def excluded(self) -> bool:
@@ -256,7 +290,9 @@ def _reevaluate(
             )
         }
         r.outcomes = constraints_mod.evaluate(r.venue, constraints, verified_at)
-        r.criteria = criteria_mod.build(r.venue, r.score, r.outcomes, word_count)
+        r.criteria = criteria_mod.build(
+            r.venue, r.score, r.outcomes, word_count, r.neighbourhood
+        )
         r.predatory = constraints_mod.predatory_risk(r.venue)
         r.venue.predatory_risk = r.predatory
     session.flush()
@@ -295,10 +331,93 @@ def cut(rows: list[Row]) -> tuple[list[Row], list[Row], list[Row]]:
     return shortlist, excluded[: config.MAX_SHORTLIST - len(shortlist)], unclassifiable
 
 
+def place_neighbourhood(
+    rows: list[Row],
+    shortlist: list[Row],
+    unclassifiable: list[Row],
+    found: neighbourhood_mod.Neighbourhood,
+) -> tuple[list[Row], list[Row], list[Row]]:
+    """Return (neighbourhood, conversations, unclassifiable-that-remain).
+
+    Three things happen here and the order matters.
+
+    **A shortlisted venue that the references also lead to stays where it is**
+    and gains the evidence: two independent roads to one journal is the
+    strongest thing this tool can say, and moving the row would hide it.
+
+    **The densest venues not already shortlisted form a basket of their own**,
+    capped like the shortlist. They are not appended to it: their order is by
+    citation density and the shortlist's is by topic cosine, and a single
+    numbering would state an order between the two.
+
+    **A venue with no topic profile can leave the unclassifiable basket.** That
+    basket means "nothing to measure it with", and for a venue the references
+    reach that is no longer true. It is the case that mattered in practice: a
+    journal sat there, unmeasured, on the one paper it was a real candidate for.
+    """
+    by_id = {r.venue.openalex_id: r for r in rows if r.venue.openalex_id}
+    taken = {id(r) for r in shortlist}
+
+    for r in shortlist:
+        ev = found.find(r.venue.openalex_id) if r.venue.openalex_id else None
+        if ev is not None:
+            r.neighbourhood = ev
+
+    near: list[Row] = []
+    for ev in found.overall:
+        if len(near) >= config.MAX_SHORTLIST:
+            break
+        r = by_id.get(ev.openalex_id)
+        if r is None or r.excluded or id(r) in taken:
+            continue
+        r.neighbourhood = ev
+        near.append(r)
+        taken.add(id(r))
+
+    conversations: list[Row] = []
+    for _field, evidence in found.by_field.items():
+        kept = 0
+        for ev in evidence:
+            if kept >= config.MAX_CONVERSATION_PER_FIELD:
+                break
+            r = by_id.get(ev.openalex_id)
+            if r is None or r.excluded or id(r) in taken:
+                continue
+            r.neighbourhood = ev
+            conversations.append(r)
+            taken.add(id(r))
+            kept += 1
+
+    moved = {id(r) for r in near} | {id(r) for r in conversations}
+    return near, conversations, [r for r in unclassifiable if id(r) not in moved]
+
+
 # --- orchestration --------------------------------------------------------
 
 
-def run_match(
+@dataclass
+class Outcome:
+    """Everything one consultation produced, basket by basket."""
+
+    run: MatchRun
+    shortlist: list[Row]
+    excluded_shown: list[Row]
+    unclassifiable: list[Row]
+    neighbourhood: list[Row]
+    conversations: list[Row]
+    neighbourhood_report: dict | None = None
+
+
+def run_match(*args, **kwargs) -> tuple[MatchRun, list[Row], list[Row], list[Row]]:
+    """The three baskets of the topic channel, as every caller has always had
+    them. `run_match_full` is the same run with the citation neighbourhood's two
+    baskets beside them; this wrapper exists so that adding a channel did not
+    change what a caller who never asked for it receives."""
+    out = run_match_full(*args, **kwargs)
+    return out.run, out.shortlist, out.excluded_shown, out.unclassifiable
+
+
+def run_match_full(
     session: Session,
     client: OpenAlexClient,
     title: str,
@@ -309,8 +428,10 @@ def run_match(
     precomputed_profile: dict | None = None,
     doaj: DoajClient | None = None,
     run: MatchRun | None = None,
-) -> tuple[MatchRun, list[Row], list[Row], list[Row]]:
+    references: list[str] | None = None,
+) -> Outcome:
     constraints = constraints or {}
+    references = list(references or [])
     if run is None:
         run = MatchRun(
             title=title,
@@ -320,6 +441,7 @@ def run_match(
             scoring_config_version=config.SCORING_CONFIG_VERSION,
         )
         session.add(run)
+        run.reference_dois = references or None
     else:
         # A row the caller created and committed before starting, so it had an
         # id to send the browser to while this was still running. Its constraints
@@ -327,6 +449,10 @@ def run_match(
         # and the caller only wrote what the form asked for.
         run.constraints = constraints
         run.scoring_config_version = config.SCORING_CONFIG_VERSION
+        if references:
+            run.reference_dois = references
+        else:
+            references = list(run.reference_dois or [])
 
     # The profile can be reused: redoing it costs 100 credits, i.e. a hundred
     # /sources calls, and it is the spend the daily budget caps at ten.
@@ -350,6 +476,14 @@ def run_match(
     if discover:
         candidates, sweep = generate_candidates(session, client, topic_ids)
 
+    # The second channel does not depend on `discover`: that flag is about the
+    # topic sweep, and a run that re-reads the table for the topics still has to
+    # ask where the references are cited, because nothing in the table
+    # remembers it.
+    found = None
+    if references:
+        found = neighbourhood_mod.build(session, client, references, upsert_venue)
+
     # To the discovered candidates we add whatever is already in the table: the
     # PaperTrail seed holds venues the user knows, which may not surface from
     # this particular text's topics.
@@ -361,18 +495,36 @@ def run_match(
     rows = evaluate_all(session, topics, candidates, constraints, word_count)
     shortlist, excluded_shown, unclassifiable = cut(rows)
 
+    near: list[Row] = []
+    conversations: list[Row] = []
+    if found is not None:
+        near, conversations, unclassifiable = place_neighbourhood(
+            rows, shortlist, unclassifiable, found
+        )
+        for r in shortlist + near + conversations:
+            if r.neighbourhood is not None:
+                r.criteria = criteria_mod.build(
+                    r.venue, r.score, r.outcomes, word_count, r.neighbourhood
+                )
+    finalists = shortlist + near + conversations
+
     # DOAJ runs on the finalists only, then constraints and criteria are redone
     # for those rows: enrichment can change both. Skipping the second pass would
     # leave a shortlist judged on a record that no longer exists — and it is how
     # the "declared N weeks to publication" criterion could never fire, since
     # `publication_time_weeks` was still None when the criteria were built.
     if doaj is not None:
-        enriched = enrich_from_doaj(session, doaj, [r.venue for r in shortlist])
+        enriched = enrich_from_doaj(session, doaj, [r.venue for r in finalists])
         if enriched["enriched"] or enriched["disagreements"]:
-            _reevaluate(session, shortlist, constraints, word_count)
+            _reevaluate(session, finalists, constraints, word_count)
         run.constraints = {**constraints, "_doaj": enriched}
     if sweep is not None:
         run.constraints = {**(run.constraints or constraints), "_sweep": sweep}
+    if found is not None:
+        run.constraints = {
+            **(run.constraints or constraints),
+            "_neighbourhood": found.report,
+        }
 
     # Numbered **inside** each basket, and the basket recorded.
     #
@@ -384,6 +536,8 @@ def run_match(
     # 13, in a shortlist capped at twelve.
     numbered = (
         [("shortlist", r) for r in shortlist]
+        + [("neighbourhood", r) for r in near]
+        + [("conversation", r) for r in conversations]
         + [("excluded", r) for r in excluded_shown]
         + [("unclassifiable", r) for r in unclassifiable]
     )
@@ -409,6 +563,7 @@ def run_match(
                 for o in r.outcomes
             ],
             flags=list(r.score.notes) + r.predatory["flags"],
+            neighbourhood=r.neighbourhood.to_json() if r.neighbourhood else None,
         )
         session.add(result)
         session.flush()
@@ -424,4 +579,12 @@ def run_match(
             )
 
     session.flush()
-    return run, shortlist, excluded_shown, unclassifiable
+    return Outcome(
+        run,
+        shortlist,
+        excluded_shown,
+        unclassifiable,
+        near,
+        conversations,
+        found.report if found is not None else None,
+    )
