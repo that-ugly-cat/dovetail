@@ -13,3 +13,7 @@ validation/case.local.json
 
 # Blind sheets name unpublished manuscripts; the key lives in the database.
 validation/sheets/
+
+# What SQLite keeps beside a database in WAL mode.
+*.db-wal
+*.db-shm
