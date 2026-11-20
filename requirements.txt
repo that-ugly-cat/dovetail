@@ -24,6 +24,8 @@ bcrypt==5.0.0
 fastapi==0.141.1
 httpx==0.28.1
 jinja2==3.1.6
+# Renders the user guide, which is written in Markdown (src/dovetail/docs/guide.md).
+markdown==3.11.3
 mcp[cli]==2.2.0
 python-jose[cryptography]==3.5.0
 python-multipart==0.0.32

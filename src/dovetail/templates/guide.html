@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}User guide — Dovetail{% endblock %}
+{% block body %}
+{# Like the front page, this never looks at who is reading it: it is meant to be
+   readable before signing in, and where Caddy serves it from the public branch
+   the identity headers are stripped. So it carries its own two links instead of
+   the topbar, which only exists for a signed-in user. #}
+<nav class="guide-nav">
+  <a class="brand" href="/">Dovetail</a>
+  <span class="spacer"></span>
+  <a href="/app">Open Dovetail →</a>
+  <button type="button" class="theme-toggle" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><span class="theme-icon-dark" aria-hidden="true">&#9788;</span><span class="theme-icon-light" aria-hidden="true">&#9790;</span></button>
+</nav>
+<article class="guide">{{ guide_html|safe }}</article>
+{% endblock %}

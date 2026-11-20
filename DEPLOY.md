@@ -165,6 +165,14 @@ match_run.status` on every page that lists runs. Check with:
 docker exec dovetail python -m dovetail.cli init-db
 ```
 
+## 7b. Making the user guide public
+
+`/guide` takes no user and no database, like `/`. Behind Borant ID it is still
+gated unless Caddy is told otherwise: add `/guide` to the `@pubbliche` path
+matcher of the site block, next to `/` and `/login`, and reload Caddy. Without
+that the front page's link to the guide sends an anonymous reader to sign in
+first, which works and is one step more than it needs to be.
+
 ## 8. Turning on stage 5a
 
 Stage 5a asks a model whether a journal publishes work of the same *kind* as a

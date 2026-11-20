@@ -5,12 +5,181 @@
    that cannot recognise anyone, offering a link back to itself, is a ring nobody
    gets into — and pointing at the gateway's own URL would wire Borant ID into an
    app that has to keep working without it. One button covers all four cases. #}
-<div class="landing">
-  {% include "_showcase.html" %}
+<div class="front">
+  <h1 class="hero">Dovetail</h1>
+  <p class="lead">Where to send a paper. Paste a title, an abstract and your reference list, and
+  Dovetail lists candidate journals — each with the reasons that hold it up, and with what it could
+  not check said plainly. It finds and explains. <strong>You decide.</strong></p>
+
   <div class="cta">
-    <a class="btn" href="/app">Open Dovetail</a>
+    <a class="btn" href="/app">Open Dovetail →</a>
+    <a class="more" href="/guide">User guide →</a>
   </div>
-  <p class="muted small">You sign in with Borant ID, or with a password where this instance runs on
+
+  {# The process, which is what this page is for. Five steps and one fork: the
+     fork is the part that is not obvious, and it is drawn as one. #}
+  <h2 class="front-h">How it works</h2>
+  <ol class="process">
+    <li class="step">
+      <span class="num">1</span>
+      <div><strong>You give it the manuscript</strong>
+      <span>Title and abstract, and the reference list if you have it. Optionally a word count,
+      your funder, the highest fee you can pay.</span></div>
+    </li>
+    <li class="step">
+      <span class="num">2</span>
+      <div><strong>It reads what the paper is about</strong>
+      <span>OpenAlex classifies the title and abstract into topics. You are shown them, so you can
+      see at once if the paper was misread.</span></div>
+    </li>
+    <li class="step fork">
+      <span class="num">3</span>
+      <div><strong>It looks for journals in two ways</strong>
+        <div class="roads">
+          <div class="road">
+            <em>By subject</em>
+            <span>Journals that publish on those topics, compared with your abstract at three
+            levels of detail.</span>
+          </div>
+          <div class="road">
+            <em>By your references</em>
+            <span>Journals whose recent papers cite the works you cite. This is how it finds the
+            journals of your <em>argument</em> when the abstract names only its subject.</span>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <span class="num">4</span>
+      <div><strong>It weighs each journal</strong>
+      <span>What makes a journal a good home for the argument is kept apart from fee, access and
+      speed. Your constraints mark or exclude. A fact that is missing never excludes.</span></div>
+    </li>
+    <li class="step">
+      <span class="num">5</span>
+      <div><strong>You read the lists</strong>
+      <span>Separate lists, each with its reasons, that you can reorder. If you want, a model
+      checks whether each journal publishes your <em>kind</em> of paper, and the word limits in its
+      guidelines are compared with yours.</span></div>
+    </li>
+  </ol>
+  <p class="front-note">A consultation takes one to two minutes, and only you can see it.</p>
+
+  <h2 class="front-h">What it holds to</h2>
+  <div class="pillars">
+    <div class="pillar">
+      <div class="pillar-icon">≠</div>
+      <div class="pillar-text"><strong>A list, not a ranking</strong>
+      <span>Each journal is compared with your manuscript, among the journals found that day. A
+      place in a list says nothing about the journal in general, and the lists are never merged
+      into one.</span></div>
+    </div>
+    <div class="pillar">
+      <div class="pillar-icon">⚖</div>
+      <div class="pillar-text"><strong>Merit and logistics apart</strong>
+      <span>A journal that does well only on cost, access and speed is marked. That rule comes
+      from a real choice that rested on three logistical reasons and one about merit — and it was
+      the one about merit that failed.</span></div>
+    </div>
+    <div class="pillar">
+      <div class="pillar-icon">?</div>
+      <div class="pillar-text"><strong>Unknown is not excluded</strong>
+      <span>The fee is missing for nine journals in ten. A journal is never removed for a fact
+      nobody has: it stays, marked for you to check. And a journal nothing is known about is
+      listed apart, not last.</span></div>
+    </div>
+    <div class="pillar">
+      <div class="pillar-icon">⚿</div>
+      <div class="pillar-text"><strong>Your manuscript stays yours</strong>
+      <span>Journals are shared by everyone. A consultation is seen only by whoever started it —
+      not by other members and not by admins — and runs on your own keys, so it spends nobody
+      else's budget. You can delete it.</span></div>
+    </div>
+    <div class="pillar">
+      <div class="pillar-icon">⌘</div>
+      <div class="pillar-text"><strong>Assistants are users too</strong>
+      <span>An MCP endpoint lets an AI assistant run a consultation and explain it, on your key
+      and for you alone. It can propose a correction to a journal's record. It cannot approve one:
+      that is a button, pressed by a person.</span></div>
+    </div>
+  </div>
+
+  <div class="explainers">
+    <details class="explainer">
+      <summary><span class="badge-r plain">plain words</span> Why choosing a journal needs this much care</summary>
+      <div class="body">
+        <p><strong>The problem.</strong> Most papers go to the journal their authors thought of
+        first: the one they read, the one a colleague suggested, the one with the name. When it is
+        the wrong one, the answer comes back in a few days — «out of scope», or «not in a format we
+        publish» — and the weeks spent formatting for it are gone. Then the second choice is made
+        the same way.</p>
+        <p><strong>What Dovetail does about it.</strong> It looks for candidates in two ways that
+        do not depend on each other. One reads your abstract and asks which journals publish on
+        that subject. The other reads your bibliography and asks which journals are citing the
+        same works you cite — which is where your argument is already being discussed, whatever
+        its subject. A journal both ways lead to is a strong candidate. When the two disagree,
+        the disagreement is itself the finding: it usually means the paper is <em>about</em> one
+        thing and <em>argues</em> in another field.</p>
+        <p><strong>Why it shows its reasons.</strong> A bare list of names would be one more
+        opinion. Each journal comes with what holds it up, split in two: reasons of merit, and
+        practical ones. People choosing a journal tend to be convinced by the second kind — it is
+        fast, it is open, it is cheap — so a journal that has only those is flagged.</p>
+        <p><strong>What it does not do.</strong> It does not predict acceptance and it does not
+        rank journals. Its scores say how concentrated a journal is on your subject, which favours
+        narrow journals over broad ones that would also take the paper; they have not been checked
+        against real outcomes. It reads only references that have a DOI, so a bibliography of
+        books tells it little. It is a way to find candidates you would not have thought of and
+        to see why each is there. The reading is yours.</p>
+      </div>
+    </details>
+    <details class="explainer">
+      <summary><span class="badge-r geek">geek mode</span> Data, scoring, models, MCP surface</summary>
+      <div class="body">
+        <p><strong>Stack.</strong> FastAPI, SQLite in WAL mode, Jinja2, Docker behind Caddy and
+        Borant ID. No JavaScript framework: three small scripts, for the theme, for forms in
+        flight and for reordering a list.</p>
+        <p><strong>Data.</strong> OpenAlex for the inventory — journals, their topics, works and
+        citations — and DOAJ for licence, fees and declared time to publication. Every field on a
+        journal's record carries its own source and date, and one older than 180 days is checked
+        again before it is trusted to exclude.</p>
+        <p><strong>By subject.</strong> <code>/text/topics</code> classifies title and abstract;
+        journals sharing a topic are swept, and each is scored by the cosine between the text's
+        topic vector and the journal's, at topic, subfield and field level. The list is ordered
+        by 2 × topic + subfield. A journal is reachable this way only if the topic is among its
+        25 most frequent, which is the limit the second road exists for.</p>
+        <p><strong>By reference.</strong> For each DOI in the reference list, the works citing it
+        since 1 January five years back, grouped by journal — one call per reference, so that
+        breadth can be counted and one heavily cited review does not become the list. A journal
+        passes when at least 5% of the references lead to it, and never fewer than two; the order
+        is citation links per 1,000 works it published in the same window. The references are
+        also read one field at a time, and each minority field gets up to three journals of its
+        own. Nothing is merged with the subject score.</p>
+        <p><strong>Models.</strong> Two optional steps, each on the user's own Anthropic key.
+        <code>{{ genre_model }}</code> reads a journal's recent titles and judges form and method,
+        not subject; its verdict is stored beside the scores and never orders anything, because it
+        is not reproducible. <code>{{ guidelines_model }}</code> reads one page of author
+        guidelines into article types, and every number is kept only if the sentence it was read
+        from is on the page and the number is in the sentence.</p>
+        <p><strong>Whose is what.</strong> Journals are one shared table. A consultation carries
+        its owner, and one that is not yours answers 404 like one that does not exist, on every
+        surface. OpenAlex and Anthropic keys are per user, Fernet-encrypted, and each personal
+        OpenAlex key spends from a ledger of its own.</p>
+        {# Named from the registry, not by hand: a count written here goes stale
+           the day a tool is added, and this page is public. #}
+        <p><strong>MCP.</strong> Streamable HTTP at <code>/mcp</code>, one key per user in an
+        <code>X-API-Key</code> header{% if mcp_tools %}, {{ mcp_tools|length }} tools:
+        {% for name in mcp_tools %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.
+        A tool can file a proposal and none can approve one: a test fails if a tool whose name
+        contains <em>approve</em>, <em>delete</em> or <em>remove</em> is ever added.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="cta">
+    <a class="btn" href="/app">Open Dovetail →</a>
+    <a class="more" href="/guide">User guide →</a>
+  </div>
+  <p class="front-note">You sign in with Borant ID, or with a password where this instance runs on
   its own.</p>
 </div>
 {% endblock %}

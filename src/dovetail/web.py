@@ -12,6 +12,7 @@ it is the mistake this codebase's older sibling made once and wrote down.
 
 from __future__ import annotations
 
+import functools
 import re
 import contextlib
 import os
@@ -355,7 +356,65 @@ def landing(request: Request):
     There is no `s: Session` parameter on purpose. A route with no database and
     no user cannot leak either.
     """
-    return templates.TemplateResponse(request=request, name="landing.html", context={})
+    from .matching import genre, guidelines
+
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html",
+        context={
+            "mcp_tools": _mcp_tool_names(),
+            "genre_model": genre.MODEL,
+            "guidelines_model": guidelines.MODEL,
+        },
+    )
+
+
+@functools.lru_cache(maxsize=1)
+def _mcp_tool_names() -> tuple[str, ...]:
+    """The tools the MCP surface really has, for the front page to name.
+
+    Read from the registry and not written by hand: a list typed into a
+    template goes stale the day a tool is added, on a page that is public. If
+    the registry cannot be read the page loses that sentence's tail rather
+    than claiming there are none.
+    """
+    import asyncio
+
+    try:
+        return tuple(sorted(t.name for t in asyncio.run(mcp_server.server.list_tools())))
+    except Exception:  # noqa: BLE001 - a showcase must not fail on its own footnote
+        return ()
+
+
+GUIDE_SOURCE = Path(__file__).resolve().parent / "docs" / "guide.md"
+
+
+@functools.lru_cache(maxsize=1)
+def _guide_html() -> str:
+    """The user guide, from Markdown to HTML, once per process.
+
+    It is written in Markdown because it is prose that will be edited far more
+    often than the code around it, and by people who should not have to read a
+    template to fix a sentence.
+    """
+    import markdown
+
+    return markdown.markdown(
+        GUIDE_SOURCE.read_text(encoding="utf-8"),
+        extensions=["tables", "toc", "sane_lists"],
+        extension_configs={"toc": {"toc_depth": "2-2", "title": "Contents"}},
+    )
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide(request: Request):
+    """The user guide. Like the front page it takes no user and no database, so
+    it reads the same whether or not anybody is signed in, and can be served
+    from Caddy's public branch by adding `/guide` to the paths listed there.
+    Until that is done it sits behind the gate like the rest of the app."""
+    return templates.TemplateResponse(
+        request=request, name="guide.html", context={"guide_html": _guide_html()}
+    )
 
 
 @app.exception_handler(status.HTTP_401_UNAUTHORIZED)

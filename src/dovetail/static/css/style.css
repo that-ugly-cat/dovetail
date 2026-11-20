@@ -409,3 +409,110 @@ details.explain.inline { border: 0; padding: 0; margin: 8px 0 0; }
 .topics { margin: 6px 0; padding-left: 20px; }
 .topics li { margin: 8px 0; color: var(--text); font-size: 14px; }
 .topics .val { float: right; color: var(--muted-2); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+
+/* ── the front page ──
+ * Read top to bottom by somebody who has never seen the app: what it is, how
+ * it works, what it holds to, and then as much more as they ask for. Left
+ * aligned and in one column, because it is prose with a process in the middle
+ * and not a row of cards.
+ */
+.front { max-width: 760px; margin: 0 auto; padding-top: 40px; }
+.front .hero { margin: 0 0 10px; }
+.lead { color: var(--muted); font-size: 17px; line-height: 1.7; margin: 0 0 6px; }
+.lead strong { color: var(--text); }
+.front-h {
+  font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted-2); margin: 44px 0 16px;
+}
+.front-note { color: var(--muted-2); font-size: 13.5px; margin: 14px 0 0; }
+.front .cta { margin: 26px 0 0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.front .cta .more { color: var(--accent-light); text-decoration: none; font-size: 14px; }
+.front .cta .more:hover { text-decoration: underline; }
+
+/* The process: numbered steps down a rule, and one step that forks in two. */
+.process { list-style: none; margin: 0; padding: 0; position: relative; }
+.process::before {
+  content: ""; position: absolute; left: 16px; top: 18px; bottom: 18px;
+  width: 1px; background: var(--border);
+}
+.step { display: flex; gap: 16px; align-items: flex-start; padding: 0 0 20px; position: relative; }
+.step:last-child { padding-bottom: 0; }
+.step .num {
+  flex: 0 0 33px; height: 33px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card); border: 1px solid var(--accent); color: var(--accent-light);
+  font-size: 14px; font-weight: 700; position: relative; z-index: 1;
+}
+.step > div { min-width: 0; flex: 1; padding-top: 4px; }
+.step strong { display: block; font-size: 15.5px; margin-bottom: 3px; }
+.step span { color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+.roads { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; margin-top: 8px; }
+.road {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.road > em { display: block; font-style: normal; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.road span { font-size: 14px; }
+
+.pillars { display: flex; flex-direction: column; gap: 16px; }
+.pillar { display: flex; gap: 14px; align-items: flex-start; }
+.pillar-icon {
+  flex: 0 0 34px; height: 34px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--accent-light); font-size: 15px; font-weight: 700;
+}
+.pillar-text strong { display: block; font-size: 14.5px; margin-bottom: 2px; }
+.pillar-text span { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+.explainers { display: flex; flex-direction: column; gap: 10px; margin: 36px 0 0; }
+.explainer { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.explainer[open] { border-color: var(--accent); }
+.explainer summary {
+  padding: 12px 16px; cursor: pointer; font-size: 14.5px; font-weight: 600;
+  display: flex; align-items: baseline; gap: 10px; list-style: none;
+}
+.explainer summary::-webkit-details-marker { display: none; }
+.explainer summary::before { content: "▸"; color: var(--muted-2); font-size: 12px; }
+.explainer[open] summary::before { content: "▾"; }
+.explainer summary:hover { color: var(--accent-light); }
+.explainer .body { padding: 0 18px 14px 34px; }
+.explainer .body p { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 10px 0; }
+.explainer .body strong { color: var(--text); }
+.badge-r {
+  display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px;
+  border: 1px solid var(--border); border-radius: 4px;
+  text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+}
+.badge-r.plain { border-color: var(--accent); color: var(--accent-light); }
+.badge-r.geek { border-color: var(--ok-border); color: var(--ok); }
+
+/* ── the user guide ── */
+.guide-nav {
+  display: flex; align-items: center; gap: 16px; max-width: 800px;
+  margin: 0 auto 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.guide-nav .brand { font-weight: 700; font-size: 17px; color: var(--text); text-decoration: none; }
+.guide-nav .spacer { flex: 1; }
+.guide-nav a { color: var(--accent-light); text-decoration: none; font-size: 14px; }
+.guide { max-width: 800px; margin: 0 auto; font-size: 15px; line-height: 1.7; }
+.guide h1 { font-size: 27px; margin: 22px 0 12px; line-height: 1.3; }
+.guide h2 { font-size: 19px; margin: 40px 0 10px; color: var(--accent-light); line-height: 1.35; }
+.guide h3 { font-size: 15.5px; margin: 24px 0 8px; color: var(--text); text-transform: none; letter-spacing: 0; }
+.guide p, .guide li { color: var(--muted); margin: 0 0 11px; }
+.guide ul, .guide ol { padding-left: 22px; margin: 0 0 12px; }
+.guide strong { color: var(--text); }
+.guide table { border-collapse: collapse; margin: 14px 0; display: block; overflow-x: auto; font-size: 14px; }
+.guide th, .guide td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; vertical-align: top; color: var(--muted); }
+.guide th { background: var(--card); color: var(--text); white-space: nowrap; }
+.guide hr { border: 0; border-top: 1px solid var(--border); margin: 26px 0; }
+.guide .toc {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 18px; margin: 18px 0;
+}
+.guide .toc .toctitle { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-2); }
+.guide .toc ul { list-style: none; padding: 0; margin: 8px 0 0; columns: 2; column-gap: 28px; }
+.guide .toc li { margin: 0 0 5px; break-inside: avoid; }
+.guide .toc a { text-decoration: none; }
+@media (max-width: 620px) { .guide .toc ul { columns: 1; } }

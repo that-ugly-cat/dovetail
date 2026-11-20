@@ -31,6 +31,9 @@ itself until the row says otherwise.
 
 ## What it does
 
+The front page (`/`) walks through the process step by step, and the **user guide** is at `/guide`
+(source: `src/dovetail/docs/guide.md`). Start there if you are going to use it rather than run it.
+
 Given a manuscript it produces a list of candidate venues, each with its article type,
 word limit, open access status against the funder, and the criteria that hold it up **labelled as
 merit or logistics**. A venue standing on fewer than two merit criteria comes out in red, however
@@ -56,7 +59,7 @@ uv run dovetail seed            # resolve PaperTrail's venues, file alias propos
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
 uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
-uv run pytest                   # 220 tests
+uv run pytest                   # 223 tests
 ```
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:

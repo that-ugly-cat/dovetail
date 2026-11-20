@@ -1,27 +1,8 @@
-{# The public copy, in one place.
-   Both the front page and the sign-in page show it, and neither of them may
-   look at who is reading: on the public branch of Caddy the identity headers
-   are stripped by construction, so a `{% if user %}` in here would be always
-   false behind the gate and sometimes true standalone. #}
+{# The short public copy, for the sign-in page. The front page has the long
+   one. Neither may look at who is reading: on the public branch of Caddy the
+   identity headers are stripped by construction, so a `{% if user %}` in here
+   would be always false behind the gate and sometimes true standalone. #}
 <h1 class="hero">Dovetail</h1>
 <p class="lede">Where to send a paper. From a title, an abstract and, if you have it, the reference
 list, Dovetail lists candidate journals with the reasons for each — and says plainly what it could
-not check.</p>
-
-<div class="cards">
-  <div class="card">
-    <h2>A list, not a ranking</h2>
-    <p>Each journal is compared with your manuscript, among the journals found that day. A place
-    in the list says nothing about the journal in general, and nothing here pretends it does.</p>
-  </div>
-  <div class="card">
-    <h2>Merit and logistics apart</h2>
-    <p>What makes a journal a good home for the argument is kept separate from cost, access and
-    speed. A journal that does well only on the second kind is marked.</p>
-  </div>
-  <div class="card">
-    <h2>Unknown is not excluded</h2>
-    <p>A journal is never removed because a fact about it is missing or out of date. It stays in
-    the list, marked for you to check.</p>
-  </div>
-</div>
+not check. <a href="/">How it works</a> · <a href="/guide">User guide</a></p>

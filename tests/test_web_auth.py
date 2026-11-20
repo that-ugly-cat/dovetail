@@ -716,7 +716,8 @@ def test_no_page_talks_to_a_reader_in_the_tools_own_vocabulary(client):
     jargon = re.compile(r"stage \d|sweep|shortlist|unclassifiable|the cut\b|basket", re.I)
     for path in ("/app", "/app/runs", "/app/runs/new", f"/app/runs/{run_id}", "/app/venues",
                  f"/app/venues/{venue_id}", f"/app/venues/{venue_id}/profile",
-                 "/app/venues/new", "/app/proposals", "/app/settings", "/app/admin/users"):
+                 "/app/venues/new", "/app/proposals", "/app/settings", "/app/admin/users",
+                 "/guide"):
         r = client.get(path)
         assert r.status_code == 200, path
         # What a person reads: the markup's own attributes and the scripts are
@@ -806,3 +807,55 @@ def test_a_journal_shows_the_number_its_list_is_ordered_by(client):
     # And the topics can be read in full, with where each sits and what it means.
     assert "Read the topics in full" in page
     assert "A Domain › A Field ›" in page and 'href="https://openalex.org/T1"' in page
+
+
+# --- the front page and the guide -----------------------------------------
+
+
+def test_the_front_page_explains_the_process_to_somebody_not_signed_in(client):
+    """It is the one page a stranger sees. It has to say what the tool does, in
+    the order it does it, and where to go next — without looking at who is
+    reading, which on the public branch it cannot."""
+    r = client.get("/")
+    assert r.status_code == 200
+    page = r.text
+    for step in ("You give it the manuscript", "It reads what the paper is about",
+                 "It looks for journals in two ways", "It weighs each journal",
+                 "You read the lists"):
+        assert step in page
+    assert page.index("You give it the manuscript") < page.index("You read the lists")
+    assert "By subject" in page and "By your references" in page
+    assert 'href="/app"' in page and 'href="/guide"' in page
+    # Nothing on it comes from the database or from a session.
+    assert "admin@example.org" not in page
+
+
+def test_the_front_page_names_the_mcp_tools_that_exist(client):
+    """Read from the registry. A list typed into the template said one thing
+    while the server registered another, on the page of a sister tool."""
+    import asyncio
+
+    from dovetail.mcp_server import server
+
+    real = sorted(t.name for t in asyncio.run(server.list_tools()))
+    page = client.get("/").text
+    assert f"{len(real)} tools" in page
+    for name in real:
+        assert f"<code>{name}</code>" in page
+
+
+def test_the_guide_reads_the_same_signed_in_or_not(client):
+    """Written in Markdown and served as a page. It takes no user, so it can be
+    read before signing in wherever the proxy lets it through."""
+    anonymous = client.get("/guide")
+    assert anonymous.status_code == 200
+    page = anonymous.text
+    assert "<h1" in page and "User Guide" in page
+    # The table of contents and the tables are rendered, not left as Markdown.
+    assert 'class="toc"' in page and "<table>" in page and "[TOC]" not in page
+    assert "| member | admin |" not in page
+    # It answers the question that was asked while it was being written: an
+    # Anthropic key is not needed to start a consultation.
+    assert "You do <strong>not</strong> need it to run a consultation" in page
+    sign_in(client, "admin@example.org", "pw-admin")
+    assert client.get("/guide").text == page
