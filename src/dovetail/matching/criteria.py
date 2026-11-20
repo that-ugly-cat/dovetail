@@ -109,9 +109,24 @@ def build(
             crits.append(
                 Crit(
                     MERIT,
-                    f"format fits: {best.name} ({best.word_limit} words)",
+                    f"format fits: {best.name} ({best.word_limit} words{_scope(best)})",
                     1.0,
                     best.source_url or "guidelines",
+                )
+            )
+        else:
+            # Not an exclusion: the word count given is the author's own figure,
+            # and whether it counts the references is exactly what differs from
+            # one journal to the next. But it is the shape of the first real
+            # failure this tool was consulted on, and it used to pass in silence.
+            longest = max(types, key=lambda t: t.word_limit)
+            crits.append(
+                Crit(
+                    LOGISTICS,
+                    f"over every word limit on record: the longest is {longest.name}, "
+                    f"{longest.word_limit} words{_scope(longest)}, against {word_count}",
+                    0.0,
+                    longest.source_url or "guidelines",
                 )
             )
 
@@ -146,6 +161,14 @@ def build(
             crits.append(Crit(LOGISTICS, "passes every declared constraint", 1.0, "constraints"))
 
     return crits
+
+
+def _scope(article_type) -> str:
+    """What the limit counts, beside the limit. A number without it misleads:
+    8,000 including references and 9,000 excluding them give opposite verdicts
+    on the same manuscript."""
+    scope = (getattr(article_type, "word_limit_scope", None) or "").strip()
+    return f"; counts: {scope}" if scope else "; what it counts is not on record"
 
 
 def count_merit(crits: list[Crit]) -> int:

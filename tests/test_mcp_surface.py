@@ -51,7 +51,10 @@ def test_every_write_is_named_like_one():
     name is the thing this catches.
     """
     writes = {n for n in tool_names() if n.startswith(("propose_", "match_", "judge_"))}
-    assert writes == {"propose_venue", "propose_update", "match_venues", "judge_finalists"}
+    assert writes == {
+        "propose_venue", "propose_update", "propose_article_types",
+        "match_venues", "judge_finalists",
+    }
 
     reads = tool_names() - writes
     assert all(
@@ -169,7 +172,7 @@ def test_the_mcp_endpoint_is_closed_without_a_key(http):
 def test_a_reader_key_can_list_and_read(http):
     client, keys = http
     r = rpc(client, keys["reader"], "tools/list")
-    assert r.status_code == 200 and len(r.json()["result"]["tools"]) == 13
+    assert r.status_code == 200 and len(r.json()["result"]["tools"]) == 14
 
 
 def test_a_reader_key_cannot_write_to_the_queue(http):

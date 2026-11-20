@@ -854,6 +854,88 @@ def propose_update(
         return {"proposal_id": p.id, "status": "pending"}
 
 
+@server.tool()
+def propose_article_types(venue_id: int, source_url: str, page_text: str = "") -> dict:
+    """Stage 5b: read a journal's author guidelines and file its article types.
+
+    Give the URL of the page that lists the article types and their limits. The
+    server fetches it, a model reads it into article types with word, abstract,
+    reference and figure limits, and **every number is checked against the page**:
+    a limit that is not in the sentence quoted for it is dropped and reported.
+    What survives goes into the approval queue. Nothing is written to the
+    journal's record here, and nothing on this surface can approve it.
+
+    **A word limit never comes without what it counts** — whether the abstract,
+    the references and the notes are included. Where the page does not say, the
+    scope reads «not stated» and the proposal's confidence drops.
+
+    **Some publishers refuse automated requests** (Wiley, OUP and BMJ did on
+    8 Sep 2026; Springer did not). The answer is then `blocked_by_publisher`:
+    read the page yourself and call again with its text in `page_text`. The same
+    goes for a PDF. `source_url` is still required then — it is recorded as
+    where the limits came from.
+
+    **It spends your own money**: one small model call, charged to the
+    Anthropic key stored by whoever owns the MCP key in use.
+    """
+    from anthropic import APIError
+
+    from .matching import genre, guidelines
+    from .sources import guidelines as pages
+
+    denied = _needs_admin()
+    if denied:
+        return denied
+    if not source_url.strip():
+        return {"error": "source_url is required: a limit without its page cannot be rechecked"}
+
+    db.init_engine()
+    with db.session_scope() as s:
+        venue = s.get(Venue, venue_id)
+        if venue is None:
+            return {"error": f"no venue {venue_id}"}
+        try:
+            text = (
+                pages.clean_text(page_text) if page_text.strip()
+                else pages.fetch_text(source_url.strip())
+            )
+        except pages.GuidelinesError as e:
+            return {"error": e.code, "detail": e.detail}
+        if not text:
+            return {"error": "unsupported_page", "detail": "the page has no readable text"}
+
+        client, problem = _callers_key(s)
+        if problem:
+            return problem
+        try:
+            found = guidelines.extract(client, venue.display_name, text)
+        except guidelines.ExtractionUnavailable as e:
+            return {"error": e.code, "detail": str(e)}
+        except APIError as e:
+            code, detail = genre.classify_api_error(e)
+            return {"error": code, "detail": detail}
+
+        if not found.types:
+            return {
+                "proposal_id": None,
+                "article_types": [],
+                "dropped": found.dropped,
+                "page_is_guidelines": found.page_is_guidelines,
+                "note": "nothing on this page could be filed, so nothing was",
+            }
+        p = guidelines.propose(s, venue, source_url.strip(), found)
+        return {
+            "proposal_id": p.id,
+            "status": "pending",
+            "venue": venue.display_name,
+            "confidence": p.confidence,
+            "article_types": found.types,
+            "dropped": found.dropped,
+            "model": found.model,
+            "note": "filed for approval. A person approves it in the web app.",
+        }
+
+
 def main() -> None:  # pragma: no cover - entry point
     server.run(transport="stdio")
 

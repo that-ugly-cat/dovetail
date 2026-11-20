@@ -548,6 +548,89 @@ def judge_venues_cmd(
     )
 
 
+@app.command("read-guidelines")
+def read_guidelines_cmd(
+    venue_id: int = typer.Option(..., help="The journal the page belongs to."),
+    url: str = typer.Option(..., help="The guidelines page. Recorded as the source."),
+    text_file: Path = typer.Option(
+        None, help="The page's text, when the publisher refuses an automated fetch."
+    ),
+    as_user: str = typer.Option(
+        None, help="Use this user's stored Anthropic key instead of ANTHROPIC_API_KEY."
+    ),
+):
+    """Stage 5b: read a guidelines page into article types and file a proposal.
+
+    Every limit is checked against the page before it is filed, and nothing is
+    written to the journal: the proposal waits in the queue.
+    """
+    import os
+
+    from anthropic import APIError
+    from sqlalchemy import select
+
+    from . import crypto
+    from .matching import genre, guidelines
+    from .models import User
+    from .sources import guidelines as pages
+
+    db.init_engine()
+    with db.session_scope() as s:
+        venue = s.get(Venue, venue_id)
+        if venue is None:
+            typer.secho(f"no venue {venue_id}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+        raw = os.environ.get("ANTHROPIC_API_KEY")
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+        if as_user:
+            u = s.scalar(select(User).where(User.email == as_user))
+            if u is None or not u.anthropic_key_encrypted:
+                typer.secho(f"{as_user} has no stored Anthropic key", fg=typer.colors.RED)
+                raise typer.Exit(code=1)
+            raw = crypto.decrypt_api_key(u.anthropic_key_encrypted)
+            workspace = u.anthropic_workspace_id or workspace
+        if not raw:
+            typer.secho(
+                "no Anthropic key: set ANTHROPIC_API_KEY or pass --as-user",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        try:
+            text = (
+                pages.clean_text(text_file.read_text(encoding="utf-8")) if text_file
+                else pages.fetch_text(url)
+            )
+            found = guidelines.extract(
+                genre.build_client(raw, workspace), venue.display_name, text
+            )
+        except pages.GuidelinesError as e:
+            typer.secho(f"{e.code}: {e.detail}", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=2)
+        except guidelines.ExtractionUnavailable as e:
+            typer.secho(f"{e.code}: {e}", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=2)
+        except APIError as e:
+            code, detail = genre.classify_api_error(e)
+            typer.secho(f"{code}: {detail}", fg=typer.colors.RED)
+            raise typer.Exit(code=4)
+
+        for d in found.dropped:
+            typer.secho(f"  dropped — {d['name']}: {d['why']}", fg=typer.colors.YELLOW)
+        if not found.types:
+            typer.secho("nothing on this page could be filed", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=3)
+        p = guidelines.propose(s, venue, url, found)
+        typer.echo(f"proposal #{p.id} for {venue.display_name} — confidence {p.confidence}")
+        for t in found.types:
+            limit = (
+                f"{t['word_limit']} words, counts: {t['word_limit_scope']}"
+                if t.get("word_limit") else "no word limit on the page"
+            )
+            typer.echo(f"  {t['name']}: {limit}")
+
+
 @app.command("blind-sheet")
 def blind_sheet_cmd(
     run_id: int = typer.Option(..., help="A consultation that already has a shortlist."),
