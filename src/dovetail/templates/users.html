@@ -1,11 +1,14 @@
 {% extends "base.html" %}{% block title %}Users — Dovetail{% endblock %}
 {% block body %}
 <h1>Users</h1>
-<p class="sub">A reader can look at everything. An admin can also start consultations, which spend an
-OpenAlex budget, and approve proposals.</p>
+<p class="sub">A member can browse the journals and, with their own OpenAlex key, start
+consultations. An admin also looks after what everyone shares: the journals, the review queue and
+this list.</p>
 
 <div class="card pad0 table-wrap"><table class="table">
-  <thead><tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th><th>Active</th><th>Since</th></tr></thead>
+  <thead><tr><th>Email</th><th>Name</th><th>Source</th><th>Role</th>
+    <th class="n">Consultations</th><th>Own OpenAlex key</th><th class="n">Credits on it</th>
+    <th>Active</th><th>Since</th></tr></thead>
   <tbody>
   {% for u in users %}
   <tr {% if not u.is_active %}class="dim"{% endif %}>
@@ -15,11 +18,14 @@ OpenAlex budget, and approve proposals.</p>
     <td>
       <form class="inline" method="post" action="/app/admin/users/{{ u.id }}/role">
         <select name="role" onchange="this.form.submit()" {% if u.id == user.id %}disabled{% endif %} style="width:auto">
-          <option value="reader" {% if u.role.value == 'reader' %}selected{% endif %}>reader</option>
+          <option value="reader" {% if u.role.value == 'reader' %}selected{% endif %}>member</option>
           <option value="admin" {% if u.role.value == 'admin' %}selected{% endif %}>admin</option>
         </select>
       </form>
     </td>
+    <td class="n muted">{{ consultations.get(u.id, 0) }}</td>
+    <td class="muted">{{ 'yes' if has_key.get(u.id) else 'no' }}</td>
+    <td class="n muted">{{ '{:,}'.format(own_spend.get(u.id, 0)) if has_key.get(u.id) else '—' }}</td>
     <td class="muted">{{ 'yes' if u.is_active else 'no' }}</td>
     <td class="muted small">{{ u.created_at.strftime('%d %b %Y') }}</td>
   </tr>
@@ -27,6 +33,11 @@ OpenAlex budget, and approve proposals.</p>
   </tbody>
 </table></div>
 
+<p class="note"><strong>You see how many consultations each person has run and what they spent on
+their own key, and nothing of what the consultations are about.</strong> They hold unpublished
+manuscripts, and only the person who started one can open it.{% if ownerless %} {{ ownerless }}
+{{ 'consultation was' if ownerless == 1 else 'consultations were' }} started from the command line
+and belong to nobody: admins see those among their own.{% endif %}</p>
 <p class="note">You cannot remove your own admin role, so that nobody locks themselves out by
 mistake.</p>
 <p class="note">Someone who signs in through Borant ID for the first time arrives as a reader. A

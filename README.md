@@ -56,13 +56,24 @@ uv run dovetail seed            # resolve PaperTrail's venues, file alias propos
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
 uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
-uv run pytest                   # 200 tests
+uv run pytest                   # 220 tests
 ```
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
 without `OPENALEX_API_KEY` in `.env`, run `match` with `--no-discover`. The reference list works
 either way. In the web app and over MCP a sweep with no key anywhere is refused before it spends
 anything, with the place to get one.
+
+### Whose consultations
+
+Journals are shared by everyone on an instance. **A consultation is seen only by whoever started
+it** — not by other members and not by admins, who get a count and a credit total per person and
+nothing else. It holds the title and the bibliography of a manuscript that is not published. Its
+owner can delete it; the journals it found stay.
+
+Anyone with their own OpenAlex key can start one. An Anthropic key is only needed for the check on
+the kind of paper. A consultation started from the command line has no owner and is seen by admins.
+The rules are in `src/dovetail/ownership.py`.
 
 ### Whose OpenAlex budget
 

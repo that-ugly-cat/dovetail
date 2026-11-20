@@ -36,6 +36,8 @@
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     if ((form.getAttribute("method") || "get").toLowerCase() !== "post") return;
+    // Somebody else already stopped it — a confirmation that was declined.
+    if (event.defaultPrevented) return;
 
     // Already on its way: the second click does nothing.
     if (form.dataset.busy) {

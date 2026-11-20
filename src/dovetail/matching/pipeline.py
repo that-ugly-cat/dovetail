@@ -429,6 +429,7 @@ def run_match_full(
     doaj: DoajClient | None = None,
     run: MatchRun | None = None,
     references: list[str] | None = None,
+    owner_id: int | None = None,
 ) -> Outcome:
     constraints = constraints or {}
     references = list(references or [])
@@ -439,6 +440,7 @@ def run_match_full(
             word_count=word_count,
             constraints=constraints,
             scoring_config_version=config.SCORING_CONFIG_VERSION,
+            user_id=owner_id,
         )
         session.add(run)
         run.reference_dois = references or None

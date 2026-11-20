@@ -43,6 +43,10 @@ can tell: try again in a moment.</div>
   ({{ '{:,}'.format(shared_budget) }} credits{% if not instance_keyed %}, and since this instance has
   no key of its own, Dovetail cannot search for new journals at all{% endif %}).</p>
 
+  {% if not can_consult %}
+  <p class="warn small" style="margin:0 0 12px"><strong>You need a key of your own to start
+  consultations.</strong> Store one below and the «New consultation» button appears.</p>
+  {% endif %}
   <p class="small" style="margin:0 0 12px">Today you are spending from
   {% if budget.own_key %}<strong>your own key</strong>{% else %}<strong>the shared budget</strong>{% endif %}:
   {{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits left.</p>

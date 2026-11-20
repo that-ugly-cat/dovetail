@@ -2,17 +2,23 @@
 {% block body %}
 <div class="head">
   <h1>Overview</h1>
-  {% if user.is_admin() %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
+  {% if can_consult %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
 </div>
 <p class="sub">Candidate journals for a manuscript, with the reasons that hold each one up.</p>
 
-{% if not budget.keyed %}
+{% if not can_consult %}
+<div class="flash"><strong>To start a consultation, add your own OpenAlex key.</strong> It is free,
+and <a href="/app/settings">Settings</a> says how to get one. Your consultations then spend your own
+daily budget, and only you can see them.</div>
+{% endif %}
+
+{% if can_consult and not budget.keyed %}
 <div class="flash"><strong>No OpenAlex key is in use.</strong> Without one the daily budget is a
 tenth of what a free account gets, and Dovetail cannot search for new journals at all.
 <a href="/app/settings">Add your own in Settings</a>: it is free, and the page says how to get one.</div>
 {% endif %}
 
-<div class="section-head"><h2>Recent consultations</h2>
+<div class="section-head"><h2>Your recent consultations</h2>
   {% if recent %}<a class="small" href="/app/runs">all {{ runs_total }}</a>{% endif %}</div>
 {% if recent %}
 <div class="card pad0 table-wrap"><table class="table">
@@ -34,10 +40,10 @@ tenth of what a free account gets, and Dovetail cannot search for new journals a
 </table></div>
 {% else %}
 <div class="card">
-  <p class="muted" style="margin:0">No consultation yet.
-  {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>: paste a title and an abstract, and
+  <p class="muted" style="margin:0">You have no consultations yet.
+  {% if can_consult %}<a href="/app/runs/new">Start one</a>: paste a title and an abstract, and
   the form says what it will cost before you press the button.
-  {% else %}Starting one needs an admin, because it spends an OpenAlex budget.{% endif %}</p>
+  {% else %}To start one, add your own OpenAlex key in <a href="/app/settings">Settings</a>.{% endif %}</p>
 </div>
 {% endif %}
 
@@ -88,6 +94,9 @@ tenth of what a free account gets, and Dovetail cannot search for new journals a
 
 <details class="explain">
   <summary>What these numbers mean</summary>
+  <p><strong>Consultations are yours alone.</strong> Nobody else here can see them, admins included:
+  they hold the title and the bibliography of a manuscript that is not published yet. The journals
+  are shared by everyone.</p>
   <p><strong>A consultation costs OpenAlex credits</strong>: 100 to classify the manuscript, a few
   dozen to search for journals, and one per reference when you paste a reference list. «Consultations
   left» counts only the first of those.</p>

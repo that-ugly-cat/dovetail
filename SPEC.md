@@ -738,6 +738,47 @@ fa spende crediti OpenAlex o cambia un fatto.
 mano, e approva la coda. Approvare è quella che conta: è il punto in cui un suggerimento diventa
 qualcosa che il tool ripeterà come vero.
 
+### Riviste di tutti, consultazioni di chi le avvia (20 nov 2026)
+
+Fino a questa data una consultazione non aveva un proprietario: `match_run` non portava nessun
+riferimento a un utente, e chiunque avesse fatto l'accesso vedeva quelle di tutti — nell'elenco, nel
+cruscotto, nella scheda di ogni rivista e via MCP con qualunque chiave. Con un solo account non si è
+mai notato. Con due, si leggono i titoli di **manoscritti non pubblicati**, che è ciò che la §0b
+tiene fuori dal repository.
+
+**Le riviste restano di tutti**: una tabella sola, che ogni consultazione arricchisce. Di una
+rivista si sa che esiste e cosa pubblica, non chi l'ha fatta emergere né per quale testo.
+
+**Una consultazione è di chi l'ha avviata** (`match_run.user_id`), con tutto ciò che ne dipende.
+Tre decisioni di Spit:
+
+- **Non la vede nessun altro, admin compresi.** Amministrare l'istanza non richiede di leggere i
+  manoscritti altrui: un admin vede quante consultazioni ha fatto ciascuno e quanti crediti ha speso
+  sulla propria chiave, non di cosa parlano.
+- **Può avviarne una chiunque abbia la propria chiave OpenAlex**, oltre agli admin. La regola «serve
+  un admin» esisteva perché si spendeva un budget comune. Per avviare basta la chiave OpenAlex; la
+  chiave Anthropic serve solo al controllo sul tipo di articolo.
+- **La condivisione con un coautore si fa dopo.**
+
+Una consultazione **senza proprietario** — avviata da riga di comando — è dell'istanza, e la vedono
+gli admin. Chi chiama senza identità (riga di comando, MCP su stdio) vede tutto: è un processo
+avviato da chi possiede la macchina e può leggere il file del database.
+
+Le regole stanno in un modulo solo, `ownership.py`, e ogni lettura passa di lì. Una consultazione
+altrui risponde **404 e non 403**, con le stesse parole di una che non esiste: una risposta diversa
+direbbe che esiste. Il proprietario può **cancellarla**; le riviste che ha portato in tabella
+restano.
+
+Il ruolo in database e sul gate si chiama ancora `reader`, perché Borant ID registra i ruoli
+dell'app con quel nome. Nell'interfaccia è mostrato come *member*.
+
+**Cosa non risolve.** Chi ha accesso al server legge il database: i titoli stanno in chiaro in
+SQLite e nei backup. Il budget OpenAlex condiviso non dice chi lo consuma. Le proposte in coda non
+hanno un autore.
+
+**Le consultazioni esistenti.** Dove l'istanza ha un solo account, la migrazione gliele assegna.
+Dove ne ha di più le lascia senza proprietario, invece di indovinare.
+
 ### Le chiavi sono per persona (20 nov 2026)
 
 Le impostazioni tengono due credenziali, cifrate con Fernet e mai mostrate dopo il salvataggio.
@@ -1423,7 +1464,8 @@ l'8 settembre sono la verità a terra contro cui misurarla, una pagina per edito
 
 ### v0.6 — una seconda strada, e due cose che non funzionavano (20 nov 2026)
 
-Aggiunti §6b (vicinato di citazione), §16g e §16h, e in §12 la chiave OpenAlex per persona. Tre correzioni di cose che il documento dava per
+Aggiunti §6b (vicinato di citazione), §16g e §16h, e in §12 la chiave OpenAlex per persona e le
+consultazioni per utente. Tre correzioni di cose che il documento dava per
 funzionanti: `explain_match` su una rivista valutata e non tenuta, lo scoring della scheda in cieco,
 l'approvazione dei tipi di articolo. Il limite noto del metro sui paper concettuali, registrato il
 19 settembre come cosa da scrivere qui, è il primo paragrafo di §6b.

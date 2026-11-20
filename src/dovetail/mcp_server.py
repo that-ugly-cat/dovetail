@@ -23,7 +23,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from sqlalchemy import or_, select
 
-from . import config, db
+from . import config, db, ownership
 from .db import BudgetExhausted
 from .matching import criteria as criteria_mod
 from .matching.neighbourhood import extract_dois
@@ -169,6 +169,24 @@ def budget_status() -> dict:
     }
 
 
+def _may_consult(s) -> dict | None:
+    """Guard for what spends OpenAlex credits on the caller's own manuscript.
+
+    An admin, or anyone whose MCP key belongs to an account with its own
+    OpenAlex key. The proposals stay behind `_needs_admin`: they are about the
+    journals everybody shares.
+    """
+    who = _caller_user(s)
+    if ownership.may_consult(who):
+        return None
+    return {"error": "needs_your_own_openalex_key", "detail": ownership.WHY_NOT}
+
+
+def _own_run(s, run_id: int):
+    """The consultation, if it is the caller's to read. See `ownership.run_for`."""
+    return ownership.run_for(s, run_id, _caller_user(s))
+
+
 def _caller_user(s):
     """The caller as a row of this session, or None over stdio.
 
@@ -292,7 +310,12 @@ def list_runs(limit: int = 10) -> dict:
     """
     db.init_engine()
     with db.session_scope() as s:
-        runs = list(s.scalars(select(MatchRun).order_by(MatchRun.id.desc()).limit(limit)))
+        runs = list(
+            s.scalars(
+                select(MatchRun).where(ownership.visible_to(_caller_user(s)))
+                .order_by(MatchRun.id.desc()).limit(limit)
+            )
+        )
         return {
             "runs": [
                 {
@@ -324,6 +347,8 @@ def explain_match(run_id: int, venue_id: int) -> dict:
     """
     db.init_engine()
     with db.session_scope() as s:
+        if _own_run(s, run_id) is None:
+            return {"error": f"no consultation {run_id}"}
         res = s.scalar(
             select(MatchResult).where(
                 MatchResult.run_id == run_id, MatchResult.venue_id == venue_id
@@ -403,7 +428,7 @@ def _explain_unlisted(s, run_id: int, venue_id: int) -> dict:
     It is recomputed against **today's** record of the venue, not a snapshot —
     there is none for a row that was never written — and says so.
     """
-    run = s.get(MatchRun, run_id)
+    run = _own_run(s, run_id)
     venue = s.get(Venue, venue_id)
     if run is None:
         return {"error": f"no consultation {run_id}"}
@@ -589,7 +614,7 @@ def estimate_genre_judgement(run_id: int) -> dict:
 
     db.init_engine()
     with db.session_scope() as s:
-        run = s.get(MatchRun, run_id)
+        run = _own_run(s, run_id)
         if run is None:
             return {"error": f"no consultation {run_id}"}
         results = list(
@@ -644,13 +669,12 @@ def judge_finalists(run_id: int) -> dict:
 
     from .matching import genre
 
-    denied = _needs_admin()
-    if denied:
-        return denied
-
     db.init_engine()
     with db.session_scope() as s:
-        run = s.get(MatchRun, run_id)
+        denied = _may_consult(s)
+        if denied:
+            return denied
+        run = _own_run(s, run_id)
         if run is None:
             return {"error": f"no consultation {run_id}"}
         results = list(
@@ -749,11 +773,12 @@ def match_venues(
     survive; and venues that cannot be profiled at all, where a zero means "no
     data" and not "out of scope".
     """
-    denied = _needs_admin()
-    if denied:
-        return denied
     db.init_engine()
     with db.session_scope() as s:
+        denied = _may_consult(s)
+        if denied:
+            return denied
+        who = _caller_user(s)
         constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
         try:
             openalex = _callers_openalex(s)
@@ -777,6 +802,7 @@ def match_venues(
                 discover=discover,
                 doaj=DoajClient(),
                 references=extract_dois(references),
+                owner_id=who.id if who is not None else None,
             )
         except Refusal as e:
             return {"refused": str(e)}

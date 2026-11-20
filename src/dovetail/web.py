@@ -27,8 +27,12 @@ from sqlalchemy.orm import Session
 
 from . import auth, config, db
 from .auth import COOKIE_NAME, current_user, require_admin
+from . import ownership
+from .auth import require_consultant
 from .matching.scoring import subject_match
 from .models import (
+    BudgetLedger,
+    BlindSheet,
     FINALIST_BUCKETS,
     ArticleType,
     Criterion,
@@ -158,7 +162,17 @@ def _plain_constraint(name: str) -> str:
     return _CONSTRAINTS.get(name, name.replace("_", " "))
 
 
+def _role_label(role) -> str:
+    """`reader` is the role's name in the database and at the gate, and it
+    stopped describing what the role does on 20 Nov 2026: with a key of their
+    own, a reader starts consultations. Shown as «member»; not renamed where it
+    is stored, because Borant ID registers this app's roles by that name."""
+    value = getattr(role, "value", role)
+    return "member" if value == "reader" else value
+
+
 templates.env.filters.update(
+    role_label=_role_label,
     plain_flag=_plain_flag,
     plain_label=_plain_label,
     plain_evidence=_plain_evidence,
@@ -306,6 +320,9 @@ def page(
         name=name,
         context={
             "user": user,
+            # Whether this person may start a consultation. Every page that
+            # offers the button asks this and not the role.
+            "can_consult": ownership.may_consult(user) if user is not None else False,
             "gateway": auth.gateway_mode(),
             "pending_count": pending_count,
             "nav": ctx.pop("nav", None),
@@ -452,7 +469,8 @@ def _inventory(s: Session) -> dict:
 @app.get("/app", response_class=HTMLResponse)
 def dashboard(request: Request, user: User = Depends(current_user),
               s: Session = Depends(get_db)):
-    runs = list(s.scalars(select(MatchRun).order_by(MatchRun.id.desc()).limit(6)))
+    mine = ownership.visible_to(user)
+    runs = list(s.scalars(select(MatchRun).where(mine).order_by(MatchRun.id.desc()).limit(6)))
     result_counts = dict(
         s.execute(
             select(MatchResult.run_id, func.count())
@@ -467,7 +485,7 @@ def dashboard(request: Request, user: User = Depends(current_user),
         s,
         nav="overview",
         inv=_inventory(s),
-        runs_total=s.scalar(select(func.count()).select_from(MatchRun)),
+        runs_total=s.scalar(select(func.count()).select_from(MatchRun).where(mine)),
         pending=s.scalar(
             select(func.count()).select_from(Proposal).where(
                 Proposal.status == ProposalStatus.PENDING
@@ -756,7 +774,9 @@ def venue_detail(request: Request, venue_id: int, declared: str = "",
         s.execute(
             select(MatchResult, MatchRun)
             .join(MatchRun, MatchResult.run_id == MatchRun.id)
-            .where(MatchResult.venue_id == venue_id)
+            # Only the reader's own: this table shows the titles of the
+            # manuscripts a journal came up for, and those are not shared.
+            .where(MatchResult.venue_id == venue_id, ownership.visible_to(user))
             .order_by(MatchResult.run_id.desc())
             .limit(20)
         ).all()
@@ -778,7 +798,12 @@ def venue_detail(request: Request, venue_id: int, declared: str = "",
 
 @app.get("/app/runs", response_class=HTMLResponse)
 def runs(request: Request, user: User = Depends(current_user), s: Session = Depends(get_db)):
-    rows = list(s.scalars(select(MatchRun).order_by(MatchRun.id.desc()).limit(100)))
+    rows = list(
+        s.scalars(
+            select(MatchRun).where(ownership.visible_to(user))
+            .order_by(MatchRun.id.desc()).limit(100)
+        )
+    )
     counts = dict(
         s.execute(
             select(MatchResult.run_id, func.count())
@@ -786,7 +811,8 @@ def runs(request: Request, user: User = Depends(current_user), s: Session = Depe
             .group_by(MatchResult.run_id)
         ).all()
     )
-    return page(request, "runs.html", user, s, nav="runs", runs=rows, counts=counts)
+    return page(request, "runs.html", user, s, nav="runs", runs=rows, counts=counts,
+                deleted=request.query_params.get("deleted"))
 
 
 def _budget_view(s: Session, user: User) -> dict:
@@ -863,7 +889,7 @@ def estimate_run(s: Session, discover: bool, references: int = 0,
 
 
 @app.get("/app/runs/new", response_class=HTMLResponse)
-def new_run_form(request: Request, user: User = Depends(require_admin),
+def new_run_form(request: Request, user: User = Depends(require_consultant),
                  s: Session = Depends(get_db)):
     # Declared **before** `/app/runs/{run_id}`, and that ordering is load
     # bearing: routes match in registration order, so the other way round
@@ -953,7 +979,7 @@ def new_run(
     discover: str = Form(""),
     doaj: str = Form(""),
     references: str = Form(""),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_consultant),
     s: Session = Depends(get_db),
 ):
     from .matching.neighbourhood import extract_dois
@@ -1027,6 +1053,7 @@ def new_run(
         scoring_config_version=config.SCORING_CONFIG_VERSION,
         status="running",
         reference_dois=dois or None,
+        user_id=user.id,
     )
     s.add(run)
     s.flush()
@@ -1043,9 +1070,9 @@ def new_run(
 def run_detail(request: Request, run_id: int, genre: str = "",
                judged: int = 0, failed: int = 0, detail: str = "",
                user: User = Depends(current_user), s: Session = Depends(get_db)):
-    run = s.get(MatchRun, run_id)
+    run = ownership.run_for(s, run_id, user)
     if run is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such run")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such consultation")
     # Three groups, kept apart the way `cut` produced them and the way the CLI
     # has always printed them. Drawn as one ordered list, a venue with no
     # profile reads as the worst of the shortlist rather than as something that
@@ -1108,7 +1135,7 @@ def run_detail(request: Request, run_id: int, genre: str = "",
 
 
 @app.post("/app/runs/{run_id}/read-finalists")
-def read_finalists(run_id: int, user: User = Depends(require_admin),
+def read_finalists(run_id: int, user: User = Depends(require_consultant),
                    s: Session = Depends(get_db)):
     """Stage 5a on this run's shortlist: does each journal publish work of this kind?
 
@@ -1124,9 +1151,9 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
     from .matching import genre
     from .sources.openalex import OpenAlexError, client_for
 
-    run = s.get(MatchRun, run_id)
+    run = ownership.run_for(s, run_id, user)
     if run is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such run")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such consultation")
     if not (crypto.available() and user.anthropic_key_encrypted):
         return RedirectResponse(f"/app/runs/{run_id}?genre=nokey",
                                 status_code=status.HTTP_303_SEE_OTHER)
@@ -1175,6 +1202,37 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
 
 
 # --- the key that pays for stage 5 ----------------------------------------
+
+
+@app.post("/app/runs/{run_id}/delete")
+def delete_run(run_id: int, user: User = Depends(current_user),
+               s: Session = Depends(get_db)):
+    """Remove a consultation and everything that hangs off it.
+
+    Its owner's to do, and nobody else's: the same rule that decides who reads
+    it. For a text that has not been published, being able to take it back out
+    is the other half of nobody else being able to read it.
+
+    The journals it brought into the table stay. They are facts about journals,
+    they belong to everybody, and nothing on them says which manuscript made
+    them come up.
+    """
+    run = ownership.run_for(s, run_id, user)
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such consultation")
+    if run.status == "running":
+        # The work is still writing to it from another session. Deleting it now
+        # would leave that session writing results for a run that is gone.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This consultation is still running. Delete it when it has finished.",
+        )
+    for sheet in s.scalars(select(BlindSheet).where(BlindSheet.run_id == run.id)):
+        s.delete(sheet)
+    s.delete(run)  # results and their criteria go with it
+    s.flush()
+    return RedirectResponse(f"/app/runs?deleted={run_id}",
+                            status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/app/settings", response_class=HTMLResponse)
@@ -1342,8 +1400,28 @@ def reject_proposal(proposal_id: int, user: User = Depends(require_admin),
 
 @app.get("/app/admin/users", response_class=HTMLResponse)
 def users(request: Request, user: User = Depends(require_admin), s: Session = Depends(get_db)):
+    # What an admin may know about other people's work: how much of it there
+    # is and what it cost. Not what it is about.
+    consultations = dict(
+        s.execute(
+            select(MatchRun.user_id, func.count()).group_by(MatchRun.user_id)
+        ).all()
+    )
+    spent = {
+        provider: total
+        for provider, total in s.execute(
+            select(BudgetLedger.provider, func.sum(BudgetLedger.credits_used))
+            .group_by(BudgetLedger.provider)
+        ).all()
+    }
     return page(request, "users.html", user, s, nav="users",
-                users=list(s.scalars(select(User).order_by(User.email))))
+                users=list(s.scalars(select(User).order_by(User.email))),
+                consultations=consultations,
+                ownerless=consultations.get(None, 0),
+                own_spend={u_id: spent.get(db.user_ledger(u_id), 0)
+                           for u_id in consultations if u_id is not None},
+                has_key={u.id: ownership.has_own_openalex_key(u)
+                         for u in s.scalars(select(User))})
 
 
 @app.post("/app/admin/users/{user_id}/role")

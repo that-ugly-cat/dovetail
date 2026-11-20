@@ -254,3 +254,14 @@ def require_admin(user: User = Depends(current_user)) -> User:
             "makes a proposal true.",
         )
     return user
+
+
+
+def require_consultant(user: User = Depends(current_user)) -> User:
+    """Whoever may start a consultation: an admin, or anyone spending their own
+    OpenAlex key. See `ownership.may_consult` for why the second half exists."""
+    from . import ownership
+
+    if not ownership.may_consult(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, ownership.WHY_NOT)
+    return user

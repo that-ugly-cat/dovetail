@@ -1,11 +1,13 @@
 {% extends "base.html" %}{% block title %}Consultations — Dovetail{% endblock %}
 {% block body %}
 <div class="head">
-  <h1>Consultations</h1>
-  {% if user.is_admin() %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
+  <h1>Your consultations</h1>
+  {% if can_consult %}<a class="btn" href="/app/runs/new">New consultation</a>{% endif %}
 </div>
-<p class="sub">Every consultation is kept as it was on the day, so it can be read again later
-against what was known then.</p>
+{% if deleted %}<div class="flash ok">Consultation {{ deleted }} was deleted, with its lists. The
+journals it found are still here.</div>{% endif %}
+<p class="sub">Only you can see these. Each one is kept as it was on the day, so it can be read again
+later against what was known then.</p>
 
 <div class="card pad0 table-wrap"><table class="table">
   <thead><tr>
@@ -31,8 +33,8 @@ against what was known then.</p>
   </tr>
   {% else %}
   <tr><td colspan="7" class="empty">
-    No consultation yet.
-    {% if user.is_admin() %}<a href="/app/runs/new">Start one</a>.{% else %}Starting one needs an admin, because it spends an OpenAlex budget.{% endif %}
+    You have no consultations yet.
+    {% if can_consult %}<a href="/app/runs/new">Start one</a>.{% else %}To start one, add your own OpenAlex key in <a href="/app/settings">Settings</a>.{% endif %}
   </td></tr>
   {% endfor %}
   </tbody>

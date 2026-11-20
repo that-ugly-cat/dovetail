@@ -215,6 +215,11 @@ class MatchRun(Base):
     __tablename__ = "match_run"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Whoever started it, and the only person who may read it. Null for a
+    # consultation with nobody's name on it — one started from the command line
+    # — which belongs to the instance and is seen by its admins. The rules are
+    # in `ownership.py`.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), index=True)
     title: Mapped[str] = mapped_column(Text)
     abstract: Mapped[str] = mapped_column(Text)
     word_count: Mapped[int | None] = mapped_column(Integer)

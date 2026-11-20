@@ -12,7 +12,8 @@
 
 <div class="head">
   <h1>Consultation {{ run.id }}</h1>
-  <span class="muted small">{{ run.created_at.strftime('%d %b %Y, %H:%M') }} UTC</span>
+  <span class="muted small">{{ run.created_at.strftime('%d %b %Y, %H:%M') }} UTC ·
+    {% if run.user_id %}only you can see this{% else %}started from the command line, seen by admins{% endif %}</span>
 </div>
 <p class="sub">{{ run.title }}</p>
 
@@ -108,8 +109,9 @@ key. <a href="/app/settings">Add one in Settings</a>.</div>
   says whether it publishes work of the same kind as yours. It adds a line to each journal and never
   changes their order.</p>
 
-  {% if not user.is_admin() %}
-  <p class="muted small" style="margin:10px 0 0">Only an admin can run this check.</p>
+  {% if not can_consult %}
+  <p class="warn small" style="margin:10px 0 0">It looks up what each journal published recently, so
+  it needs your own OpenAlex key as well. <a href="/app/settings">Add one in Settings</a>.</p>
   {% elif not genre_ready %}
   <p class="warn small" style="margin:10px 0 0">It is paid for with your own Anthropic key.
   <a href="/app/settings">Add one in Settings</a> to use it.</p>
@@ -418,5 +420,16 @@ rest.</p>
   <p><strong>A missing fact never removes a journal.</strong> When a journal's fee or access model
   is unknown, a constraint marks it for checking instead of excluding it.</p>
 </details>
+{% if run.status != 'running' %}
+<details class="explain">
+  <summary>Delete this consultation</summary>
+  <p>This removes consultation {{ run.id }} for good: the manuscript's title and classification, its
+  reference list, and every list on this page. It cannot be undone. The journals it found stay, for
+  everyone.</p>
+  <form method="post" action="/app/runs/{{ run.id }}/delete">
+    <button class="btn btn-danger" type="submit" data-busy-label="Deleting…">Delete consultation {{ run.id }}</button>
+  </form>
+</details>
+{% endif %}
 <script src="/static/js/orderby.js?v={{ ASSETS }}"></script>
 {% endblock %}

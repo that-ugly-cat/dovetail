@@ -32,7 +32,7 @@
     <a href="/app/settings" class="{{ 'on' if nav == 'settings' }}">Settings</a>
     {% if user.is_admin() %}<a href="/app/admin/users" class="{{ 'on' if nav == 'users' }}">Users</a>{% endif %}
     <span class="who">{{ user.email }}</span>
-    <span class="badge {{ 'accent' if user.is_admin() }}">{{ user.role.value }}</span>
+    <span class="badge {{ 'accent' if user.is_admin() }}">{{ user.role|role_label }}</span>
     {% if gateway %}<span class="badge">Borant ID</span>
     {% else %}<form class="inline" method="post" action="/logout"><button class="btn btn-link btn-small">Sign out</button></form>{% endif %}
     <button type="button" class="theme-toggle" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><span class="theme-icon-dark" aria-hidden="true">&#9788;</span><span class="theme-icon-light" aria-hidden="true">&#9790;</span></button>
