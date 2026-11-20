@@ -1,8 +1,9 @@
-# Dovetail — SPEC v0.5
+# Dovetail — SPEC v0.6
 
 *Trovare la rivista giusta per un paper, partendo da titolo, abstract e word count.*
 *Creato: 27 agosto 2026 — Giovanni Spitale + Ono*
 *v0.5, 28 ago 2026: stadio 5a, e la Fase 1b ridisegnata su misure che reggono.*
+*v0.6, 20 nov 2026: il vicinato di citazione (§6b), lo stadio 5b, e la coda che scrive i tipi di articolo.*
 *Storia delle revisioni in §17.*
 
 > **Lingua:** il codice, la CLI e i test sono **in inglese**; questo documento resta in italiano,
@@ -421,6 +422,97 @@ taglio. Due chiamate di natura diversa:
 Il giudizio di genere **non riordina** la shortlist. Alza una bandiera accanto alla venue e scrive
 la frase che la motiva, che finisce fra i criteri di merito di §9. Ordinare su un giudizio non
 riproducibile renderebbe la lista impossibile da spiegare, e §11 promette `explain_match`.
+
+---
+
+## 6b. Il vicinato di citazione (20 nov 2026)
+
+### Il difetto che lo motiva
+
+Lo stadio 2 arriva a una rivista passando due volte dai topic di OpenAlex: il manoscritto viene
+classificato in topic, e una rivista si trova se uno di quelli sta fra i suoi primi venticinque.
+Entrambe le metà leggono l'**oggetto** del testo. Un paper normativo su una tecnologia viene
+classificato dalla tecnologia e abbinato alle riviste che la costruiscono. È successo in tre
+consultazioni vere del 2026 (8 set, 19 set, 11 ott): le riviste dell'oggetto, e nessuna di quelle a
+cui apparteneva l'argomento.
+
+Una precisazione su come quel difetto era stato letto. `explain_match` rispondeva *«venue N was not
+in run»* e la frase era stata presa per «non sono mai entrate nella corsa». Non è così: `run_match`
+valuta **ogni** rivista in tabella, ma salva solo i cesti. Quelle riviste erano state valutate e
+ordinate dopo tutte le raggiungibili, perché `sort_key` mette `stage2_reachable` davanti al punteggio.
+Ora `explain_match` ricalcola il punteggio dal profilo salvato e dice quale dei due casi è.
+
+### Cosa fa
+
+Una consultazione può ricevere la **lista delle referenze** del manoscritto, incollata com'è. Se ne
+leggono solo i DOI (al massimo `MAX_REFERENCES`, 150). Per ogni referenza si chiede a OpenAlex dove
+sono usciti i lavori che la citano dal 1° gennaio di cinque anni prima, raggruppati per rivista.
+
+Una rivista entra se è raggiunta attraverso almeno il **5% delle referenze**, e mai meno di due.
+L'ordine è la **densità**: legami di citazione per mille lavori pubblicati dalla rivista nella
+stessa finestra.
+
+Le due scelte vengono da due prove fallite sulla bibliografia vera, non da un ragionamento:
+
+- **Una chiamata per referenza, non una per tutte.** Raggruppando tutto insieme una review citata
+  quattromila volte batte venti articoli citati quaranta volte l'uno, e la lista diventa il pubblico
+  di quella review. Tenendole separate si conta attraverso quante referenze *diverse* si arriva a una
+  rivista.
+- **Densità, non conteggio.** Per numero di referenze raggiunte vincono *PLoS ONE*, *Scientific
+  Reports* e *Frontiers in Psychology*, che citano tutto perché pubblicano tutto. Divise per la
+  produzione recente finiscono in fondo.
+
+### Le conversazioni minori
+
+Una bibliografia parla soprattutto del **soggetto** del paper. Su uno dei due paper di prova 73
+referenze su 89 stanno in un solo campo, e il conteggio complessivo restituisce le riviste di quel
+campo: quelle dell'argomento ci sono tutte, fra il ventesimo e il centesimo posto. È lo stesso difetto del coseno visto
+da un'altra parte, e una normalizzazione non lo toglie.
+
+Quindi le referenze si leggono anche **campo per campo**, col campo del `primary_topic` di ciascuna.
+Un campo che ne tiene almeno quattro e meno del 60% è una conversazione minore: riceve fino a tre
+riviste sue, in un cesto a parte. È la tecnica trovata l'8 settembre — interrogare due volte, una
+con l'abstract vero e una con l'abstract riscritto sulla forma, e leggere la distanza fra le due
+liste — resa strutturale, senza dover riscrivere niente.
+
+### Dove finisce il risultato
+
+Niente viene fuso col punteggio di scope: sono due misure costruite su evidenze diverse.
+
+- Una rivista **in shortlist** che anche le referenze raggiungono **resta dov'è** e guadagna due
+  criteri di merito. Due strade indipendenti verso la stessa rivista sono la cosa più forte che il
+  tool possa dire.
+- Le più dense fra le altre vanno nel cesto **`neighbourhood`**, con lo stesso tetto della shortlist
+  e numerate per conto loro.
+- Le conversazioni minori vanno nel cesto **`conversation`**.
+- Una rivista senza profilo di topic **esce da `unclassifiable`** quando le referenze la raggiungono:
+  quel cesto vuol dire «non ho con che misurarla», e non è più vero.
+
+E un effetto non cercato: le riviste che le referenze portano in tabella diventano candidate anche
+per il **punteggio a topic**. Il troncamento a 25 impedisce di *trovarle*, non di *valutarle*.
+
+### Cosa misura, e cosa no
+
+- Descrive la **bibliografia**, non l'argomento. Un manoscritto le cui referenze parlano quasi
+  tutte del suo soggetto ottiene le riviste del soggetto, qualunque sia la tesi.
+- La densità è una misura di **concentrazione**, come il coseno, e premia le specialistiche piccole
+  per la stessa ragione. La soglia sulle referenze raggiunte e il minimo di trenta lavori recenti la
+  contengono, non la tolgono.
+- Le referenze senza DOI — i libri, soprattutto — **non si vedono**. Il rapporto dice quanti DOI
+  c'erano e quanti OpenAlex ne conosce; sotto cinque il canale si rifiuta.
+- I gruppi di OpenAlex si fermano a 200: per una referenza molto citata si perde la coda delle
+  riviste con un solo lavoro citante.
+- **Non ha validazione.** Ha due prove su due paper, sotto.
+
+### Costo
+
+Un credito per referenza, più uno ogni quaranta DOI per risolverli, più uno ogni cento riviste da
+leggere (tetto 1500). Le chiamate a `/works` che filtrano soltanto costano **1 credito** e non 10:
+letto da `X-RateLimit-Credits-Used` il 20 nov 2026. La chiamata raggruppata di
+`journals_publishing_on` era stata prezzata a 10 prima di questa misura e **non è stata rimisurata**.
+
+Il canale **non dipende da `discover`**: quel flag riguarda lo sweep per topic, e niente in tabella
+ricorda dove una lista di referenze viene citata.
 
 ---
 
@@ -890,9 +982,12 @@ dell'abstract. Conferenze ed editori di libri. Scrittura verso PaperTrail.
   (§16d). Al suo posto due misure: i **negativi noti**, che hanno dato **4/4 tutte irraggiungibili**
   su tre paper (§16f), e la **precisione a dodici giudicata in cieco**, che è pronta e **non ha
   ancora un numero** perché aspetta un'ora di giudizio umano.
-- **Fase 4** — **stadio 5a fatto** (giudizio di genere, §12); restano **5b** (estrazione guidelines
-  con Haiku, che vuole fetchare pagine web arbitrarie e un URL che per quasi tutte le venue non si
-  ha), l'anatomia e `venue_history`.
+- **Fase 4** — **stadio 5a fatto** (giudizio di genere, §12); **5b scritto il 20 nov 2026 e non
+  ancora provato contro un modello vero** (§16h); restano l'anatomia e `venue_history`.
+- **Fase 1c — il vicinato di citazione, fatto il 20 nov 2026** (§6b, §16g). Lo strato a embedding
+  previsto dalla v0.3 **resta non costruito**: il vicinato copre lo stesso buco, la generazione, con
+  un dato che c'è già e senza un modello da ospitare. Se la scheda in cieco dicesse che non basta,
+  quello è il passo dopo.
 
 **Sul modello dello stadio 5a.** La v0.3 diceva Sonnet 5 «perché è la chiamata difficile». È
 `claude-opus-5`, che è la stessa intenzione applicata al modello che oggi la soddisfa meglio; le
@@ -1238,7 +1333,75 @@ escluderebbe una rivista valida per più settori.
 
 ---
 
+## 16g. Cosa ha trovato il 20 novembre 2026
+
+**Due consultazioni vere in locale**, budget anonimo, sweep per topic spento (vedi sotto).
+
+| paper | referenze | crediti | cosa esce |
+|---|---|---|---|
+| A, concettuale | 55 su 55 risolte | 163 | vicinato: in testa le due riviste specialistiche del suo sottocampo filosofico; conversazioni: riviste di etica della tecnologia e di filosofia |
+| B, argomento in un campo e soggetto in un altro | 89 su 89 risolte, 73 in un campo solo | 197 | vicinato: le riviste del soggetto; conversazioni: riviste dell'argomento; shortlist: una delle finaliste scelte a mano dagli autori |
+
+Sul paper A la corsa a topic di ottobre aveva dato riviste vicine per argomento e sbagliate per
+genere. Sul paper B la finalista ora in shortlist non era uscita in nessuna delle due corse di
+settembre.
+
+I due manoscritti **non sono pubblicati**, quindi qui non sono nominati né loro né le riviste a cui
+sono stati mandati (§0b). I nomi stanno nel database locale delle due corse.
+
+**Quello che queste due prove non dicono.** Sono due paper, scelti perché erano i casi falliti, e
+giudicati da chi ha scritto il codice. La misura che conta è la scheda in cieco, che ora porta
+**entrambi i canali** contro gli stessi decoy (`by_origin` nel rapporto di `score_sheet`).
+
+**Lo sweep per topic vuole la chiave.** In anonimo OpenAlex risponde **401** al cursore di
+paginazione di `/sources`. Le due prove non hanno quindi esercitato la generazione dei due canali
+insieme: la shortlist è stata pescata fra le riviste che le referenze avevano portato in tabella.
+
+**La scheda in cieco misurava un'altra scheda.** Lo scoring ricostruiva il mescolamento dal seed, e
+il mescolamento è sulla tabella delle riviste, che cresce a ogni sweep. Un test che aggiunge quindici
+riviste fra la stampa e lo scoring ha trasformato la riga 1 da decoy a finalista. La chiave ora è
+salvata (`blind_sheet`), in una tabella che nessuna pagina e nessun tool MCP legge.
+
+**I tipi di articolo non si potevano approvare.** Vedi §16h.
+
+## 16h. Stadio 5b, e la coda che non scriveva
+
+`propose_update` si è sempre presentato come il modo di depositare «article types and word limits»,
+e l'8 settembre ne sono state depositate dieci. Ma `proposals.approve` conosceva solo le colonne
+della rivista: approvandone una, i tipi di articolo tornavano fra gli `ignored`. **Niente nel codice
+scriveva nella tabella `article_type`**, e il criterio «format fits» non ha mai avuto una riga da
+leggere.
+
+Ora l'approvazione di una `update_venue` scrive ciò che porta sotto `article_types`: abbinato sul
+nome, sostituito campo per campo, datato e con la sua fonte, senza cancellare niente. **Un limite di
+parole senza `word_limit_scope` non si scrive**, chiunque l'abbia depositato. La forma delle dieci
+proposte esistenti non è stata guardata: ciò che non si può scrivere torna indietro con la ragione.
+
+Lo stadio 5b legge **una pagina** indicata da una persona. Non fa crawling e non si finge un
+browser. Una chiamata a `claude-haiku-5-5` con schema fisso, e poi il controllo, che è la parte che
+conta: ogni limite arriva con la frase da cui è stato letto, e si tiene solo se **la frase è sulla
+pagina e il numero è nella frase**. Dove la pagina non dice cosa conta il limite, lo scope vale
+«not stated» e la confidenza della proposta scende.
+
+Fallisce **per editore**, come previsto: il 20 nov 2026 Springer risponde, Wiley risponde 403, BMJ
+risponde una pagina di duemila caratteri che non sono le guidelines. Un rifiuto torna come
+`blocked_by_publisher` e chi chiama passa il testo in `page_text` — che è la terza strada pensata per
+`venue_history`, applicata qui: il client MCP ha un browser, il server no. Un PDF si rifiuta. Gli
+host fuori da internet pubblica si rifiutano a ogni salto di un redirect.
+
+**Non verificato:** l'estrazione ha girato solo contro un client finto. Le dieci righe lette a mano
+l'8 settembre sono la verità a terra contro cui misurarla, una pagina per editore.
+
+---
+
 ## 17. Storia delle revisioni
+
+### v0.6 — una seconda strada, e due cose che non funzionavano (20 nov 2026)
+
+Aggiunti §6b (vicinato di citazione), §16g e §16h. Tre correzioni di cose che il documento dava per
+funzionanti: `explain_match` su una rivista valutata e non tenuta, lo scoring della scheda in cieco,
+l'approvazione dei tipi di articolo. Il limite noto del metro sui paper concettuali, registrato il
+19 settembre come cosa da scrivere qui, è il primo paragrafo di §6b.
 
 ### v0.4 — la UI smette di essere solo una finestra (28 ago 2026)
 

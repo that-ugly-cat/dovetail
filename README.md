@@ -36,6 +36,12 @@ word limit, open access status against the funder, and the criteria that hold it
 merit or logistics**. A venue standing on fewer than two merit criteria comes out in red, however
 well it does on logistics — that rule comes from a post-mortem, not from taste.
 
+Give it the **reference list** too, pasted as it is, and it takes a second road to a candidate. The
+topics classify a text by its object, so a normative paper about a technology comes back with the
+journals that build the technology. With the references Dovetail also asks where the works the
+manuscript cites are themselves being cited, and lists those journals apart. See below, and SPEC.md
+§6b.
+
 It sits beside PaperTrail without overlapping it: PaperTrail knows where a paper *is* and where it
 has already been, Dovetail knows where it *could* go. Dovetail reads PaperTrail and never writes
 to it.
@@ -49,8 +55,13 @@ uv run dovetail budget          # how many OpenAlex credits are left today
 uv run dovetail seed            # resolve PaperTrail's venues, file alias proposals
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
-uv run pytest                   # 122 tests
+uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
+uv run pytest                   # 175 tests
 ```
+
+The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
+without `OPENALEX_API_KEY` in `.env`, run `match` with `--no-discover`. The reference list works
+either way.
 
 A text profile can be reused with `--profile file.json`, which skips stage 1 and its hundred
 credits; `import-source` loads an already downloaded `/sources` response, so you can work without
@@ -75,15 +86,57 @@ under is worse than none, because it is the one people believe** — so the term
 calls that generate them, and a test reads the source of `generate_candidates` and fails if it calls
 anything the estimate does not price.
 
-### Three baskets, not one list
+### Five baskets, not one list
 
-`cut` returns three, and they are kept apart everywhere:
+`cut` returns three, the reference list adds two, and they are kept apart everywhere:
 
 - **shortlist** — scored, passed the constraints, inside the cut of twelve.
 - **excluded** — a constraint removed it, shown anyway when fewer than three passed. An empty list
   is not an answer.
 - **unclassifiable** — no profile, so no score applies. **Its zero means «I don't know», not «out of
   scope»**, and it is not numbered among the others.
+- **neighbourhood** — reached through the reference list: journals whose recent papers cite the
+  works the manuscript cites, through at least 5% of the references, densest first. Citation density
+  is not the shortlist's axis, so these are numbered on their own. A shortlisted venue the references
+  also reach stays in the shortlist and says so.
+- **conversation** — the same count inside one minority field of the references at a time. A
+  bibliography is mostly about the paper's subject, and the journals where its argument belongs are
+  reached through the few references that are not.
+
+### The citation neighbourhood, and what it is not
+
+It describes the **bibliography**, not the argument. Measured on 20 Nov 2026 on two real papers:
+
+- 55 references, a conceptual paper: the two specialist journals of its own philosophical subfield
+  came first, where the topic channel had returned the journals of the technology it discusses.
+  163 credits.
+- 89 references, 73 of them in one field, a paper whose argument belongs to another: the overall
+  list is that field's journals, and the journals of the argument come out of the minority fields.
+  197 credits.
+
+The journals the references bring into the table are scored by the topic channel too, which is how
+one of the journals the authors had picked by hand entered the second paper's shortlist.
+
+Both manuscripts are unpublished, so neither is named here or anywhere in this repository (SPEC.md
+§0b).
+
+## Stage 5b — what the guidelines say about length
+
+```bash
+uv run dovetail read-guidelines --venue-id 12 --url https://.../submission-guidelines
+uv run dovetail read-guidelines --venue-id 12 --url https://... --text-file page.txt
+```
+
+Reads one page of author guidelines into article types with their limits, and files a proposal.
+**Every limit is checked against the page**: it is kept only if the sentence quoted for it is on the
+page and the number is in the sentence. **A word limit never comes without what it counts** — 8,000
+including references and 9,000 excluding them give opposite verdicts on one manuscript.
+
+Some publishers refuse an automated request (Wiley did on 20 Nov 2026, Springer did not). That comes
+back as `blocked_by_publisher`: read the page yourself and pass the text in. Approving the proposal
+in the web app is what writes the article types; until 20 Nov 2026 nothing did.
+
+**Not yet run against a real model.** The tests use a fake client.
 
 ### Journals no index knows about
 
@@ -148,7 +201,7 @@ rejections recorded in PaperTrail only 6 carry any reason from the venue, becaus
 field on a submission. **The bottleneck for validating this tool is a missing field in a different
 one.** SPEC.md §16f.
 
-### Precision at twelve, judged blind — no number yet
+### Precision, judged blind — no number yet
 
 ```bash
 uv run dovetail blind-sheet --run-id 1 --seed 12345 --out sheet.md
@@ -156,7 +209,9 @@ uv run dovetail score-sheet  --run-id 1 --seed 12345 --marks sheet.md
 ```
 
 Finalists shuffled with decoys drawn from the same subfield, stripped of score, position and
-criteria. **The decoy rate is the finding, not the precision**: a judge who accepts everything
+criteria. When the run had a reference list, both channels are on the sheet and each is scored
+against the same decoys. The key is stored when the sheet is built: scoring used to rebuild the
+shuffle from the seed, and a sweep in between changed which journals the row numbers stood for. **The decoy rate is the finding, not the precision**: a judge who accepts everything
 scores twelve out of twelve, and only the control shows it. Costs nothing and needs an hour of
 somebody's judgement.
 
