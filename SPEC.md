@@ -738,6 +738,31 @@ fa spende crediti OpenAlex o cambia un fatto.
 mano, e approva la coda. Approvare è quella che conta: è il punto in cui un suggerimento diventa
 qualcosa che il tool ripeterà come vero.
 
+### Le chiavi sono per persona (20 nov 2026)
+
+Le impostazioni tengono due credenziali, cifrate con Fernet e mai mostrate dopo il salvataggio.
+
+**La chiave OpenAlex.** L'istanza ne aveva una per tutti, quindi la consultazione di una persona
+spendeva il budget della successiva. Chi salva la propria spende da un **registro suo**
+(`budget_ledger.provider = openalex:u<id>`), che vale sempre 10.000 crediti al giorno perché una
+chiave personale è per definizione una chiave. Ogni pagina che stampa un budget stampa quello di chi
+la legge. La chiave d'istanza resta il ripiego per chi non ne ha una.
+
+Tre regole:
+
+- **La chiave si prova prima di tenerla**, con una chiamata a `/sources` pagata dalla chiave stessa.
+  Una chiave emessa e mai attivata è identica a una che funziona, e solo OpenAlex lo sa (401 chiave
+  ignota, 403 mai attivata). Una chiave respinta non si salva e **non costa quella che c'era già**.
+- **Uno sweep senza alcuna chiave si rifiuta prima di spendere.** Il cursore di paginazione senza
+  chiave risponde 401: la corsa pagherebbe i cento crediti della classificazione e si fermerebbe
+  alla prima pagina. È successo il 20 novembre, in locale.
+- **Il task in background riceve l'id di chi ha avviato la corsa, non la chiave.** Gira dopo che la
+  richiesta è finita, e una credenziale decifrata non deve stare in una coda.
+
+Il modale «?» dice come ottenerla, con i due indirizzi che dà la documentazione di OpenAlex.
+
+**La chiave Anthropic** c'era dallo stadio 5a. Ora paga anche lo stadio 5b.
+
 ### La consultazione risponde prima di aver finito
 
 Lo sweep è un centinaio di chiamate e un minuto scarso: troppo per tenere fermo un browser, e molto
@@ -1398,7 +1423,7 @@ l'8 settembre sono la verità a terra contro cui misurarla, una pagina per edito
 
 ### v0.6 — una seconda strada, e due cose che non funzionavano (20 nov 2026)
 
-Aggiunti §6b (vicinato di citazione), §16g e §16h. Tre correzioni di cose che il documento dava per
+Aggiunti §6b (vicinato di citazione), §16g e §16h, e in §12 la chiave OpenAlex per persona. Tre correzioni di cose che il documento dava per
 funzionanti: `explain_match` su una rivista valutata e non tenuta, lo scoring della scheda in cieco,
 l'approvazione dei tipi di articolo. Il limite noto del metro sui paper concettuali, registrato il
 19 settembre come cosa da scrivere qui, è il primo paragrafo di §6b.

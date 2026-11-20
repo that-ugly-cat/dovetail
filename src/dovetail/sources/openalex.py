@@ -16,7 +16,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..db import mark_exhausted, spend
+from ..db import SHARED_LEDGER, mark_exhausted, spend, user_ledger
 
 
 class OpenAlexError(RuntimeError):
@@ -39,9 +39,34 @@ class InsufficientProfile(OpenAlexError):
     """
 
 
+class KeyRejected(OpenAlexError):
+    """A key OpenAlex will not take, with the reason as a code."""
+
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+
+
 class OpenAlexClient:
-    def __init__(self, client: httpx.Client | None = None):
+    def __init__(
+        self,
+        client: httpx.Client | None = None,
+        api_key: str | None = None,
+        ledger: str = SHARED_LEDGER,
+    ):
+        """`api_key` and `ledger` go together: a personal key spends from a
+        ledger of its own (`db.user_ledger`). Left out, the client uses the
+        instance's key, if it has one, and the shared ledger."""
         self._client = client or httpx.Client(timeout=30.0)
+        self._api_key = (api_key or "").strip() or None
+        self.ledger = ledger
+
+    @property
+    def keyed(self) -> bool:
+        """Whether any key travels with the requests. Cursor paging, which the
+        topic sweep is made of, is refused without one."""
+        return bool(self._api_key or config.openalex_api_key())
 
     # -- plumbing ----------------------------------------------------------
 
@@ -56,7 +81,7 @@ class OpenAlexClient:
         secret in a URL ends up in server logs, proxies and Referer headers. A
         header does not.
         """
-        key = config.openalex_api_key()
+        key = self._api_key or config.openalex_api_key()
         return {"Authorization": f"Bearer {key}"} if key else {}
 
     def _get(self, path: str, params: dict) -> dict:
@@ -96,7 +121,7 @@ class OpenAlexClient:
                 raise OpenAlexError(f"OpenAlex {r.status_code} at {path}: {r.text[:200]}")
             return r.json()
         except RemoteBudgetExhausted:
-            mark_exhausted(session)
+            mark_exhausted(session, self.ledger)
             raise
 
     def _call(self, session: Session, path: str, params: dict) -> dict:
@@ -106,7 +131,7 @@ class OpenAlexClient:
         try:
             return self._get(path, params)
         except RemoteBudgetExhausted:
-            mark_exhausted(session)
+            mark_exhausted(session, self.ledger)
             raise
 
     # -- calls -------------------------------------------------------------
@@ -120,27 +145,27 @@ class OpenAlexClient:
         dropped, under a key of ours, so the run can record it.
         """
         title, abstract, dropped = fit_text(title, abstract)
-        spend(session, config.COST_TEXT)
+        spend(session, config.COST_TEXT, self.ledger)
         payload = self._post(session, "/text/topics", {"title": title, "abstract": abstract})
         payload["_dovetail_chars_dropped"] = dropped
         return payload
 
     def source_by_issn(self, session: Session, issn: str) -> dict:
-        spend(session, config.COST_SOURCES)
+        spend(session, config.COST_SOURCES, self.ledger)
         return self._call(session, f"/sources/issn:{issn}", {})
 
     def search_sources(self, session: Session, query: str, per_page: int = 5) -> dict:
         """Lexical search over journal names. Used to resolve PaperTrail's free
         strings, and like any lexical search **a miss means "not with these
         words"**, never "does not exist"."""
-        spend(session, config.COST_SOURCES)
+        spend(session, config.COST_SOURCES, self.ledger)
         return self._call(
             session, "/sources", {"search": query, "filter": "type:journal", "per-page": per_page}
         )
 
     def work_by_doi(self, session: Session, doi: str) -> dict:
         """One published work, to validate against its real venue."""
-        spend(session, config.COST_SOURCES)
+        spend(session, config.COST_SOURCES, self.ledger)
         return self._call(session, f"/works/doi:{doi}", {})
 
     def journals_publishing_on(
@@ -167,7 +192,7 @@ class OpenAlexClient:
         """
         if not topic_ids:
             return []
-        spend(session, config.COST_WORKS)
+        spend(session, config.COST_WORKS, self.ledger)
         payload = self._call(
             session,
             "/works",
@@ -197,7 +222,7 @@ class OpenAlexClient:
         Titles and years only. The judgement does not need abstracts, and asking
         for them would multiply the payload for nothing.
         """
-        spend(session, config.COST_WORKS)
+        spend(session, config.COST_WORKS, self.ledger)
         payload = self._call(
             session,
             "/works",
@@ -228,7 +253,7 @@ class OpenAlexClient:
         out: list[dict] = []
         for start in range(0, len(dois), 40):
             batch = dois[start : start + 40]
-            spend(session, config.COST_WORKS_FILTER)
+            spend(session, config.COST_WORKS_FILTER, self.ledger)
             payload = self._call(
                 session,
                 "/works",
@@ -254,7 +279,7 @@ class OpenAlexClient:
         with one citing work each is cut. That loses breadth at the margin and
         nothing at the top.
         """
-        spend(session, config.COST_WORKS_FILTER)
+        spend(session, config.COST_WORKS_FILTER, self.ledger)
         payload = self._call(
             session,
             "/works",
@@ -285,7 +310,7 @@ class OpenAlexClient:
             batch = [i for i in ids[start : start + 100] if i]
             if not batch:
                 continue
-            spend(session, config.COST_SOURCES)
+            spend(session, config.COST_SOURCES, self.ledger)
             payload = self._call(
                 session,
                 "/sources",
@@ -327,7 +352,7 @@ class OpenAlexClient:
         pages = 0
 
         while cursor and pages < max_pages:
-            spend(session, config.COST_SOURCES)
+            spend(session, config.COST_SOURCES, self.ledger)
             payload = self._call(
                 session,
                 "/sources",
@@ -353,6 +378,76 @@ class OpenAlexClient:
             "truncated": bool(cursor) and len(results) < total,
             "pages": pages,
         }
+
+
+# --- whose key ------------------------------------------------------------
+
+
+def client_for(user) -> OpenAlexClient:
+    """The client a person's work should run on: their own key if they stored
+    one, the instance's otherwise.
+
+    A stored key that cannot be read back — `FERNET_KEY` rotated, or unset —
+    falls through to the instance's. That is the one quiet fallback here, and it
+    is quiet because the alternative is every page that shows a budget failing
+    for one person; the settings page is where a key that no longer works gets
+    noticed and replaced.
+    """
+    from .. import crypto
+
+    encrypted = getattr(user, "openalex_key_encrypted", None)
+    if encrypted and crypto.available():
+        try:
+            return OpenAlexClient(
+                api_key=crypto.decrypt_api_key(encrypted), ledger=user_ledger(user.id)
+            )
+        except Exception:  # noqa: BLE001 - an unreadable key is treated as no key
+            pass
+    return OpenAlexClient()
+
+
+def ledger_for(user) -> str:
+    from .. import crypto
+
+    if getattr(user, "openalex_key_encrypted", None) and crypto.available():
+        return user_ledger(user.id)
+    return SHARED_LEDGER
+
+
+def verify_key(api_key: str, client: httpx.Client | None = None) -> int:
+    """Ask OpenAlex whether it takes this key. Returns its daily limit, in credits.
+
+    One call to /sources, charged to the key being tested — which is the point:
+    the answer comes from the same service the key will be used against, not
+    from the shape of the string. A key that looks right and was never activated
+    is the commonest way this goes wrong, and only the server knows.
+    """
+    owned = client is None
+    client = client or httpx.Client(timeout=15.0)
+    try:
+        r = client.get(
+            f"{config.OPENALEX_BASE}/sources",
+            params={"per-page": 1, "select": "id"},
+            headers={"Authorization": f"Bearer {api_key.strip()}"},
+        )
+    except httpx.HTTPError as e:
+        raise KeyRejected("unreachable", f"{type(e).__name__}: {e}") from e
+    finally:
+        if owned:
+            client.close()
+    if r.status_code == 401:
+        raise KeyRejected("invalid", "OpenAlex does not know this key")
+    if r.status_code == 403:
+        # `key_not_activated`: issued, and the link in the email never clicked.
+        raise KeyRejected("inactive", r.text[:200])
+    if r.status_code == 429:
+        raise KeyRejected("exhausted", "the key is valid and has no budget left today")
+    if r.status_code >= 400:
+        raise KeyRejected("unreachable", f"OpenAlex answered {r.status_code}")
+    try:
+        return int(r.headers.get("X-RateLimit-Limit") or 0)
+    except ValueError:
+        return 0
 
 
 # --- derivations ----------------------------------------------------------

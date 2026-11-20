@@ -1,27 +1,134 @@
 {% extends "base.html" %}{% block title %}Settings — Dovetail{% endblock %}
 {% block body %}
 <h1>Settings</h1>
-<p class="sub">Your own credentials, for the one thing Dovetail cannot pay for out of a shared
-budget.</p>
+<p class="sub">Your own credentials. Both are optional, both are encrypted, and each one moves a
+cost from the instance to you: an OpenAlex key for the consultations, an Anthropic key for the two
+things a model does here.</p>
 
-{% if saved == '1' %}<div class="flash ok"><strong>Key stored.</strong> It is encrypted, and no
-screen will show it again — not to you and not to whoever runs the server.</div>
+{% if not crypto_ready %}
+<div class="flash err"><strong>This instance cannot store a key.</strong> <code>FERNET_KEY</code>
+is not set, so there is nowhere to keep one encrypted — and keeping one any other way is not on
+offer. Both fields below are unavailable until an operator sets it.</div>
+{% endif %}
+
+{# ---- OpenAlex ----------------------------------------------------------- #}
+
+{% if openalex == 'stored' %}<div class="flash ok"><strong>OpenAlex key stored.</strong> OpenAlex
+accepted it just now. It is encrypted, and no screen will show it again.</div>
+{% elif openalex == 'cleared' %}<div class="flash">OpenAlex key removed. Your consultations spend
+the instance's shared budget again.</div>
+{% elif openalex == 'invalid' %}<div class="flash err"><strong>OpenAlex does not know that
+key</strong>, so it was not stored{% if has_openalex_key %} and the one you had is still in
+place{% endif %}. Copy it again from <em>Settings → API key</em> on openalex.org: a missing
+character is the usual cause.</div>
+{% elif openalex == 'inactive' %}<div class="flash err"><strong>That key has not been activated
+yet</strong>, so it was not stored. OpenAlex emailed a link when the key was issued; the key starts
+working once it is clicked.</div>
+{% elif openalex == 'exhausted' %}<div class="flash err"><strong>That key is valid and has no
+budget left today</strong>, so it could not be tried and was not stored. It resets at midnight
+UTC.</div>
+{% elif openalex == 'unreachable' %}<div class="flash err"><strong>OpenAlex could not be
+reached</strong> to try the key, so it was not stored. Nothing is wrong with it as far as this page
+can tell: try again in a moment.</div>
+{% endif %}
+
+<div class="card">
+  <h2>OpenAlex API key
+    <button type="button" class="help" aria-label="How to get an OpenAlex key"
+      aria-haspopup="dialog"
+      onclick="document.getElementById('openalex-help').showModal()">?</button></h2>
+  <p class="muted">A consultation is paid for in OpenAlex credits. With a key of your own it spends
+  <strong>your</strong> daily budget of {{ '{:,}'.format(own_budget) }} credits; without one it
+  spends the budget everybody on this instance shares
+  ({{ '{:,}'.format(shared_budget) }} credits{% if not instance_keyed %}, and the instance has no key
+  of its own, so the sweep for new candidates cannot run at all{% endif %}).</p>
+
+  <p class="small" style="margin:0 0 12px">Today you are spending from
+  {% if budget.own_key %}<strong>your own key</strong>{% else %}<strong>the shared budget</strong>{% endif %}:
+  {{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits left.</p>
+
+  {% if crypto_ready %}
+  <form method="post" action="/app/settings/openalex-key">
+    <label>Key
+      <input name="openalex_key" type="password" autocomplete="off"
+        placeholder="{% if has_openalex_key %}stored — type a new one to replace it{% else %}paste your OpenAlex key{% endif %}">
+    </label>
+    <p class="muted small" style="margin:-4px 0 0">The key is tried against OpenAlex before it is
+    kept, which costs it one credit. Saving the field empty removes the stored key.</p>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn" type="submit">{% if has_openalex_key %}Save{% else %}Store{% endif %}</button>
+      {% if has_openalex_key %}<span class="badge ok">a key is stored</span>{% endif %}
+      <button type="button" class="btn btn-link"
+        onclick="document.getElementById('openalex-help').showModal()">How do I get one?</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<dialog id="openalex-help" class="modal" aria-labelledby="openalex-help-title">
+  <div class="modal-body">
+    <h2 id="openalex-help-title">Getting an OpenAlex key</h2>
+    <p>It is free and takes a couple of minutes.</p>
+    <ol>
+      <li><strong>Make an account</strong> at
+        <a href="https://openalex.org/signup" target="_blank" rel="noopener noreferrer">openalex.org/signup</a>
+        and confirm the email address. A key only works once its address is verified.</li>
+      <li><strong>Copy the key</strong> from
+        <a href="https://openalex.org/settings/api-key" target="_blank" rel="noopener noreferrer">Settings → API key</a>
+        on openalex.org.</li>
+      <li><strong>Paste it here</strong> and save. Dovetail asks OpenAlex whether it works before
+        keeping it, so a key that was mistyped or never activated is refused on the spot.</li>
+    </ol>
+    <h3>What it changes</h3>
+    <ul>
+      <li><strong>A budget of your own:</strong> $1 a day, which is
+        {{ '{:,}'.format(own_budget) }} credits, against the 1,000 a request with no key gets — and
+        that anonymous allowance is shared by everything coming from the same address.</li>
+      <li><strong>The sweep works.</strong> Looking for new candidate journals pages through
+        OpenAlex with a cursor, and OpenAlex refuses that without a key.</li>
+      <li><strong>What a consultation costs:</strong> 100 credits to classify the manuscript, up to
+        about 40 for the sweep, and one per reference when you paste a reference list. The form
+        shows the figure before you press the button.</li>
+    </ul>
+    <p class="muted small">The budget resets at midnight UTC. The key is stored encrypted and is
+    never shown again, here or to whoever runs the server; you can revoke it at any time from the
+    same page on openalex.org. Source:
+    <a href="https://help.openalex.org/api/authentication/" target="_blank" rel="noopener noreferrer">OpenAlex — Authentication</a>,
+    read on 20 Nov 2026.</p>
+    <form method="dialog" class="btnrow" style="justify-content:flex-end">
+      <button class="btn" type="submit" autofocus>Close</button>
+    </form>
+  </div>
+</dialog>
+<script>
+// A click on the backdrop closes the dialog; a click inside it does not.
+document.getElementById('openalex-help').addEventListener('click', function (e) {
+  if (e.target === this) this.close();
+});
+</script>
+
+{# ---- Anthropic ---------------------------------------------------------- #}
+
+{% if saved == '1' %}<div class="flash ok"><strong>Anthropic key stored.</strong> It is encrypted,
+and no screen will show it again — not to you and not to whoever runs the server.</div>
 {% elif saved == 'workspace' %}<div class="flash ok">Workspace id saved. The stored key was left
 alone — you normally find out you need one after a call has already been refused.</div>
-{% elif saved == 'cleared' %}<div class="flash">Key removed. Genre judgements will be offered again
-once there is one.</div>{% endif %}
+{% elif saved == 'cleared' %}<div class="flash">Anthropic key removed. The two model-backed steps
+will be offered again once there is one.</div>{% endif %}
 
 <div class="card">
   <h2>Anthropic API key</h2>
-  <p class="muted">Stage 5a asks a model whether a journal publishes work of the same
-  <em>kind</em> as your manuscript — form and method, not subject. That call costs money, and it is
-  charged to whoever's key runs it.</p>
+  <p class="muted">Two steps ask a model, and each is charged to whoever's key runs it:</p>
+  <ul class="muted" style="margin-top:0">
+    <li><strong>Reading the finalists</strong> — whether a journal publishes work of the same
+      <em>kind</em> as your manuscript: form and method, not subject
+      (<code>{{ model }}</code>, about a cent a journal).</li>
+    <li><strong>Reading author guidelines</strong> — a journal's article types and word limits,
+      each number checked against the page before it is filed for approval
+      (<code>{{ guidelines_model }}</code>, a fraction of a cent a page).</li>
+  </ul>
 
-  {% if not crypto_ready %}
-  <div class="flash err" style="margin-bottom:0"><strong>This instance cannot store a key.</strong>
-  <code>FERNET_KEY</code> is not set, so there is nowhere to keep one encrypted — and keeping one any
-  other way is not on offer. Stage 5a is unavailable until an operator sets it.</div>
-  {% else %}
+  {% if crypto_ready %}
   <form method="post" action="/app/settings/anthropic-key">
     <label>Key
       <input name="anthropic_key" type="password" autocomplete="off"
@@ -44,13 +151,12 @@ once there is one.</div>{% endif %}
   {% endif %}
 </div>
 
-<p class="note"><strong>Per person, not per machine.</strong> A judgement bills the account of
-whoever started it, and this server holds no model credential of its own — the same question left
-open for <code>venue_history</code>, settled the other way here because there is a place to put the
-key. Encrypted with Fernet, decrypted in memory when a judgement runs, and never written to a log.</p>
-<p class="note">Removing it is emptying the field and saving. Nothing else on this instance uses it,
-and everything through stage 4 — the sweep, the scores, the constraints, the criteria — works with
-no key at all.</p>
-<p class="note">The model is <code>{{ model }}</code>, and it is recorded on every verdict it
-writes. A judgement read back a year from now should say what produced it.</p>
+<p class="note"><strong>Per person, not per machine.</strong> A model call bills the account of
+whoever started it, and this server holds no model credential of its own. The same goes for an
+OpenAlex key stored here: it pays for your consultations and nobody else's. Both are encrypted with
+Fernet, decrypted in memory when they are used, and never written to a log.</p>
+<p class="note">Removing a key is emptying its field and saving. Everything through stage 4 — the
+sweep, the scores, the constraints, the criteria — works with no Anthropic key at all.</p>
+<p class="note">The model is recorded on every verdict and every proposal it writes. Something read
+back a year from now should say what produced it.</p>
 {% endblock %}

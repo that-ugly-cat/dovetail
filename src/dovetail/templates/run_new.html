@@ -2,7 +2,15 @@
 {% block body %}
 <h1>New consultation</h1>
 <p class="sub">Title, abstract and word count in; a list of candidate journals out. This is the one
-screen that spends the shared OpenAlex budget, which is why it needs an admin.</p>
+screen that spends an OpenAlex budget —
+{% if estimate.own_key %}<strong>your own key's</strong>{% else %}<strong>the one this instance
+shares</strong>, unless you <a href="/app/settings">store a key of your own</a>{% endif %} — which is
+why it needs an admin.</p>
+{% if not estimate.keyed %}
+<div class="flash"><strong>No OpenAlex key is in use, so the sweep cannot run.</strong> OpenAlex
+refuses cursor paging to a request without one. <a href="/app/settings">Store your own key</a> — it
+is free — or untick the sweep below.</div>
+{% endif %}
 
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
@@ -21,7 +29,7 @@ screen that spends the shared OpenAlex budget, which is why it needs an admin.</
         they lead to; at most {{ estimate.max_references }} DOIs are read</span></td>
         <td class="n">up to {{ estimate.total_with_max_references }}</td></tr>
     {% endif %}
-    <tr><td class="muted">Left today</td>
+    <tr><td class="muted">Left today{% if estimate.own_key %} on your own key{% endif %}</td>
         <td class="n {{ 'err' if not estimate.affordable }}">{{ '{:,}'.format(estimate.remaining) }} of {{ '{:,}'.format(estimate.budget) }}</td></tr>
     </tbody>
   </table></div>

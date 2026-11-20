@@ -56,12 +56,21 @@ uv run dovetail seed            # resolve PaperTrail's venues, file alias propos
 uv run dovetail proposals       # the queue: nothing becomes an alias without approval
 uv run dovetail match --title "..." --abstract-file abstract.txt --funder snsf
 uv run dovetail match --title "..." --abstract-file abstract.txt --references-file refs.txt
-uv run pytest                   # 175 tests
+uv run pytest                   # 194 tests
 ```
 
 The topic sweep pages through OpenAlex with a cursor, and **anonymous cursor paging answers 401**:
 without `OPENALEX_API_KEY` in `.env`, run `match` with `--no-discover`. The reference list works
-either way.
+either way. In the web app and over MCP a sweep with no key anywhere is refused before it spends
+anything, with the place to get one.
+
+### Whose OpenAlex budget
+
+Each person can store **their own OpenAlex key** at `/app/settings` (the «?» there says how to get
+one: it is free). Their consultations then spend that key's daily budget of 10,000 credits, on a
+ledger of their own, and not the budget everybody on the instance shares. The key is tried against
+OpenAlex before it is kept, stored encrypted, and never shown again. `OPENALEX_API_KEY` in `.env`
+stays what everyone without a key of their own falls back to.
 
 A text profile can be reused with `--profile file.json`, which skips stage 1 and its hundred
 credits; `import-source` loads an already downloaded `/sources` response, so you can work without
@@ -161,7 +170,8 @@ reproducible cannot order a list that has to be explainable.
 
 It needs your own Anthropic key, stored encrypted per user at `/app/settings`, because that call is
 charged to a person rather than to a shared budget. Set `FERNET_KEY` on the server to enable it;
-without one the feature is off and everything through stage 4 works unchanged.
+without one the feature is off and everything through stage 4 works unchanged. The same key pays
+for stage 5b, and the same `FERNET_KEY` is what lets a personal OpenAlex key be stored.
 
 ```bash
 uv run dovetail judge-venues --run-id 3 --issn 1472-6939 --as-user you@example.org

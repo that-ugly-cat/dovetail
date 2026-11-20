@@ -448,6 +448,11 @@ class User(Base):
     # would make it unreadable exactly when somebody is working out why their key
     # is being refused.
     anthropic_workspace_id: Mapped[str | None] = mapped_column(String(128))
+    # This person's own OpenAlex key, Fernet-encrypted like the one above. With
+    # it their consultations spend their own daily budget and not the one every
+    # user of the instance shares — and the topic sweep, which pages with a
+    # cursor, works on an instance that has no key of its own.
+    openalex_key_encrypted: Mapped[str | None] = mapped_column(Text)
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.READER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

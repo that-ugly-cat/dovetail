@@ -50,7 +50,7 @@ bigger numbers.
   <div class="stat">
     <div class="n {% if budget.classifications < 1 %}err{% endif %}">{{ budget.classifications }}</div>
     <div class="lbl">classifications left today</div>
-    <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits</div>
+    <div class="foot">{{ '{:,}'.format(budget.remaining) }} of {{ '{:,}'.format(budget.total) }} credits{% if budget.own_key %}, on your own key{% endif %}</div>
   </div>
   <div class="stat">
     <div class="n">{{ '{:,}'.format(budget.spent) }}</div>
@@ -60,8 +60,10 @@ bigger numbers.
 </div>
 
 {% if not budget.keyed %}
-<div class="flash">No OpenAlex API key is set, so this instance runs on the anonymous budget — a tenth
-of what a free account gets. The key has to be created by hand; the tool does not register accounts.</div>
+<div class="flash">No OpenAlex key is in use, so this runs on the anonymous budget — a tenth of what
+a free account gets — and the sweep for new candidates cannot run at all, because OpenAlex refuses
+cursor paging without a key. <a href="/app/settings">Store your own in Settings</a>: it is free, and
+the page says how to get one.</div>
 {% endif %}
 
 <div class="head"><h2>Recent consultations</h2>

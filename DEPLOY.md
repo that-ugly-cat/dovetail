@@ -186,6 +186,12 @@ key that belongs to a person rather than to the server.
 Losing `FERNET_KEY` means every stored key becomes unreadable and has to be
 entered again. Nothing else breaks: stages 1 to 4 never touch it.
 
+**The same `FERNET_KEY` protects people's own OpenAlex keys**, stored on the same
+page. A person who has one spends their own daily budget and not the instance's;
+a stored OpenAlex key that can no longer be decrypted falls back to
+`OPENALEX_API_KEY` without an error, so after a rotation the symptom is the
+shared budget draining again, not a failure.
+
 **Not every Anthropic key is the same kind of thing.** A key scoped to «all
 workspaces» is *identity-linked* and refuses every call — including one that
 asks the model to say "ok" — until the request names a workspace, which the SDK

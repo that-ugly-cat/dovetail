@@ -42,7 +42,7 @@ from .models import (
     Venue,
 )
 from .sources.doaj import DoajClient
-from .sources.openalex import OpenAlexClient, OpenAlexError
+from .sources.openalex import OpenAlexClient, OpenAlexError, client_for, ledger_for
 
 server = MCPServer(
     "dovetail",
@@ -149,15 +149,38 @@ def budget_status() -> dict:
     """
     db.init_engine()
     with db.session_scope() as s:
-        spent, remaining = db.credits_spent(s), db.credits_remaining(s)
+        ledger = ledger_for(_caller_user(s))
+        spent, remaining = db.credits_spent(s, ledger), db.credits_remaining(s, ledger)
+    own = ledger != db.SHARED_LEDGER
     return {
-        "daily_budget": config.daily_budget(),
+        "daily_budget": db.budget_of(ledger),
         "spent": spent,
         "remaining": remaining,
         "classifications_left": remaining // config.COST_TEXT,
-        "has_api_key": bool(config.openalex_api_key()),
-        "note": "resets at midnight UTC; a free account key multiplies the budget by ten",
+        # Whose till. A caller who stored their own OpenAlex key in the web
+        # app's Settings spends that key's budget; everybody else shares one.
+        "spending_from": "your own OpenAlex key" if own else "the instance's shared budget",
+        "has_api_key": own or bool(config.openalex_api_key()),
+        "note": (
+            "resets at midnight UTC. Without any key the sweep cannot run: "
+            "OpenAlex refuses cursor paging. A free key is stored per person in "
+            "the web app, under Settings"
+        ),
     }
+
+
+def _caller_user(s):
+    """The caller as a row of this session, or None over stdio.
+
+    `caller` holds a detached copy made by the HTTP layer; the key is read from
+    a fresh row so that one stored a minute ago is the one that gets used.
+    """
+    who = caller.get()
+    return s.get(User, who.id) if who is not None else None
+
+
+def _callers_openalex(s) -> OpenAlexClient:
+    return client_for(_caller_user(s))
 
 
 @server.tool()
@@ -649,7 +672,7 @@ def judge_finalists(run_id: int) -> dict:
 
         try:
             verdicts, failures = genre.read_finalists(
-                s, client, OpenAlexClient(), run, results
+                s, client, _callers_openalex(s), run, results
             )
         except APIError as e:
             # Three different fixes, and they used to be one class name: a key
@@ -733,9 +756,20 @@ def match_venues(
     with db.session_scope() as s:
         constraints = {k: v for k, v in {"funder": funder, "max_apc": max_apc}.items() if v}
         try:
+            openalex = _callers_openalex(s)
+            if discover and not openalex.keyed:
+                return {
+                    "error": "no_openalex_key",
+                    "detail": (
+                        "the sweep pages through OpenAlex with a cursor, which is "
+                        "refused without a key, and neither you nor the instance "
+                        "has one. Store a free key in the web app under Settings, "
+                        "or pass discover=False."
+                    ),
+                }
             out = run_match_full(
                 s,
-                OpenAlexClient(),
+                openalex,
                 title,
                 abstract,
                 word_count,

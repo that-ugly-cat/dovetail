@@ -70,6 +70,26 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+# The ledger the instance's own credential spends from. A person who has stored
+# their own OpenAlex key spends from a ledger of their own, named after them:
+# OpenAlex counts each key's budget separately, so one counter for everybody
+# would refuse a run that the key paying for it can perfectly well afford — or
+# let the shared key be charged for it in the books and not in fact.
+SHARED_LEDGER = "openalex"
+
+
+def user_ledger(user_id: int) -> str:
+    return f"{SHARED_LEDGER}:u{user_id}"
+
+
+def budget_of(provider: str = SHARED_LEDGER) -> int:
+    """What one day is worth on this ledger. A personal key is by definition a
+    key, so its ledger is never the anonymous allowance."""
+    if provider == SHARED_LEDGER:
+        return config.daily_budget()
+    return config.BUDGET_WITH_KEY
+
+
 def credits_spent(s: Session, provider: str = "openalex") -> int:
     row = s.scalar(
         select(BudgetLedger).where(
@@ -80,7 +100,7 @@ def credits_spent(s: Session, provider: str = "openalex") -> int:
 
 
 def credits_remaining(s: Session, provider: str = "openalex") -> int:
-    return max(0, config.daily_budget() - credits_spent(s, provider))
+    return max(0, budget_of(provider) - credits_spent(s, provider))
 
 
 def spend(s: Session, credits: int, provider: str = "openalex") -> None:
@@ -92,12 +112,18 @@ def spend(s: Session, credits: int, provider: str = "openalex") -> None:
     """
     remaining = credits_remaining(s, provider)
     if credits > remaining:
+        if provider != SHARED_LEDGER:
+            raise BudgetExhausted(
+                f"need {credits} credits, {remaining} left of {budget_of(provider)} "
+                f"on your own OpenAlex key for today. The budget resets at "
+                f"midnight UTC."
+            )
         raise BudgetExhausted(
             f"need {credits} credits, {remaining} left of {config.daily_budget()} "
             f"for today. The budget resets at midnight UTC. With no key the "
             f"account is anonymous and worth {config.BUDGET_ANONYMOUS} credits: "
-            f"setting OPENALEX_API_KEY with a free account raises it to "
-            f"{config.BUDGET_WITH_KEY}."
+            f"a free OpenAlex key — your own in Settings, or OPENALEX_API_KEY on "
+            f"the instance — raises it to {config.BUDGET_WITH_KEY}."
         )
     row = s.scalar(
         select(BudgetLedger).where(
@@ -128,5 +154,5 @@ def mark_exhausted(s: Session, provider: str = "openalex") -> None:
     if row is None:
         row = BudgetLedger(day=_today_utc(), provider=provider, credits_used=0, calls=0)
         s.add(row)
-    row.credits_used = max(row.credits_used, config.daily_budget())
+    row.credits_used = max(row.credits_used, budget_of(provider))
     s.flush()

@@ -369,13 +369,7 @@ def dashboard(request: Request, user: User = Depends(current_user),
                 Proposal.status == ProposalStatus.PENDING
             )
         ),
-        budget={
-            "total": config.daily_budget(),
-            "spent": db.credits_spent(s),
-            "remaining": db.credits_remaining(s),
-            "classifications": db.credits_remaining(s) // config.COST_TEXT,
-            "keyed": bool(config.openalex_api_key()),
-        },
+        budget=_budget_view(s, user),
         recent=runs,
         result_counts=result_counts,
     )
@@ -577,7 +571,8 @@ def profile_venue_form(request: Request, venue_id: int, user: User = Depends(req
                 venue=venue, form={}, error=None, report=None,
                 per_article=config.COST_TEXT,
                 min_words=config.MIN_ABSTRACT_WORDS,
-                remaining=db.credits_remaining(s), budget=config.daily_budget())
+                remaining=_budget_view(s, user)["remaining"],
+                budget=_budget_view(s, user)["total"])
 
 
 @app.post("/app/venues/{venue_id}/profile")
@@ -596,7 +591,7 @@ def profile_venue(
     long a SQLite write session is held while other pages read.
     """
     from .matching.pipeline import Refusal, guard_rail
-    from .sources.openalex import OpenAlexClient, OpenAlexError, RemoteBudgetExhausted
+    from .sources.openalex import OpenAlexError, RemoteBudgetExhausted, client_for
     from . import manual
 
     venue = s.get(Venue, venue_id)
@@ -608,7 +603,8 @@ def profile_venue(
                     venue=venue, form={"articles": articles}, error=error, report=report,
                     per_article=config.COST_TEXT,
                     min_words=config.MIN_ABSTRACT_WORDS,
-                    remaining=db.credits_remaining(s), budget=config.daily_budget())
+                    remaining=_budget_view(s, user)["remaining"],
+                    budget=_budget_view(s, user)["total"])
 
     parsed = parse_articles(articles)
     if not parsed:
@@ -625,16 +621,17 @@ def profile_venue(
             return render(f"Article {i} («{art['title'][:60]}»): {e}")
 
     cost = len(parsed) * config.COST_TEXT
-    remaining = db.credits_remaining(s)
+    view = _budget_view(s, user)
+    remaining = view["remaining"]
     if cost > remaining:
         return render(
             f"Not enough budget: {len(parsed)} articles cost {cost} credits and "
-            f"{remaining} are left of {config.daily_budget()} for today. It resets "
+            f"{remaining} are left of {view['total']} for today. It resets "
             f"at midnight UTC."
         )
 
     try:
-        report = manual.profile_from_texts(s, OpenAlexClient(), venue, parsed)
+        report = manual.profile_from_texts(s, client_for(user), venue, parsed)
     except (db.BudgetExhausted, RemoteBudgetExhausted) as e:
         return render(f"Budget: {e}")
     except OpenAlexError as e:
@@ -688,7 +685,29 @@ def runs(request: Request, user: User = Depends(current_user), s: Session = Depe
     return page(request, "runs.html", user, s, nav="runs", runs=rows, counts=counts)
 
 
-def estimate_run(s: Session, discover: bool, references: int = 0) -> dict:
+def _budget_view(s: Session, user: User) -> dict:
+    """Today's OpenAlex budget as this person sees it: their own key's if they
+    stored one, the instance's otherwise. The two are different tills, and a
+    page that showed the shared one to somebody spending their own would be
+    showing them a number that does not apply to them."""
+    from .sources.openalex import ledger_for
+
+    ledger = ledger_for(user)
+    remaining = db.credits_remaining(s, ledger)
+    own = ledger != db.SHARED_LEDGER
+    return {
+        "total": db.budget_of(ledger),
+        "spent": db.credits_spent(s, ledger),
+        "remaining": remaining,
+        "classifications": remaining // config.COST_TEXT,
+        "own_key": own,
+        "keyed": own or bool(config.openalex_api_key()),
+        "ledger": ledger,
+    }
+
+
+def estimate_run(s: Session, discover: bool, references: int = 0,
+                 user: User | None = None) -> dict:
     """What a consultation will cost, before it is started. Free, and no calls.
 
     The house rule for a tool that spends: next to the thing that spends there
@@ -705,8 +724,15 @@ def estimate_run(s: Session, discover: bool, references: int = 0) -> dict:
 
     terms = cost_terms(discover, references)
     total = sum(t["credits"] for t in terms)
-    remaining = db.credits_remaining(s)
+    view = _budget_view(s, user) if user is not None else None
+    remaining = view["remaining"] if view else db.credits_remaining(s)
     return {
+        # Whose till this run spends from, and whether any key travels with it.
+        # The sweep pages with a cursor, and OpenAlex refuses that to a request
+        # with no key: found on 20 Nov 2026 by a run that spent its
+        # classification and then failed on the first page.
+        "own_key": bool(view and view["own_key"]),
+        "keyed": view["keyed"] if view else bool(config.openalex_api_key()),
         "terms": terms,
         "total": total,
         # The reference list is pasted into the same form the estimate is
@@ -716,7 +742,7 @@ def estimate_run(s: Session, discover: bool, references: int = 0) -> dict:
         "max_references": config.MAX_REFERENCES,
         "total_with_max_references": cost_ceiling(discover, config.MAX_REFERENCES),
         "remaining": remaining,
-        "budget": config.daily_budget(),
+        "budget": view["total"] if view else config.daily_budget(),
         # A ceiling and not a bill: the sweep stops when the pool runs out, and
         # the recovery batches only happen if the grouping found something the
         # first mechanism missed. Stage 1 is the call that cannot be skipped, so
@@ -735,11 +761,12 @@ def new_run_form(request: Request, user: User = Depends(require_admin),
     # "new" would be handed to a path parameter typed `int` and answered with
     # a 422 that mentions parsing.
     return page(request, "run_new.html", user, s, nav="runs",
-                estimate=estimate_run(s, discover=True),
+                estimate=estimate_run(s, discover=True, user=user),
                 min_words=config.MIN_ABSTRACT_WORDS, form={}, error=None)
 
 
-def _execute_run(run_id: int, discover: bool, use_doaj: bool) -> None:
+def _execute_run(run_id: int, discover: bool, use_doaj: bool,
+                 user_id: int | None = None) -> None:
     """The sweep, off the request.
 
     A hundred-odd calls take the better part of a minute, which is too long to
@@ -755,21 +782,25 @@ def _execute_run(run_id: int, discover: bool, use_doaj: bool) -> None:
     from .sources.doaj import DoajClient
     from .sources.openalex import (
         EndpointBroken,
-        OpenAlexClient,
         OpenAlexError,
         RemoteBudgetExhausted,
+        client_for,
     )
 
     with db.session_scope() as s:
         run = s.get(MatchRun, run_id)
         if run is None:  # pragma: no cover - only if the row was deleted meanwhile
             return
+        # The run spends from the till of whoever started it. Looked up again
+        # here and not passed in as a key: this runs after the request is gone,
+        # and a decrypted credential should not sit in a task queue meanwhile.
+        starter = s.get(User, user_id) if user_id is not None else None
         constraints = {k: v for k, v in (run.constraints or {}).items()
                        if not k.startswith("_")}
         try:
             run_match(
                 s,
-                OpenAlexClient(),
+                client_for(starter),
                 run.title,
                 run.abstract,
                 run.word_count,
@@ -821,7 +852,7 @@ def new_run(
 
     def refuse(msg: str):
         return page(request, "run_new.html", user, s, nav="runs",
-                    estimate=estimate_run(s, discover_on, len(dois)),
+                    estimate=estimate_run(s, discover_on, len(dois), user),
                     min_words=config.MIN_ABSTRACT_WORDS, form=form, error=msg)
 
     # Both checks are free and both are done *before* anything is written. The
@@ -833,7 +864,14 @@ def new_run(
         guard_rail(abstract)
     except Refusal as e:
         return refuse(str(e))
-    est = estimate_run(s, discover_on, len(dois))
+    est = estimate_run(s, discover_on, len(dois), user)
+    if discover_on and not est["keyed"]:
+        return refuse(
+            "The sweep needs an OpenAlex key and there is none: OpenAlex refuses "
+            "cursor paging to a request without one, so the run would spend its "
+            "classification and then stop at the first page. Store your own key "
+            "in Settings — it is free — or untick the sweep."
+        )
     if not est["affordable"]:
         return refuse(
             f"Not enough budget: classifying costs {est['classify']} credits and "
@@ -879,7 +917,7 @@ def new_run(
     # its own session and has to be able to find the row.
     s.commit()
 
-    background.add_task(_execute_run, run_id, discover_on, doaj_on)
+    background.add_task(_execute_run, run_id, discover_on, doaj_on, user.id)
     return RedirectResponse(f"/app/runs/{run_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -963,7 +1001,7 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
 
     from . import crypto
     from .matching import genre
-    from .sources.openalex import OpenAlexClient, OpenAlexError
+    from .sources.openalex import OpenAlexError, client_for
 
     run = s.get(MatchRun, run_id)
     if run is None:
@@ -992,7 +1030,7 @@ def read_finalists(run_id: int, user: User = Depends(require_admin),
     )
     try:
         verdicts, failures = genre.read_finalists(
-            s, client, OpenAlexClient(), run, results
+            s, client, client_for(user), run, results
         )
     except APIError as e:
         # The whole pass died rather than one journal, and *which* whole-pass
@@ -1024,12 +1062,69 @@ def settings(request: Request, user: User = Depends(current_user),
     from . import crypto
     from .matching import genre
 
+    from .matching import guidelines
+
     return page(request, "settings.html", user, s, nav="settings",
                 crypto_ready=crypto.available(),
                 has_key=bool(user.anthropic_key_encrypted),
                 workspace_id=user.anthropic_workspace_id or "",
                 model=genre.MODEL,
-                saved=request.query_params.get("saved"))
+                guidelines_model=guidelines.MODEL,
+                saved=request.query_params.get("saved"),
+                has_openalex_key=bool(user.openalex_key_encrypted),
+                openalex=request.query_params.get("openalex"),
+                budget=_budget_view(s, user),
+                shared_budget=db.budget_of(db.SHARED_LEDGER),
+                own_budget=config.BUDGET_WITH_KEY,
+                instance_keyed=bool(config.openalex_api_key()))
+
+
+@app.post("/app/settings/openalex-key")
+def save_openalex_key(openalex_key: str = Form(""),
+                      user: User = Depends(current_user),
+                      s: Session = Depends(get_db)):
+    """Store, or clear, this user's own OpenAlex key.
+
+    `current_user`, for the reason the Anthropic key is: it is theirs. A reader
+    cannot start a consultation, so a reader's key is spent by nothing until
+    somebody makes them an admin, and storing it early costs nobody anything.
+
+    **The key is tried against OpenAlex before it is kept.** A key that was
+    issued and never activated looks exactly like one that works, and finding
+    out at the first consultation means finding out after the classification
+    was charged to the shared budget instead. Saving an empty field removes it.
+
+    The outcome travels as a code and the page picks the sentence. The key
+    itself goes nowhere but the encrypted column: not into the redirect, not
+    into a log, and not back onto the page.
+    """
+    from . import crypto
+    from .sources.openalex import KeyRejected, verify_key
+
+    if not crypto.available():
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "FERNET_KEY is not set on this instance, so a key cannot be stored "
+            "encrypted — and storing one any other way is not on offer.",
+        )
+    key = openalex_key.strip()
+    if not key:
+        user.openalex_key_encrypted = None
+        s.flush()
+        outcome = "cleared"
+    else:
+        try:
+            verify_key(key)
+        except KeyRejected as e:
+            # Nothing is stored and whatever was there before is left alone: a
+            # typo while replacing a working key must not cost the working key.
+            outcome = e.code
+        else:
+            user.openalex_key_encrypted = crypto.encrypt_api_key(key)
+            s.flush()
+            outcome = "stored"
+    return RedirectResponse(f"/app/settings?openalex={outcome}",
+                            status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/app/settings/anthropic-key")

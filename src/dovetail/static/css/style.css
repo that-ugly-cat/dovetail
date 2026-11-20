@@ -39,6 +39,7 @@
   --on-primary: #fff;
   --warn-border: #4a3a1a;
   --warn-text: #e8d5b0;
+  --scrim: rgba(0, 0, 0, .62);  /* behind a dialog */
   --radius: 10px;
 }
 
@@ -67,6 +68,7 @@
   --on-primary: #ffffff;
   --warn-border: #e8d5a8;
   --warn-text: #6b4a12;  /* flash text on --warn-bg */
+  --scrim: rgba(26, 32, 44, .48);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -319,3 +321,27 @@ form.searchbar input.q { min-width: 260px; flex: 1; }
 }
 .verdict.fits { border-left: 3px solid var(--ok); }
 .verdict.misfits { border-left: 3px solid var(--warn); }
+
+/* A round "?" beside a heading, and the dialog it opens. The dialog is the
+   native element: focus is trapped and Escape closes it without a line of
+   script, which is the part hand-rolled modals get wrong. */
+.help {
+  width: 22px; height: 22px; padding: 0; margin-left: 8px; vertical-align: middle;
+  border-radius: 50%; border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; line-height: 1;
+  cursor: pointer;
+}
+.help:hover, .help:focus-visible { color: var(--text); border-color: var(--accent); }
+dialog.modal {
+  width: calc(100% - 32px); max-width: 580px; max-height: calc(100% - 48px); padding: 0;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+dialog.modal::backdrop { background: var(--scrim); }
+.modal-body { padding: 20px 22px; }
+.modal-body h2 { margin: 0 0 10px; }
+.modal-body h3 { font-size: 14px; margin: 18px 0 6px; }
+.modal-body ol, .modal-body ul { margin: 0; padding-left: 20px; }
+.modal-body li { margin: 6px 0; }
+/* --muted-2 on --card is 4.19:1 in dark, under the line for small text. */
+.modal-body .muted { color: var(--muted); }

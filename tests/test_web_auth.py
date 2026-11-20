@@ -340,6 +340,9 @@ def test_a_run_started_from_the_web_is_never_left_saying_running(client, monkeyp
         raise RuntimeError("the network fell over")
 
     monkeypatch.setattr("dovetail.matching.pipeline.run_match", explode)
+    # A sweep with no key anywhere is refused before it starts (see
+    # test_openalex_key.py), so this run is given the instance's.
+    monkeypatch.setenv("OPENALEX_API_KEY", "instance-key")
     r = client.post(
         "/app/runs/new",
         data={"title": "T", "abstract": "word " * 100, "discover": "on"},
