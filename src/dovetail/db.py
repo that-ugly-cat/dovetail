@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import config
@@ -26,8 +26,41 @@ def init_engine(path: Path | None = None):
     else:
         url = "sqlite://"
     _engine = create_engine(url, future=True)
+    event.listen(_engine, "connect", _pragmas)
     _Session = sessionmaker(bind=_engine, future=True, expire_on_commit=False)
     return _engine
+
+
+# How long a connection waits for another one's write before giving up. The
+# default is five seconds, which is shorter than a single page of a sweep.
+BUSY_TIMEOUT_MS = 30_000
+
+
+def _pragmas(dbapi_connection, _record) -> None:
+    """Set on every connection, because two of the three are per connection.
+
+    **WAL**, so that a reader never waits for a writer. In the default journal
+    mode a writer that has outgrown its page cache takes the file exclusively
+    and keeps it until it commits, and a consultation is a write transaction
+    that upserts thousands of journals: on 20 Nov 2026 the page showing a run in
+    progress answered 500 with `database is locked`, raised by the query that
+    looks up who is asking. The mode is stored in the file, so setting it again
+    is a no-op; it is set here rather than once because a database restored
+    from a dump comes back in the default mode.
+
+    **busy_timeout**, so that a second *writer* waits its turn instead of
+    failing at once. WAL does not change that there is one writer at a time.
+
+    **synchronous=NORMAL** is what WAL is meant to run with: a power cut can
+    lose the last transaction, never corrupt the file.
+    """
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+    finally:
+        cursor.close()
 
 
 def create_all(path: Path | None = None):

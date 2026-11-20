@@ -795,12 +795,17 @@ def _execute_run(run_id: int, discover: bool, use_doaj: bool,
         # here and not passed in as a key: this runs after the request is gone,
         # and a decrypted credential should not sit in a task queue meanwhile.
         starter = s.get(User, user_id) if user_id is not None else None
+        openalex = client_for(starter)
+        # Let go of the database after every call the run pays for. Otherwise
+        # this is one write transaction as long as the run, and anything else
+        # that has to write waits for all of it.
+        openalex.commit_each_call = True
         constraints = {k: v for k, v in (run.constraints or {}).items()
                        if not k.startswith("_")}
         try:
             run_match(
                 s,
-                client_for(starter),
+                openalex,
                 run.title,
                 run.abstract,
                 run.word_count,

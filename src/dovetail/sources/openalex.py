@@ -61,6 +61,18 @@ class OpenAlexClient:
         self._client = client or httpx.Client(timeout=30.0)
         self._api_key = (api_key or "").strip() or None
         self.ledger = ledger
+        # Commit after every charge. Off by default, because it commits whatever
+        # else the session holds and most callers are inside a unit of work they
+        # mean to keep whole. A run started from the web turns it on: its row is
+        # already committed as `running`, so nothing half-done can be mistaken
+        # for a result, and without it the write lock taken by the first charge
+        # is held through every network call that follows.
+        self.commit_each_call = False
+
+    def _charge(self, session: Session, credits: int) -> None:
+        spend(session, credits, self.ledger)
+        if self.commit_each_call:
+            session.commit()
 
     @property
     def keyed(self) -> bool:
@@ -145,27 +157,27 @@ class OpenAlexClient:
         dropped, under a key of ours, so the run can record it.
         """
         title, abstract, dropped = fit_text(title, abstract)
-        spend(session, config.COST_TEXT, self.ledger)
+        self._charge(session, config.COST_TEXT)
         payload = self._post(session, "/text/topics", {"title": title, "abstract": abstract})
         payload["_dovetail_chars_dropped"] = dropped
         return payload
 
     def source_by_issn(self, session: Session, issn: str) -> dict:
-        spend(session, config.COST_SOURCES, self.ledger)
+        self._charge(session, config.COST_SOURCES)
         return self._call(session, f"/sources/issn:{issn}", {})
 
     def search_sources(self, session: Session, query: str, per_page: int = 5) -> dict:
         """Lexical search over journal names. Used to resolve PaperTrail's free
         strings, and like any lexical search **a miss means "not with these
         words"**, never "does not exist"."""
-        spend(session, config.COST_SOURCES, self.ledger)
+        self._charge(session, config.COST_SOURCES)
         return self._call(
             session, "/sources", {"search": query, "filter": "type:journal", "per-page": per_page}
         )
 
     def work_by_doi(self, session: Session, doi: str) -> dict:
         """One published work, to validate against its real venue."""
-        spend(session, config.COST_SOURCES, self.ledger)
+        self._charge(session, config.COST_SOURCES)
         return self._call(session, f"/works/doi:{doi}", {})
 
     def journals_publishing_on(
@@ -192,7 +204,7 @@ class OpenAlexClient:
         """
         if not topic_ids:
             return []
-        spend(session, config.COST_WORKS, self.ledger)
+        self._charge(session, config.COST_WORKS)
         payload = self._call(
             session,
             "/works",
@@ -222,7 +234,7 @@ class OpenAlexClient:
         Titles and years only. The judgement does not need abstracts, and asking
         for them would multiply the payload for nothing.
         """
-        spend(session, config.COST_WORKS, self.ledger)
+        self._charge(session, config.COST_WORKS)
         payload = self._call(
             session,
             "/works",
@@ -253,7 +265,7 @@ class OpenAlexClient:
         out: list[dict] = []
         for start in range(0, len(dois), 40):
             batch = dois[start : start + 40]
-            spend(session, config.COST_WORKS_FILTER, self.ledger)
+            self._charge(session, config.COST_WORKS_FILTER)
             payload = self._call(
                 session,
                 "/works",
@@ -279,7 +291,7 @@ class OpenAlexClient:
         with one citing work each is cut. That loses breadth at the margin and
         nothing at the top.
         """
-        spend(session, config.COST_WORKS_FILTER, self.ledger)
+        self._charge(session, config.COST_WORKS_FILTER)
         payload = self._call(
             session,
             "/works",
@@ -310,7 +322,7 @@ class OpenAlexClient:
             batch = [i for i in ids[start : start + 100] if i]
             if not batch:
                 continue
-            spend(session, config.COST_SOURCES, self.ledger)
+            self._charge(session, config.COST_SOURCES)
             payload = self._call(
                 session,
                 "/sources",
@@ -352,7 +364,7 @@ class OpenAlexClient:
         pages = 0
 
         while cursor and pages < max_pages:
-            spend(session, config.COST_SOURCES, self.ledger)
+            self._charge(session, config.COST_SOURCES)
             payload = self._call(
                 session,
                 "/sources",
